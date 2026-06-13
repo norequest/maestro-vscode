@@ -5,7 +5,7 @@ import type {
   HealthStatus,
 } from "./adapter.js";
 import { EventQueue } from "./event-queue.js";
-import type { AgentEvent, Capabilities, Task, Workspace } from "./types.js";
+import type { AgentEvent, Capabilities, Role, Task, Workspace } from "./types.js";
 
 export interface FakeAdapterOptions {
   id?: string;
@@ -29,6 +29,8 @@ export class FakeEngineAdapter implements EngineAdapter {
   private readonly healthy: boolean;
   /** The most recently started session, for test assertions. */
   lastSession?: FakeSession;
+  /** The role passed to the most recent start(), for test assertions. */
+  lastRole?: Role;
 
   constructor(options: FakeAdapterOptions) {
     this.id = options.id ?? "fake";
@@ -43,9 +45,10 @@ export class FakeEngineAdapter implements EngineAdapter {
     );
   }
 
-  start(_task: Task, _workspace: Workspace): FakeSession {
+  start(_task: Task, _workspace: Workspace, role?: Role): FakeSession {
     const session = new FakeSession(this.script);
     this.lastSession = session;
+    this.lastRole = role;
     void session.run();
     return session;
   }

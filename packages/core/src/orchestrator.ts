@@ -94,7 +94,7 @@ export class Orchestrator {
     this.update(agent, "working");
     let session: AgentSession;
     try {
-      session = adapter.start(agent.task, agent.workspace);
+      session = adapter.start(agent.task, agent.workspace, agent.role);
     } catch (error) {
       this.fail(agent, `Engine failed to start: ${errorMessage(error)}`);
       this.release();

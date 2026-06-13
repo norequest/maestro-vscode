@@ -66,4 +66,34 @@ describe("Orchestrator happy path", () => {
     const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
     expect(() => orch.spawn("Nope", "x")).toThrow("Unknown role: Nope");
   });
+
+  it("passes the role (instructions/model/autonomy) to the engine adapter", async () => {
+    const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
+    orch.registerRole(role);
+    const adapter = new FakeEngineAdapter({
+      script: [{ kind: "done", summary: "ok", diff: { files: [], patch: "" } }],
+    });
+    orch.registerAdapter(adapter);
+
+    const agent = orch.spawn("Implementer", "task");
+    await waitForState(orch, agent.id, "done");
+
+    expect(adapter.lastRole).toEqual(role);
+  });
+
+  it("accepts a done event with no diff", async () => {
+    const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
+    orch.registerRole(role);
+    orch.registerAdapter(
+      new FakeEngineAdapter({ script: [{ kind: "done", summary: "no diff here" }] }),
+    );
+
+    const agent = orch.spawn("Implementer", "task");
+    await waitForState(orch, agent.id, "done");
+
+    const final = orch.getAgent(agent.id)!;
+    expect(final.state).toBe("done");
+    expect(final.summary).toBe("no diff here");
+    expect(final.diff).toBeUndefined();
+  });
 });

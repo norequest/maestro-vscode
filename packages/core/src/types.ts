@@ -47,7 +47,7 @@ export type AgentEvent =
   | { kind: "action"; tool: string; detail: unknown }
   | { kind: "approval"; id: string; detail: unknown }
   | { kind: "status"; state: EngineState }
-  | { kind: "done"; summary: string; diff: Diff }
+  | { kind: "done"; summary: string; diff?: Diff }
   | { kind: "error"; message: string };
 
 /** A reusable worker template. */

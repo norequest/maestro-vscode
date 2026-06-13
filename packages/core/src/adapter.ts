@@ -1,4 +1,4 @@
-import type { AgentEvent, Capabilities, Task, Workspace } from "./types.js";
+import type { AgentEvent, Capabilities, Role, Task, Workspace } from "./types.js";
 
 export type ApprovalDecision = "allow" | "deny";
 
@@ -22,6 +22,6 @@ export interface AgentSession {
 export interface EngineAdapter {
   readonly id: string;
   readonly capabilities: Capabilities;
-  start(task: Task, workspace: Workspace): AgentSession;
+  start(task: Task, workspace: Workspace, role: Role): AgentSession;
   health(): Promise<HealthStatus>;
 }
