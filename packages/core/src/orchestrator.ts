@@ -1,5 +1,6 @@
 import type { AgentSession, ApprovalDecision, EngineAdapter } from "./adapter.js";
 import { Emitter } from "./emitter.js";
+import { isTerminalState } from "./events.js";
 import type {
   Agent,
   AgentEvent,
@@ -10,6 +11,10 @@ import type {
   Task,
 } from "./types.js";
 import type { WorkspaceProvider } from "./workspace.js";
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 export class Orchestrator {
   private readonly agents = new Map<string, Agent>();
@@ -82,12 +87,19 @@ export class Orchestrator {
     try {
       agent.workspace = await this.workspaces.create(agent.id);
     } catch (error) {
-      this.fail(agent, `Workspace creation failed: ${(error as Error).message}`);
+      this.fail(agent, `Workspace creation failed: ${errorMessage(error)}`);
       this.release();
       return;
     }
     this.update(agent, "working");
-    const session = adapter.start(agent.task, agent.workspace);
+    let session: AgentSession;
+    try {
+      session = adapter.start(agent.task, agent.workspace);
+    } catch (error) {
+      this.fail(agent, `Engine failed to start: ${errorMessage(error)}`);
+      this.release();
+      return;
+    }
     this.sessions.set(agent.id, session);
     void this.consume(agent, session);
   }
@@ -107,7 +119,7 @@ export class Orchestrator {
         }
       }
     } catch (error) {
-      this.fail(agent, `Session error: ${(error as Error).message}`);
+      this.fail(agent, `Session error: ${errorMessage(error)}`);
     } finally {
       this.stopping.delete(agent.id);
       this.sessions.delete(agent.id);
@@ -116,6 +128,7 @@ export class Orchestrator {
   }
 
   private applyEvent(agent: Agent, event: AgentEvent): void {
+    if (isTerminalState(agent.state)) return;
     switch (event.kind) {
       case "approval":
         agent.pendingApprovalId = event.id;
