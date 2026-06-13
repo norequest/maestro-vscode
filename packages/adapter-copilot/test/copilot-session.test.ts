@@ -76,4 +76,25 @@ describe("CopilotSession", () => {
     const result = await events;
     expect(result).toEqual([{ kind: "output", text: "starting\n" }]);
   });
+
+  it("swallows output emitted after stop()", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    session.stop();
+    child.out("late output\n"); // arrives after stop -> ignored
+    expect(await events).toEqual([]);
+  });
+
+  it("ignores a stray error after a clean exit", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    child.close(0);
+    child.error(new Error("late")); // guarded by settled -> no second terminal event
+    const result = await events;
+    expect(result).toEqual([{ kind: "done", summary: "Copilot run completed" }]);
+  });
 });

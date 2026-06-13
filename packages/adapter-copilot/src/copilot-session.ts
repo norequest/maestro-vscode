@@ -17,6 +17,7 @@ export class CopilotSession implements AgentSession {
   /** Begin consuming the child's streams. Call once, right after construction. */
   start(): void {
     this.child.stdout.on("data", (chunk) => {
+      if (this.settled) return; // ignore late output after done/error/stop
       const text = cleanOutput(chunk.toString());
       if (text.trim().length === 0) return;
       this.lastText = text;
