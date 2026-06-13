@@ -4,19 +4,21 @@ type Resolver = (result: IteratorResult<AgentEvent>) => void;
 
 /**
  * A single-consumer, push-based async iterable of AgentEvents.
- * Invariant: a pending resolver only exists when the buffer is empty,
- * so push() either hands off to a waiter or buffers, never both.
+ * Single-consumer is enforced: a second concurrent consumer's next() rejects
+ * rather than hanging. Invariant: at most one pending resolver, and it only
+ * exists when the buffer is empty.
  */
 export class EventQueue implements AsyncIterable<AgentEvent> {
   private readonly buffer: AgentEvent[] = [];
-  private readonly resolvers: Resolver[] = [];
+  private resolver: Resolver | null = null;
   private ended = false;
 
   push(event: AgentEvent): void {
     if (this.ended) return;
-    const resolver = this.resolvers.shift();
-    if (resolver) {
-      resolver({ value: event, done: false });
+    if (this.resolver) {
+      const resolve = this.resolver;
+      this.resolver = null;
+      resolve({ value: event, done: false });
     } else {
       this.buffer.push(event);
     }
@@ -25,24 +27,29 @@ export class EventQueue implements AsyncIterable<AgentEvent> {
   end(): void {
     if (this.ended) return;
     this.ended = true;
-    let resolver: Resolver | undefined;
-    while ((resolver = this.resolvers.shift())) {
-      resolver({ value: undefined as never, done: true });
+    if (this.resolver) {
+      const resolve = this.resolver;
+      this.resolver = null;
+      resolve({ value: undefined as never, done: true });
     }
   }
 
   [Symbol.asyncIterator](): AsyncIterator<AgentEvent> {
     return {
       next: (): Promise<IteratorResult<AgentEvent>> => {
-        const buffered = this.buffer.shift();
-        if (buffered !== undefined) {
-          return Promise.resolve({ value: buffered, done: false });
+        if (this.buffer.length > 0) {
+          return Promise.resolve({ value: this.buffer.shift()!, done: false });
         }
         if (this.ended) {
           return Promise.resolve({ value: undefined as never, done: true });
         }
+        if (this.resolver) {
+          return Promise.reject(
+            new Error("EventQueue is single-consumer: a consumer is already waiting"),
+          );
+        }
         return new Promise<IteratorResult<AgentEvent>>((resolve) => {
-          this.resolvers.push(resolve);
+          this.resolver = resolve;
         });
       },
     };

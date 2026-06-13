@@ -35,4 +35,29 @@ describe("EventQueue", () => {
     q.push({ kind: "output", text: "dropped" });
     expect(await drain(q)).toEqual([{ kind: "output", text: "kept" }]);
   });
+
+  it("returns done when end() is called while a consumer is waiting", async () => {
+    const q = new EventQueue();
+    const iterator = q[Symbol.asyncIterator]();
+    const pending = iterator.next();
+    q.end();
+    expect(await pending).toEqual({ value: undefined, done: true });
+  });
+
+  it("is safe to end() with no consumer attached", async () => {
+    const q = new EventQueue();
+    expect(() => q.end()).not.toThrow();
+    const out: AgentEvent[] = [];
+    for await (const e of q) out.push(e);
+    expect(out).toEqual([]);
+  });
+
+  it("rejects a second concurrent consumer (single-consumer)", async () => {
+    const q = new EventQueue();
+    const iterator = q[Symbol.asyncIterator]();
+    const first = iterator.next();
+    await expect(iterator.next()).rejects.toThrow("single-consumer");
+    q.push({ kind: "output", text: "x" });
+    expect(await first).toEqual({ value: { kind: "output", text: "x" }, done: false });
+  });
 });

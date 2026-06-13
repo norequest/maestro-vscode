@@ -23,4 +23,15 @@ describe("Emitter", () => {
     e.emit("y");
     expect(seen).toEqual(["x"]);
   });
+
+  it("is safe to unsubscribe a listener during emit", () => {
+    const e = new Emitter<string>();
+    const seen: string[] = [];
+    let off2: () => void = () => {};
+    e.on(() => off2());
+    off2 = e.on((s) => seen.push(s));
+    e.emit("a");
+    e.emit("b");
+    expect(seen).toEqual(["a"]);
+  });
 });
