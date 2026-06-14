@@ -74,6 +74,30 @@ export function acpErrorResponse(id: number | string, code: number, message: str
   return { jsonrpc: "2.0", id, error: { code, message } };
 }
 
+/**
+ * A scripted tool-call `session/update`. Real ACP engines carry a `sessionUpdate`
+ * discriminator of "tool_call" (begin) or "tool_call_update" (progress), with a
+ * tool name/title and a status such as pending/in_progress/completed.
+ */
+export function acpToolCallUpdate(opts: {
+  variant?: "tool_call" | "tool_call_update";
+  toolCallId?: string;
+  title?: string;
+  kind?: string;
+  status?: string;
+  rawInput?: Record<string, unknown>;
+}): AcpMessage {
+  const params: Record<string, unknown> = {
+    sessionUpdate: opts.variant ?? "tool_call",
+  };
+  if (opts.toolCallId !== undefined) params["toolCallId"] = opts.toolCallId;
+  if (opts.title !== undefined) params["title"] = opts.title;
+  if (opts.kind !== undefined) params["kind"] = opts.kind;
+  if (opts.status !== undefined) params["status"] = opts.status;
+  if (opts.rawInput !== undefined) params["rawInput"] = opts.rawInput;
+  return { jsonrpc: "2.0", method: "session/update", params };
+}
+
 /** A slash-namespaced permission request, the form real ACP engines use. */
 export function acpSessionRequestPermission(
   id: number | string | undefined,

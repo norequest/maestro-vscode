@@ -21,6 +21,7 @@ const TERMINAL_BY_STATE: Record<AgentState, boolean> = {
   conflict: false,
   detached: true,
   "merge-cleanup-failed": true,
+  "pr-created": true,
 };
 
 /** Discardable = the user may throw the worktree away from this state. */
@@ -36,6 +37,8 @@ const DISCARDABLE_BY_STATE: Record<AgentState, boolean> = {
   conflict: true,
   detached: true,
   "merge-cleanup-failed": true,
+  // The branch is kept; the user can still discard later to delete it.
+  "pr-created": true,
 };
 
 /** Needs attention = the UI should surface this agent to the conductor. */
@@ -51,6 +54,8 @@ const NEEDS_ATTENTION_BY_STATE: Record<AgentState, boolean> = {
   conflict: true,
   detached: true,
   "merge-cleanup-failed": true,
+  // Terminal success: the PR carries the review now, nothing to surface here.
+  "pr-created": false,
 };
 
 export function isTerminalState(state: AgentState): boolean {

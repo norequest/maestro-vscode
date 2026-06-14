@@ -4,6 +4,7 @@ import { AcpSession } from "../src/session.js";
 import {
   FakeAcpTransport,
   acpSessionUpdate,
+  acpToolCallUpdate,
   acpRequestPermission,
   acpSessionRequestPermission,
   acpTurnComplete,
@@ -286,6 +287,64 @@ describe("AcpSession", () => {
       | undefined;
     expect(approvalEvent).toBeDefined();
     expect(approvalEvent!.detail).not.toHaveProperty("args");
+  });
+
+  // Tool-call progress: a tool_call begin + a tool_call_update with a status are
+  // surfaced as readable output lines carrying the tool name/title.
+  it("emits formatted output for tool-call session/update variants", async () => {
+    const { transport, session } = makeSession();
+    const events = collect(session.events);
+
+    transport.receive(
+      acpToolCallUpdate({
+        variant: "tool_call",
+        toolCallId: "tc-1",
+        title: "write_file",
+        kind: "edit",
+        status: "pending",
+        rawInput: { path: "src/components/Roster.tsx" },
+      }),
+    );
+    transport.receive(
+      acpToolCallUpdate({
+        variant: "tool_call_update",
+        toolCallId: "tc-1",
+        title: "write_file",
+        status: "completed",
+      }),
+    );
+    transport.receive(acpTurnComplete("done"));
+    transport.end();
+
+    const result = await events;
+    const outputs = result.filter((e) => e.kind === "output") as Array<{ text: string }>;
+    expect(outputs.length).toBeGreaterThan(0);
+    const joined = outputs.map((o) => o.text).join("");
+    expect(joined).toContain("write_file");
+    // The begin line is formatted with the tool marker.
+    expect(outputs.some((o) => o.text.includes("▸") && o.text.includes("write_file"))).toBe(true);
+  });
+
+  // Tolerance: an unknown session/update variant must be ignored gracefully and
+  // must not spuriously emit output (the status:working bootstrap is fine).
+  it("ignores an unknown session/update variant without throwing or emitting output", async () => {
+    const { transport, session } = makeSession();
+    const events = collect(session.events);
+
+    transport.receive({
+      jsonrpc: "2.0",
+      method: "session/update",
+      params: { sessionUpdate: "some_future_variant", mystery: { nested: true } },
+    } as any);
+    transport.receive(acpTurnComplete("done"));
+    transport.end();
+
+    const result = await events;
+    const outputs = result.filter((e) => e.kind === "output");
+    expect(outputs).toHaveLength(0);
+    // Still terminates normally; no error.
+    expect(result.some((e) => e.kind === "error")).toBe(false);
+    expect(result.at(-1)).toMatchObject({ kind: "done" });
   });
 
   it("omits a non-string tool from the approval detail rather than coercing it", async () => {

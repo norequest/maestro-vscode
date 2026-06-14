@@ -103,6 +103,26 @@ describe("GitWorkspaceManager (real git)", () => {
     expect(existsSync(ws.path)).toBe(false);
     expect(git(repo, "branch", "--list", "agent/a1").trim()).toBe("");
   });
+
+  // releaseWorktree complements the PR flow (pushAndPr): after a PR is opened
+  // from the branch, the worktree directory is cleaned up and pruned from git's
+  // worktree list, but the branch MUST survive so the PR keeps its source ref.
+  // This is the key distinction from discard, which deletes the branch too.
+  it("releaseWorktree removes the worktree (pruned) but keeps the branch", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    expect(existsSync(ws.path)).toBe(true);
+    expect(git(repo, "worktree", "list")).toContain(ws.path);
+
+    await m.releaseWorktree("a1");
+
+    // Worktree directory is gone from disk.
+    expect(existsSync(ws.path)).toBe(false);
+    // And it is no longer listed by git (pruned from the worktree list).
+    expect(git(repo, "worktree", "list")).not.toContain(ws.path);
+    // The branch survives (the PR still references it).
+    expect(git(repo, "branch", "--list", "agent/a1")).toContain("agent/a1");
+  });
 });
 
 // ---- Task C2: isStale + rebase (real git) ----

@@ -94,6 +94,14 @@ export class AcpSession implements AgentSession {
         if (typeof delta?.text === "string") {
           this.queue.push({ kind: "output", text: delta.text });
         }
+        // Real ACP engines also stream tool-call progress through session/update,
+        // discriminated by a `sessionUpdate` field. Surface it as a concise
+        // output line so the user can see what the agent is doing (file writes,
+        // shell commands, etc.). Unknown variants fall through and are ignored.
+        const toolCallLine = formatToolCallUpdate(msg.params);
+        if (toolCallLine !== undefined) {
+          this.queue.push({ kind: "output", text: toolCallLine });
+        }
         break;
       }
 
@@ -189,4 +197,69 @@ export class AcpSession implements AgentSession {
     this.transport.terminate();
     this.queue.end();
   }
+}
+
+/** The `sessionUpdate` discriminator values that carry tool-call progress. */
+const TOOL_CALL_VARIANTS = new Set(["tool_call", "tool_call_update"]);
+
+/** Read a string field from an unvalidated params bag, else undefined. */
+function readString(params: Record<string, unknown> | undefined, key: string): string | undefined {
+  const raw = params?.[key];
+  return typeof raw === "string" && raw.length > 0 ? raw : undefined;
+}
+
+/**
+ * Format a tool-call `session/update` notification into a concise output line,
+ * e.g. `▸ write_file: src/components/Roster.tsx` or `▸ write_file [completed]`.
+ *
+ * Defensive by design: returns undefined for non-tool-call variants (so they are
+ * ignored) and formats from whatever recognizable fields are present rather than
+ * asserting a strict schema. Never throws on malformed input.
+ */
+function formatToolCallUpdate(params: Record<string, unknown> | undefined): string | undefined {
+  if (params === undefined) return undefined;
+  const variant = params["sessionUpdate"];
+  if (typeof variant !== "string" || !TOOL_CALL_VARIANTS.has(variant)) {
+    return undefined;
+  }
+
+  // Prefer a human label: `title`, falling back to a tool `name`/`kind`. If none
+  // is present, still acknowledge the tool call rather than emitting a blank line.
+  const label =
+    readString(params, "title") ??
+    readString(params, "name") ??
+    readString(params, "kind") ??
+    "tool call";
+
+  // A concrete detail (the path being written, the command being run) makes the
+  // line actionable. Try the common rawInput shapes, then the status.
+  const detail = readToolCallDetail(params);
+  const status = readString(params, "status");
+
+  let line = `▸ ${label}`;
+  if (detail !== undefined) {
+    line += `: ${detail}`;
+  } else if (status !== undefined) {
+    line += ` [${status}]`;
+  }
+  return `${line}\n`;
+}
+
+/**
+ * Pull a single human-meaningful detail out of a tool call's input, if present.
+ * Tolerant of unknown shapes: only reads a small set of well-known string fields.
+ */
+function readToolCallDetail(params: Record<string, unknown>): string | undefined {
+  const raw = params["rawInput"] ?? params["input"] ?? params["args"];
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+  const obj = raw as Record<string, unknown>;
+  for (const key of ["path", "file_path", "filePath", "command", "cmd", "pattern"]) {
+    const value = obj[key];
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+  return undefined;
 }

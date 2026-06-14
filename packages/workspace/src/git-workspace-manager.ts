@@ -300,6 +300,19 @@ export class GitWorkspaceManager implements WorkspaceManager {
     await this.teardown(agentId, !this.retainBranchOnMerge);
   }
 
+  /**
+   * Remove the agent's worktree directory and prune it from git's worktree
+   * list, but KEEP the local branch intact. Used after {@link pushAndPr} has
+   * opened a pull request from the branch: the working tree can be cleaned up
+   * while the branch must survive so the PR keeps its source ref. Unlike
+   * {@link discard} (which always deletes the branch), this NEVER runs a
+   * branch-deletion command. Idempotent for an unknown/already-released agent
+   * (teardown is a no-op when no record exists).
+   */
+  async releaseWorktree(agentId: string): Promise<void> {
+    await this.teardown(agentId, false);
+  }
+
   private async teardown(agentId: string, deleteBranch: boolean): Promise<void> {
     const rec = this.records.get(agentId);
     if (!rec) return;

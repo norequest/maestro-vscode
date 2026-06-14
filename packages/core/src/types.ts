@@ -45,7 +45,9 @@ export type AgentState =
   /** Process gone, worktree preserved on disk; user decides merge/discard/retry. */
   | "detached"
   /** Merge landed (code is in the branch) but worktree cleanup failed; recover via retryCleanup. */
-  | "merge-cleanup-failed";
+  | "merge-cleanup-failed"
+  /** A PR was opened for the branch; worktree released but the branch is kept. Terminal. */
+  | "pr-created";
 
 /** States an adapter itself reports via a `status` event. */
 export type EngineState = "working" | "awaiting-approval";

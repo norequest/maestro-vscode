@@ -16,7 +16,7 @@ describe("roster mapping", () => {
   });
 
   it("picks a distinct icon per state", () => {
-    const states: AgentState[] = ["preparing", "working", "awaiting-approval", "done", "error", "conflict", "merged", "discarded", "stopped", "detached"];
+    const states: AgentState[] = ["preparing", "working", "awaiting-approval", "done", "error", "conflict", "merged", "discarded", "stopped", "detached", "pr-created"];
     const icons = states.map(cardIcon);
     expect(new Set(icons).size).toBe(icons.length); // all distinct
   });
@@ -31,5 +31,16 @@ describe("roster mapping", () => {
 
   it("returns warning icon for merge-cleanup-failed state", () => {
     expect(cardIcon("merge-cleanup-failed")).toBe("warning");
+  });
+
+  it("returns git-pull-request icon for pr-created state", () => {
+    expect(cardIcon("pr-created")).toBe("git-pull-request");
+  });
+
+  it("maps a pr-created card to a roster item with the right description and icon", () => {
+    const item = cardToRosterItem(card({ state: "pr-created" }));
+    expect(item.icon).toBe("git-pull-request");
+    expect(item.description).toContain("pr-created");
+    expect(item.description).toContain("copilot");
   });
 });

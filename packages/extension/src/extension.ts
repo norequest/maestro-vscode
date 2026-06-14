@@ -8,7 +8,7 @@ import { RosterTreeDataProvider } from "./roster.js";
 import { StageWebviewPanel } from "./stage.js";
 import { EventLogger } from "./persistence.js";
 import { FsPersistenceBackend } from "./persistence-fs.js";
-import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter } from "@maestro/config";
+import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter, DEFAULT_CONFIG } from "@maestro/config";
 
 const DEFAULT_ROLE: Role = {
   name: "Implementer",
@@ -17,7 +17,7 @@ const DEFAULT_ROLE: Role = {
   autonomy: "auto-approve-safe",
 };
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
   if (!folder) {
     void vscode.window.showWarningMessage("Maestro needs an open folder (a git repo) to conduct agents.");
@@ -27,8 +27,21 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const eventLogger = new EventLogger(new FsPersistenceBackend(repoRoot));
 
+  // Honor .conductor/config.yaml's maxParallelAgents. Best-effort: any load
+  // failure (missing dir, unreadable config, parse error) falls back to
+  // DEFAULT_CONFIG so a bad config never blocks activation. The lazy role
+  // loader below re-reads .conductor/ at spawn time; this read is config-only.
+  let orchConfig = DEFAULT_CONFIG;
+  try {
+    const fsReader = await makeNodeFsReader();
+    const loaded = await loadConductorDir(repoRoot, fsReader);
+    orchConfig = loaded.config ?? DEFAULT_CONFIG;
+  } catch {
+    orchConfig = DEFAULT_CONFIG;
+  }
+
   const workspaces = new GitWorkspaceManager({ repoRoot });
-  const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);
+  const orch = new Orchestrator(orchConfig, workspaces);
   orch.registerAdapter(new CopilotAdapter());
   // Register the generic ACP adapter (Gemini CLI in --acp --stdio mode). With
   // no approval UI yet (M6), an ACP-targeted role should use an auto-approving
@@ -85,7 +98,7 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showInformationMessage("PR mode is off. Enable maestro.prMode in settings.");
         return;
       }
-      const { buildPrTitle, buildPrBody } = await import("./merge-helpers.js");
+      const { buildPrTitle, buildPrBody, markPrCreatedAfterPush } = await import("./merge-helpers.js");
       try {
         const result = await workspaces.pushAndPr(agent.id, {
           title: buildPrTitle(agent.role.name, agent.task.description),
@@ -95,13 +108,13 @@ export function activate(context: vscode.ExtensionContext): void {
           draft: vscode.workspace.getConfiguration("maestro").get<boolean>("prDraft", false),
         });
         void vscode.window.showInformationMessage(`PR created: ${result.prUrl}`);
-        // pushAndPr emits nothing through the orchestrator, so the card would
-        // not refresh on its own. Force a re-push of the current state so the UI
-        // is consistent. The branch is pushed; the local worktree stays so the
-        // existing Discard affordance can clean it up (we never delete the
-        // branch we just pushed). A dedicated "pr-created" terminal state is a
-        // follow-up that needs a core change.
-        cockpit.handle({ type: "ready" });
+        // The PR is open. Move the card to the terminal "pr-created" state via
+        // the core: this releases the worktree but KEEPS the branch (the PR
+        // needs its commits). markPrCreated emits the terminal agent-updated
+        // event, so the cockpit re-renders on its own (no manual "ready" push
+        // needed). pushAndPr itself stays here because it needs vscode.workspace;
+        // the post-push transition is the pure, unit-tested seam.
+        await markPrCreatedAfterPush(orch, agent.id);
       } catch (err) {
         void vscode.window.showErrorMessage(`Create PR failed: ${err instanceof Error ? err.message : String(err)}`);
       }

@@ -323,6 +323,30 @@ export class Orchestrator {
   }
 
   /**
+   * After a pull request has been opened for a done agent's branch, move it to
+   * the terminal "pr-created" state. The worktree is released (removed) but the
+   * branch is KEPT so the PR keeps its commits. Like merge(), only a done agent
+   * is eligible; by the time an agent is done its session already ended, so the
+   * running slot was released in consume()'s finally and there is no slot to
+   * touch here (mirroring how merge() leaves the concurrency counter alone).
+   */
+  async markPrCreated(agentId: string): Promise<void> {
+    const agent = this.requireAgent(agentId);
+    if (agent.state !== "done") {
+      throw new Error(`Agent ${agentId} is not ready for a PR (state: ${agent.state})`);
+    }
+    // releaseWorktree lives on WorkspaceManager and is itself optional there;
+    // feature-detect the manager (like merge() does), then guard the optional
+    // call so an impl predating releaseWorktree is tolerated. A plain provider
+    // has no worktree to release, so this is a no-op for it.
+    const ws = this.workspaces;
+    if (isWorkspaceManager(ws)) {
+      await ws.releaseWorktree?.(agentId);
+    }
+    this.update(agent, "pr-created");
+  }
+
+  /**
    * Chain a new link onto the merge serialization queue. Returns the previous
    * link (which the caller awaits before entering the critical section) and the
    * release function for THIS link. The caller awaits `predecessor` inside a try

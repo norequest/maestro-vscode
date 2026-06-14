@@ -28,6 +28,12 @@ describe("isTerminalState", () => {
   it("keeps conflict NON-terminal", () => {
     expect(isTerminalState("conflict")).toBe(false);
   });
+
+  it("treats pr-created as terminal, discardable, and not needing attention", () => {
+    expect(isTerminalState("pr-created")).toBe(true);
+    expect(isDiscardableState("pr-created")).toBe(true);
+    expect(stateNeedsAttention("pr-created")).toBe(false);
+  });
 });
 
 // ---- T8: single source of truth for AgentState policy ----
@@ -46,12 +52,13 @@ const ALL_STATES: AgentState[] = [
   "conflict",
   "detached",
   "merge-cleanup-failed",
+  "pr-created",
 ];
 
 describe("AgentState policy predicates (exhaustive)", () => {
   it("covers every AgentState member in the enumeration", () => {
-    // 11 states today; a bare count guard so the table below stays exhaustive.
-    expect(ALL_STATES).toHaveLength(11);
+    // 12 states today; a bare count guard so the table below stays exhaustive.
+    expect(ALL_STATES).toHaveLength(12);
     expect(new Set(ALL_STATES).size).toBe(ALL_STATES.length);
   });
 
@@ -67,6 +74,7 @@ describe("AgentState policy predicates (exhaustive)", () => {
     conflict: false,
     detached: true,
     "merge-cleanup-failed": true,
+    "pr-created": true,
   };
   const discardable: Record<AgentState, boolean> = {
     preparing: false,
@@ -80,6 +88,7 @@ describe("AgentState policy predicates (exhaustive)", () => {
     conflict: true,
     detached: true,
     "merge-cleanup-failed": true,
+    "pr-created": true,
   };
   const attention: Record<AgentState, boolean> = {
     preparing: false,
@@ -93,6 +102,7 @@ describe("AgentState policy predicates (exhaustive)", () => {
     conflict: true,
     detached: true,
     "merge-cleanup-failed": true,
+    "pr-created": false,
   };
 
   for (const state of ALL_STATES) {

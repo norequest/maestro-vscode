@@ -47,6 +47,12 @@ export interface WorkspaceManager extends WorkspaceProvider {
   merge(agentId: string): Promise<MergeResult>;
   /** Drop the agent's branch + worktree without merging. */
   discard(agentId: string): Promise<void>;
+  /**
+   * Remove the agent's worktree but KEEP its branch (the branch now lives on in
+   * an opened PR). Optional: implementations predating this method are tolerated
+   * via the guarded optional call in the orchestrator.
+   */
+  releaseWorktree?(agentId: string): Promise<void>;
 }
 
 /** Runtime feature-detection guard. */
@@ -66,6 +72,7 @@ export class FakeWorkspaceManager implements WorkspaceManager {
   readonly diffed: string[] = [];
   readonly merged: string[] = [];
   readonly discarded: string[] = [];
+  readonly released: string[] = [];
   private diffs = new Map<string, Diff>();
   private mergeResults = new Map<string, MergeResult>();
 
@@ -94,6 +101,10 @@ export class FakeWorkspaceManager implements WorkspaceManager {
   }
   discard(agentId: string): Promise<void> {
     this.discarded.push(agentId);
+    return Promise.resolve();
+  }
+  releaseWorktree(agentId: string): Promise<void> {
+    this.released.push(agentId);
     return Promise.resolve();
   }
 }

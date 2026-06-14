@@ -27,3 +27,22 @@ export function buildPrBody(summary: string | undefined, diffFiles: readonly str
   const fileList = diffFiles.length > 0 ? `\n\n**Changed files:**\n${diffFiles.map((f) => `- ${f}`).join("\n")}` : "";
   return `${summary ?? "No summary provided."}${fileList}\n\n_Created by Maestro._`;
 }
+
+/** The minimal orchestrator slice the PR-created transition needs (pure, testable). */
+export interface PrCreatedTransitioner {
+  markPrCreated(agentId: string): Promise<void>;
+}
+
+/**
+ * After `pushAndPr` has SUCCEEDED for a done agent, move the card to the
+ * terminal "pr-created" state via the core. This releases the worktree but
+ * keeps the branch (the PR needs its commits). Kept pure (no vscode import) so
+ * the post-push wiring is unit-tested; only the `pushAndPr` call itself lives
+ * in extension.ts because it needs `vscode.workspace`.
+ */
+export async function markPrCreatedAfterPush(
+  orch: PrCreatedTransitioner,
+  agentId: string,
+): Promise<void> {
+  await orch.markPrCreated(agentId);
+}
