@@ -58,10 +58,24 @@ describe("Orchestrator merge/discard", () => {
     await expect(orch.merge(agent.id)).rejects.toThrow("not ready to merge");
   });
 
-  it("discard -> discarded + cleanup, allowed from done/conflict", async () => {
+  it("discard -> discarded + cleanup, allowed from done", async () => {
     const { orch, manager } = build();
     const agent = orch.spawn("Impl", "task");
     await waitFor(orch, agent.id, "done");
+
+    await orch.discard(agent.id);
+    expect(orch.getAgent(agent.id)!.state).toBe("discarded");
+    expect(manager.discarded).toContain(agent.id);
+  });
+
+  it("discard is allowed from a conflict state (the merge-failed-throw-it-away path)", async () => {
+    const manager = new FakeWorkspaceManager();
+    const { orch } = build({ manager });
+    const agent = orch.spawn("Impl", "task");
+    await waitFor(orch, agent.id, "done");
+    manager.setMergeResult(agent.id, { status: "conflict", files: ["x.ts"] });
+    await orch.merge(agent.id);
+    expect(orch.getAgent(agent.id)!.state).toBe("conflict");
 
     await orch.discard(agent.id);
     expect(orch.getAgent(agent.id)!.state).toBe("discarded");
