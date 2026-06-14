@@ -20,11 +20,13 @@
     },
     "commands": [
       { "command": "maestro.spawnAgent", "title": "Maestro: Spawn Agent", "icon": "$(add)" },
+      { "command": "maestro.launchTeam", "title": "Maestro: Launch Team", "icon": "$(organization)" },
       { "command": "maestro.openStage", "title": "Maestro: Open Stage" }
     ],
     "menus": {
       "view/title": [
-        { "command": "maestro.spawnAgent", "when": "view == maestro.roster", "group": "navigation" }
+        { "command": "maestro.spawnAgent", "when": "view == maestro.roster", "group": "navigation" },
+        { "command": "maestro.launchTeam", "when": "view == maestro.roster", "group": "navigation" }
       ]
     },
     "configuration": {

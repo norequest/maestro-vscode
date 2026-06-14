@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
-import { Orchestrator, type Role } from "@maestro/core";
+import { Orchestrator, type Role, type Team } from "@maestro/core";
 import { GitWorkspaceManager } from "@maestro/workspace";
 import { CopilotAdapter } from "@maestro/adapter-copilot";
 import { AcpAdapter } from "@maestro/adapter-acp";
 import { createCockpit, type MergeActionMessage } from "./controller.js";
 import { RosterTreeDataProvider } from "./roster.js";
+import { teamQuickPickItems } from "./team-picker.js";
 import { StageWebviewPanel } from "./stage.js";
 import { EventLogger } from "./persistence.js";
 import { FsPersistenceBackend } from "./persistence-fs.js";
@@ -221,6 +222,50 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         void vscode.window.showErrorMessage(`Maestro: could not spawn agent: ${message}`);
+      }
+    }),
+    vscode.commands.registerCommand("maestro.launchTeam", async () => {
+      // Load teams from .conductor/teams/. Mirror spawnAgent: same fsReader,
+      // same repoRoot, same error-surfacing.
+      const fsReader = await makeNodeFsReader();
+      const loaded = await loadConductorDir(repoRoot, fsReader).catch(() => null);
+
+      if (!loaded || loaded.teams.length === 0) {
+        void vscode.window.showInformationMessage("Maestro: no teams defined in .conductor/teams/.");
+        return;
+      }
+
+      if (loaded.errors.length > 0) {
+        const msgs = loaded.errors.map((e) => `${e.source}: ${e.errors.join("; ")}`).join("\n");
+        void vscode.window.showWarningMessage(`Maestro: config errors in .conductor/:\n${msgs}`);
+      }
+
+      const items = teamQuickPickItems(loaded.teams);
+      let selectedTeam: Team;
+      if (items.length === 1) {
+        // Auto-select the sole team (mirrors spawnAgent's single-role path).
+        selectedTeam = items[0]!.team;
+      } else {
+        const picked = await vscode.window.showQuickPick(items, {
+          title: "Select a team to dispatch",
+          placeHolder: "Team",
+        });
+        if (!picked) return;
+        selectedTeam = picked.team;
+      }
+
+      const description = await vscode.window.showInputBox({
+        prompt: `Task for team ${selectedTeam.name}`,
+        placeHolder: "What should this team work on?",
+      });
+      if (!description) return;
+
+      stage.reveal();
+      try {
+        orch.launchTeam(selectedTeam, description);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        void vscode.window.showErrorMessage(`Maestro: could not launch team: ${message}`);
       }
     }),
     { dispose: () => cockpit.dispose() },

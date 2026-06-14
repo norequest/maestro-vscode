@@ -6,7 +6,7 @@ and reports completion on process exit.
 
 ## Auth
 
-Reuses your **GitHub Copilot subscription** — no API key. Set a GitHub token with
+Reuses your **GitHub Copilot subscription**, no API key. Set a GitHub token with
 Copilot access via `COPILOT_GITHUB_TOKEN` (or `GH_TOKEN` / `GITHUB_TOKEN`), or run
 `gh auth login`. Requires the `copilot` binary (`npm install -g @github/copilot`,
 v1.0.52+ recommended).
@@ -42,7 +42,7 @@ Capabilities reported: `{ streaming: true, structuredEvents: false, approvals: f
 
 ## Testing
 
-`pnpm --filter @maestro/adapter-copilot test` runs the full suite with a fake spawn —
+`pnpm --filter @maestro/adapter-copilot test` runs the full suite with a fake spawn:
 no `copilot` process, no network, no token. The optional live smoke test
 (`pnpm --filter @maestro/adapter-copilot build && MAESTRO_LIVE=1 COPILOT_GITHUB_TOKEN=... pnpm --filter @maestro/adapter-copilot smoke`)
 exercises the real `copilot`.
