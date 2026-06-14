@@ -55,6 +55,7 @@ function actions(card: CardVM): string {
       return `${retryCleanup} ${discard}`;
     case "error":
     case "stopped":
+    case "pr-created":
       return discard;
     case "merged":
     case "discarded":
@@ -81,6 +82,11 @@ function detail(card: CardVM): string {
   }
   if (card.state === "error" && card.error) {
     return `<pre class="error">${escapeHtml(card.error)}</pre>`;
+  }
+  if (card.state === "pr-created") {
+    // Terminal note: the PR was opened, the worktree was released, but the
+    // branch was kept so the pull request keeps its commits.
+    return `<div class="pr-note">${escapeHtml("Pull request opened. Worktree released, branch kept.")}</div>`;
   }
   return "";
 }

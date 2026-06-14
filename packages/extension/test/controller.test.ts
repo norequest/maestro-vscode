@@ -16,6 +16,7 @@ function fakeOrch() {
     discard: vi.fn(async (id: string) => { calls.push(`discard:${id}`); }),
     sendBack: (id: string, fb: string) => { calls.push(`sendBack:${id}:${fb}`); return {} as Agent; },
     retryCleanup: async (id: string) => { calls.push(`retryCleanup:${id}`); },
+    markPrCreated: async (id: string) => { calls.push(`markPrCreated:${id}`); },
   };
   return { orch, calls, emit: (e: OrchestratorEvent) => listener?.(e) };
 }

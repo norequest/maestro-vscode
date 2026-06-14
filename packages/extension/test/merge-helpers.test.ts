@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Agent } from "@maestro/core";
-import { buildConflictResolveMessage, buildPrTitle, buildPrBody, conflictFileBase } from "../src/merge-helpers.js";
+import { buildConflictResolveMessage, buildPrTitle, buildPrBody, conflictFileBase, markPrCreatedAfterPush } from "../src/merge-helpers.js";
 
 describe("conflictFileBase (Issue 6)", () => {
   it("returns the agent's worktree path so files open with their conflict markers", () => {
@@ -37,5 +37,21 @@ describe("buildPrBody", () => {
   });
   it("handles undefined summary", () => {
     expect(buildPrBody(undefined, [])).toContain("No summary provided");
+  });
+});
+
+describe("markPrCreatedAfterPush", () => {
+  it("calls markPrCreated with the agent id so the card becomes terminal", async () => {
+    const markPrCreated = vi.fn(async () => {});
+    await markPrCreatedAfterPush({ markPrCreated }, "a1");
+    expect(markPrCreated).toHaveBeenCalledTimes(1);
+    expect(markPrCreated).toHaveBeenCalledWith("a1");
+  });
+
+  it("awaits the orchestrator transition (propagates rejection to the caller)", async () => {
+    const markPrCreated = vi.fn(async () => {
+      throw new Error("not done");
+    });
+    await expect(markPrCreatedAfterPush({ markPrCreated }, "a1")).rejects.toThrow("not done");
   });
 });

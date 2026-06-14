@@ -13,6 +13,8 @@ export interface OrchestratorLike {
   discard(agentId: string): Promise<void>;
   sendBack(agentId: string, feedback: string): Agent;
   retryCleanup(agentId: string): Promise<void>;
+  /** Transition a done agent to the terminal "pr-created" state after a PR is opened. */
+  markPrCreated(agentId: string): Promise<void>;
 }
 
 export interface Cockpit {
