@@ -74,4 +74,43 @@ describe("GitWorkspaceManager create/cleanup/discard", () => {
     // it attempted a best-effort abort to clear any partial state
     expect(fake.calls.some((c) => c.args.join(" ") === "merge --abort")).toBe(true);
   });
+
+  it("diff: snapshots dirty work, then three-arg base..HEAD diff", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("status", "--porcelain"), result: { stdout: " M a.ts\n" } },
+      { match: startsWith("diff", "--name-only"), result: { stdout: "a.ts\n" } },
+      { match: (a) => a[0] === "diff" && a[1] === "base123" && a[2] === "HEAD", result: { stdout: "PATCH" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    const diff = await m.diff("a1");
+    expect(diff).toEqual({ files: ["a.ts"], patch: "PATCH" });
+    // dirty -> add -A + commit happened before the diff
+    expect(fake.calls.some((c) => c.args.join(" ") === "add -A")).toBe(true);
+    expect(fake.calls.some((c) => c.args[0] === "commit")).toBe(true);
+  });
+
+  it("merge clean: --no-commit --no-ff then commit", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("merge", "--no-commit"), result: { exitCode: 0 } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    expect(await m.merge("a1")).toEqual({ status: "clean" });
+    expect(fake.calls.some((c) => c.args[0] === "commit" && c.args.includes("--no-edit"))).toBe(true);
+  });
+
+  it("merge conflict: collects U files and aborts", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("merge", "--no-commit"), result: { exitCode: 1, stdout: "CONFLICT" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "a.ts\n" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    expect(await m.merge("a1")).toEqual({ status: "conflict", files: ["a.ts"] });
+    expect(fake.calls.some((c) => c.args.join(" ") === "merge --abort")).toBe(true);
+  });
 });
