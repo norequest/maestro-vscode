@@ -5,12 +5,13 @@ import type {
   Agent,
   AgentEvent,
   AgentState,
+  MergeResult,
   OrchestratorConfig,
   OrchestratorEvent,
   Role,
   Task,
 } from "./types.js";
-import type { WorkspaceProvider } from "./workspace.js";
+import { isWorkspaceManager, type WorkspaceProvider } from "./workspace.js";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -141,6 +142,7 @@ export class Orchestrator {
         agent.summary = event.summary;
         agent.diff = event.diff;
         this.update(agent, "done");
+        if (event.diff === undefined) this.computeDiff(agent);
         break;
       case "error":
         this.fail(agent, event.message);
@@ -170,6 +172,23 @@ export class Orchestrator {
     this.update(agent, "error");
   }
 
+  private computeDiff(agent: Agent): void {
+    if (!isWorkspaceManager(this.workspaces)) return; // plain provider -> no-op
+    const ws = this.workspaces;
+    void ws
+      .diff(agent.id)
+      .then((diff) => {
+        if (agent.diff !== undefined) return; // adapter won the race
+        agent.diff = diff;
+        this.emitter.emit({ kind: "agent-updated", agent });
+      })
+      .catch((error) => {
+        if (agent.diff !== undefined) return; // diff already populated; ignore late failure
+        agent.diffError = errorMessage(error);
+        this.emitter.emit({ kind: "agent-updated", agent });
+      });
+  }
+
   approve(agentId: string, approvalId: string, decision: ApprovalDecision): void {
     const agent = this.requireAgent(agentId);
     if (agent.state !== "awaiting-approval") {
@@ -193,6 +212,44 @@ export class Orchestrator {
     if (!session) return;
     this.stopping.add(agentId);
     session.stop();
+  }
+
+  async merge(agentId: string): Promise<MergeResult> {
+    const agent = this.requireAgent(agentId);
+    if (agent.state !== "done") {
+      throw new Error(`Agent ${agentId} is not ready to merge (state: ${agent.state})`);
+    }
+    const ws = this.workspaces;
+    if (!isWorkspaceManager(ws)) {
+      throw new Error("Workspace provider does not support merge");
+    }
+    const result = await ws.merge(agentId);
+    if (result.status === "conflict") {
+      agent.conflict = { files: result.files };
+      this.update(agent, "conflict"); // worktree preserved, no cleanup
+      return result;
+    }
+    await ws.cleanup(agentId);
+    this.update(agent, "merged");
+    return result;
+  }
+
+  async discard(agentId: string): Promise<void> {
+    const agent = this.requireAgent(agentId);
+    if (!this.canDiscard(agent.state)) {
+      throw new Error(`Agent ${agentId} cannot be discarded (state: ${agent.state})`);
+    }
+    const ws = this.workspaces;
+    if (isWorkspaceManager(ws)) {
+      await ws.discard(agentId);
+    } else {
+      await ws.cleanup(agentId);
+    }
+    this.update(agent, "discarded");
+  }
+
+  private canDiscard(state: AgentState): boolean {
+    return state === "done" || state === "error" || state === "stopped" || state === "conflict";
   }
 
   private requireAgent(agentId: string): Agent {

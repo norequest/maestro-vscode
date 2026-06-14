@@ -18,6 +18,11 @@ export interface Diff {
   patch: string;
 }
 
+/** Outcome of merging an agent's branch. */
+export type MergeResult =
+  | { status: "clean" }
+  | { status: "conflict"; files: string[] };
+
 /** What an engine adapter can do; drives UI graceful degradation. */
 export interface Capabilities {
   streaming: boolean;
@@ -34,9 +39,9 @@ export type AgentState =
   | "done"
   | "error"
   | "stopped"
-  // reserved for the Workspace Manager milestone:
   | "merged"
-  | "discarded";
+  | "discarded"
+  | "conflict";
 
 /** States an adapter itself reports via a `status` event. */
 export type EngineState = "working" | "awaiting-approval";
@@ -67,6 +72,8 @@ export interface Agent {
   log: AgentEvent[];
   summary?: string;
   diff?: Diff;
+  conflict?: { files: string[] };
+  diffError?: string;
   error?: string;
   pendingApprovalId?: string;
   workspace?: Workspace;

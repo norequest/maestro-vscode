@@ -15,4 +15,8 @@ describe("isTerminalState", () => {
     expect(isTerminalState("working")).toBe(false);
     expect(isTerminalState("awaiting-approval")).toBe(false);
   });
+
+  it("treats conflict as non-terminal (it is resolvable)", () => {
+    expect(isTerminalState("conflict")).toBe(false);
+  });
 });
