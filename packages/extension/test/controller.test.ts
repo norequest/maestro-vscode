@@ -14,6 +14,7 @@ function fakeOrch() {
     stop: (id) => { calls.push(`stop:${id}`); },
     merge: vi.fn(async (id: string) => { calls.push(`merge:${id}`); return { status: "clean" as const }; }),
     discard: vi.fn(async (id: string) => { calls.push(`discard:${id}`); }),
+    sendBack: (id: string, fb: string) => { calls.push(`sendBack:${id}:${fb}`); return {} as Agent; },
   };
   return { orch, calls, emit: (e: OrchestratorEvent) => listener?.(e) };
 }
@@ -63,6 +64,13 @@ describe("createCockpit", () => {
     cockpit.handle({ type: "merge", agentId: "a1" });
     await new Promise((r) => setTimeout(r, 0));
     expect(onError).toHaveBeenCalledWith(expect.stringContaining("conflict abort failed"));
+  });
+
+  it("dispatches sendBack to the orchestrator", () => {
+    const { orch, calls } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "sendBack", agentId: "a1", feedback: "please add tests" });
+    expect(calls).toContain("sendBack:a1:please add tests");
   });
 
   it("focus updates state and dispose unsubscribes", () => {

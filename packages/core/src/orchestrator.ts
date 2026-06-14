@@ -85,14 +85,20 @@ export class Orchestrator {
       this.release();
       return;
     }
-    try {
-      agent.workspace = await this.workspaces.create(agent.id);
-    } catch (error) {
-      this.fail(agent, `Workspace creation failed: ${errorMessage(error)}`);
-      this.release();
-      return;
+    if (!agent.workspace) {
+      try {
+        agent.workspace = await this.workspaces.create(agent.id);
+      } catch (error) {
+        this.fail(agent, `Workspace creation failed: ${errorMessage(error)}`);
+        this.release();
+        return;
+      }
     }
     this.update(agent, "working");
+    agent.engineCapabilities = {
+      approvals: adapter.capabilities.approvals,
+      steerable: adapter.capabilities.steerable,
+    };
     let session: AgentSession;
     try {
       session = adapter.start(agent.task, agent.workspace, agent.role);
@@ -131,10 +137,19 @@ export class Orchestrator {
   private applyEvent(agent: Agent, event: AgentEvent): void {
     if (isTerminalState(agent.state)) return;
     switch (event.kind) {
-      case "approval":
+      case "approval": {
         agent.pendingApprovalId = event.id;
+        const d = event.detail;
+        if (d !== null && typeof d === "object" && "tool" in d && "description" in d) {
+          const rec = d as Record<string, unknown>;
+          agent.approvalDetail = {
+            tool: String(rec["tool"]),
+            description: String(rec["description"]),
+          };
+        }
         this.update(agent, "awaiting-approval");
         break;
+      }
       case "status":
         this.update(agent, event.state);
         break;
@@ -198,6 +213,7 @@ export class Orchestrator {
     if (!session) throw new Error(`No active session for ${agentId}`);
     session.respond(approvalId, decision);
     agent.pendingApprovalId = undefined;
+    agent.approvalDetail = undefined;
     this.update(agent, "working");
   }
 
@@ -246,6 +262,36 @@ export class Orchestrator {
       await ws.cleanup(agentId);
     }
     this.update(agent, "discarded");
+  }
+
+  /**
+   * Re-launch a done or conflict agent in its EXISTING worktree with feedback
+   * appended to the task description. The previous session already ended; the
+   * worktree is reused (launch() skips create when agent.workspace is set), so
+   * partial work on disk is preserved. done|conflict -> preparing -> working.
+   */
+  sendBack(agentId: string, feedback: string): Agent {
+    const agent = this.requireAgent(agentId);
+    if (agent.state !== "done" && agent.state !== "conflict") {
+      throw new Error(
+        `Cannot send back agent ${agentId} (state: ${agent.state}); only done or conflict agents can be sent back`,
+      );
+    }
+    agent.summary = undefined;
+    agent.diff = undefined;
+    agent.diffError = undefined;
+    agent.conflict = undefined;
+    agent.error = undefined;
+    agent.pendingApprovalId = undefined;
+    agent.approvalDetail = undefined;
+    agent.log = [];
+    agent.task = {
+      ...agent.task,
+      description: `${agent.task.description}\n\nConductor feedback: ${feedback}`,
+    };
+    this.update(agent, "preparing");
+    this.tryStart(agent);
+    return agent;
   }
 
   private canDiscard(state: AgentState): boolean {

@@ -20,6 +20,30 @@ window.addEventListener("message", (e: MessageEvent<HostToWebview>) => {
   if (e.data.type === "state") render(e.data.state);
 });
 
+// Steer + send-back forms.
+document.addEventListener("submit", (e) => {
+  const form = e.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  const action = form.dataset["action"];
+  const id = form.dataset["id"];
+  if (!id) return;
+  if (action === "steer") {
+    e.preventDefault();
+    const input = form.querySelector<HTMLInputElement>(".steer-input");
+    const text = input?.value.trim();
+    if (!text) return;
+    vscode.postMessage({ type: "steer", agentId: id, input: text });
+    if (input) input.value = "";
+  } else if (action === "sendBack") {
+    e.preventDefault();
+    const textarea = form.querySelector<HTMLTextAreaElement>(".sendback-input");
+    const text = textarea?.value.trim();
+    if (!text) return;
+    vscode.postMessage({ type: "sendBack", agentId: id, feedback: text });
+    if (textarea) textarea.value = "";
+  }
+});
+
 document.addEventListener("click", (e) => {
   const target = e.target;
   if (!(target instanceof HTMLElement)) return;
@@ -28,9 +52,23 @@ document.addEventListener("click", (e) => {
     const id = btn.dataset["id"];
     const action = btn.dataset["action"];
     if (!id) return;
-    if (action === "stop") vscode.postMessage({ type: "stop", agentId: id });
-    else if (action === "merge") vscode.postMessage({ type: "merge", agentId: id });
-    else if (action === "discard") vscode.postMessage({ type: "discard", agentId: id });
+    if (action === "stop") {
+      vscode.postMessage({ type: "stop", agentId: id });
+    } else if (action === "merge") {
+      vscode.postMessage({ type: "merge", agentId: id });
+    } else if (action === "discard") {
+      vscode.postMessage({ type: "discard", agentId: id });
+    } else if (action === "approve" || action === "deny") {
+      const approvalId = btn.dataset["approvalId"];
+      if (approvalId) {
+        vscode.postMessage({
+          type: "approve",
+          agentId: id,
+          approvalId,
+          decision: action === "approve" ? "allow" : "deny",
+        });
+      }
+    }
     return;
   }
   const card = target.closest<HTMLElement>(".card");

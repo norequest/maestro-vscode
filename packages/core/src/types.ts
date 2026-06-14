@@ -55,6 +55,12 @@ export type AgentEvent =
   | { kind: "done"; summary: string; diff?: Diff }
   | { kind: "error"; message: string };
 
+/** The renderable detail of a pending approval request from an engine. */
+export interface ApprovalDetail {
+  tool: string;
+  description: string;
+}
+
 /** A reusable worker template. */
 export interface Role {
   name: string;
@@ -76,6 +82,10 @@ export interface Agent {
   diffError?: string;
   error?: string;
   pendingApprovalId?: string;
+  /** Set when state === "awaiting-approval"; cleared when the approval is resolved. */
+  approvalDetail?: ApprovalDetail;
+  /** Capabilities carried from the adapter so the UI can degrade without adapter access. */
+  engineCapabilities?: { approvals: boolean; steerable: boolean };
   workspace?: Workspace;
 }
 

@@ -14,6 +14,10 @@ export interface CardVM {
   conflictFiles?: string[];
   error?: string;
   pendingApprovalId?: string;
+  /** Human-readable detail of the pending approval; set while pendingApprovalId is set. */
+  approvalDetail?: { tool: string; description: string };
+  /** Engine capabilities carried to the UI for graceful degradation. */
+  engineCapabilities?: { approvals: boolean; steerable: boolean };
   /** True when this card needs a human decision (awaiting-approval, done, error, conflict). */
   attention: boolean;
 }
@@ -36,4 +40,5 @@ export type WebviewToHost =
   | { type: "approve"; agentId: string; approvalId: string; decision: "allow" | "deny" }
   | { type: "stop"; agentId: string }
   | { type: "merge"; agentId: string }
-  | { type: "discard"; agentId: string };
+  | { type: "discard"; agentId: string }
+  | { type: "sendBack"; agentId: string; feedback: string };

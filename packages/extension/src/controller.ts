@@ -11,6 +11,7 @@ export interface OrchestratorLike {
   stop(agentId: string): void;
   merge(agentId: string): Promise<MergeResult>;
   discard(agentId: string): Promise<void>;
+  sendBack(agentId: string, feedback: string): Agent;
 }
 
 export interface Cockpit {
@@ -68,6 +69,9 @@ export function createCockpit(
         break;
       case "discard":
         orch.discard(message.agentId).catch(fail);
+        break;
+      case "sendBack":
+        orch.sendBack(message.agentId, message.feedback);
         break;
     }
   }
