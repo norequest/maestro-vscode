@@ -1,0 +1,1 @@
+export const MAESTRO_ADAPTER_ACP_VERSION = "0.0.0";
