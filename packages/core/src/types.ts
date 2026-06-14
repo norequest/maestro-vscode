@@ -41,7 +41,9 @@ export type AgentState =
   | "stopped"
   | "merged"
   | "discarded"
-  | "conflict";
+  | "conflict"
+  /** Process gone, worktree preserved on disk; user decides merge/discard/retry. */
+  | "detached";
 
 /** States an adapter itself reports via a `status` event. */
 export type EngineState = "working" | "awaiting-approval";
@@ -87,6 +89,16 @@ export interface Agent {
   /** Capabilities carried from the adapter so the UI can degrade without adapter access. */
   engineCapabilities?: { approvals: boolean; steerable: boolean };
   workspace?: Workspace;
+}
+
+/** Minimal record persisted per agent so the orchestrator can rehydrate after a reload. */
+export interface PersistedAgentRecord {
+  /** Full agent snapshot at the last persisted state. */
+  agent: Agent;
+  /** Absolute path to the agent's worktree, if one was created. */
+  workspacePath?: string;
+  /** Branch name, e.g. "agent/fix-tests". */
+  workspaceBranch?: string;
 }
 
 /** Events the orchestrator emits for a UI to render. */

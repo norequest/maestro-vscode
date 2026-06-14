@@ -19,4 +19,12 @@ describe("isTerminalState", () => {
   it("treats conflict as non-terminal (it is resolvable)", () => {
     expect(isTerminalState("conflict")).toBe(false);
   });
+
+  it("treats detached as terminal", () => {
+    expect(isTerminalState("detached")).toBe(true);
+  });
+
+  it("keeps conflict NON-terminal", () => {
+    expect(isTerminalState("conflict")).toBe(false);
+  });
 });
