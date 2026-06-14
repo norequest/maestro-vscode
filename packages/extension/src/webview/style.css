@@ -1,1 +1,20 @@
-body { font-family: var(--vscode-font-family); }
+:root { color-scheme: light dark; }
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 12px; }
+#root { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.empty { color: var(--vscode-descriptionForeground); }
+.card { border: 1px solid var(--vscode-panel-border); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.card.attention { border-color: var(--vscode-focusBorder); box-shadow: 0 0 0 1px var(--vscode-focusBorder); }
+.card header { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.card .role { font-weight: 600; }
+.card .engine, .card .badge { color: var(--vscode-descriptionForeground); }
+.card .status { margin-left: auto; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; }
+.card .badge { border: 1px solid var(--vscode-panel-border); border-radius: 3px; padding: 0 4px; }
+.output { margin: 0; max-height: 220px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--vscode-textCodeBlock-background); padding: 8px; border-radius: 4px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+.files { margin: 0; padding-left: 18px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+.summary { font-weight: 600; }
+.conflict { color: var(--vscode-editorWarning-foreground); }
+.error { color: var(--vscode-editorError-foreground); white-space: pre-wrap; }
+.card footer { display: flex; gap: 8px; }
+button { font-family: inherit; color: var(--vscode-button-foreground); background: var(--vscode-button-background); border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button[data-action="discard"] { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); }
