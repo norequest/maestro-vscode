@@ -2,3 +2,5 @@ node_modules/
 dist/
 packages/*/dist/
 .conductor/.runtime/
+.DS_Store
+**/.DS_Store

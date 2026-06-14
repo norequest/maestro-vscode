@@ -39,7 +39,8 @@
     "@maestro/core": "workspace:*",
     "@maestro/cockpit": "workspace:*",
     "@maestro/workspace": "workspace:*",
-    "@maestro/adapter-copilot": "workspace:*"
+    "@maestro/adapter-copilot": "workspace:*",
+    "@maestro/adapter-acp": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

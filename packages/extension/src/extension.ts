@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { Orchestrator, type Role } from "@maestro/core";
 import { GitWorkspaceManager } from "@maestro/workspace";
 import { CopilotAdapter } from "@maestro/adapter-copilot";
+import { AcpAdapter } from "@maestro/adapter-acp";
 import { createCockpit } from "./controller.js";
 import { RosterTreeDataProvider } from "./roster.js";
 import { StageWebviewPanel } from "./stage.js";
@@ -24,6 +25,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const workspaces = new GitWorkspaceManager({ repoRoot });
   const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);
   orch.registerAdapter(new CopilotAdapter());
+  // Register the generic ACP adapter (Gemini CLI in --acp --stdio mode). With
+  // no approval UI yet (M6), an ACP-targeted role should use an auto-approving
+  // autonomy. No ACP role is seeded in M5; this registration is forward-compat.
+  orch.registerAdapter(new AcpAdapter({ command: "gemini" }));
   orch.registerRole(DEFAULT_ROLE);
 
   const roster = new RosterTreeDataProvider();
