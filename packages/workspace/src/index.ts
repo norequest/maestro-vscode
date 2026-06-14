@@ -1,0 +1,1 @@
+export const MAESTRO_WORKSPACE_VERSION = "0.0.0";
