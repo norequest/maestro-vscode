@@ -33,6 +33,8 @@ function cardFromAgent(agent: Agent, prevOutput: string): CardVM {
     conflictFiles: agent.conflict?.files,
     error: agent.error,
     pendingApprovalId: agent.pendingApprovalId,
+    approvalDetail: agent.approvalDetail,
+    engineCapabilities: agent.engineCapabilities,
     attention: needsAttention(agent.state),
   };
 }
