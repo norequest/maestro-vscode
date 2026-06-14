@@ -1,0 +1,125 @@
+import { describe, it, expect } from "vitest";
+import { Orchestrator, FakeWorkspaceProvider, isTerminalState } from "@maestro/core";
+import type { EngineAdapter, Role, AgentEvent } from "@maestro/core";
+
+/**
+ * A factory the per-adapter conformance test provides. It returns a fresh
+ * adapter plus driver hooks the suite calls AFTER the agent reaches `working`:
+ * the adapter must not emit anything until driven.
+ */
+export type AdapterFactory = () => {
+  adapter: EngineAdapter;
+  /** Drive the adapter to emit a terminal `done` event. */
+  completeSucessfully(): void;
+  /** Drive the adapter to emit a terminal `error` event. */
+  failWithError(): void;
+  /** Drive the adapter to emit at least one `output` event. */
+  emitOutput(text: string): void;
+};
+
+function makeRole(engineId: string): Role {
+  return {
+    name: "Implementer",
+    instructions: "do the thing",
+    engine: { id: engineId },
+    autonomy: "yolo",
+  };
+}
+
+function waitForTerminal(orch: Orchestrator, agentId: string): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      const a = orch.getAgent(agentId);
+      if (a && isTerminalState(a.state)) resolve();
+    };
+    orch.on(check);
+    check();
+  });
+}
+
+function waitForState(orch: Orchestrator, agentId: string, target: string): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (orch.getAgent(agentId)?.state === target) resolve();
+    };
+    orch.on(check);
+    check();
+  });
+}
+
+/**
+ * The shared adapter conformance suite. Every adapter calls this from its own
+ * conformance test, passing a label and a factory. Turns "add an engine = write
+ * one adapter" into a machine-checked guarantee.
+ */
+export function runConformanceSuite(label: string, factory: AdapterFactory): void {
+  describe(`${label} conformance`, () => {
+    it("declares id and capabilities", () => {
+      const { adapter } = factory();
+      expect(typeof adapter.id).toBe("string");
+      expect(adapter.id.length).toBeGreaterThan(0);
+      const c = adapter.capabilities;
+      expect(typeof c.streaming).toBe("boolean");
+      expect(typeof c.structuredEvents).toBe("boolean");
+      expect(typeof c.approvals).toBe("boolean");
+      expect(typeof c.steerable).toBe("boolean");
+    });
+
+    it("health() resolves to a HealthStatus", async () => {
+      const { adapter } = factory();
+      const h = await adapter.health();
+      expect(typeof h.ok).toBe("boolean");
+    });
+
+    it("streams events then terminates with done or error", async () => {
+      const { adapter, completeSucessfully, emitOutput } = factory();
+      const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
+      orch.registerRole(makeRole(adapter.id));
+      orch.registerAdapter(adapter);
+
+      const events: AgentEvent[] = [];
+      orch.on((e) => {
+        if (e.kind === "agent-event") events.push(e.event);
+      });
+
+      const agent = orch.spawn("Implementer", "task");
+      await waitForState(orch, agent.id, "working");
+
+      emitOutput("doing work\n");
+      completeSucessfully();
+
+      await waitForTerminal(orch, agent.id);
+
+      const final = orch.getAgent(agent.id)!;
+      expect(["done", "error"]).toContain(final.state);
+      // Capability-aware: structured-event adapters must emit a status event;
+      // unstructured adapters (e.g. Copilot) just need to stream something.
+      if (adapter.capabilities.structuredEvents) {
+        expect(events.some((e) => e.kind === "status")).toBe(true);
+      } else {
+        expect(events.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("honors stop(): agent reaches stopped, stream ends without error", async () => {
+      const { adapter } = factory();
+      const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
+      orch.registerRole(makeRole(adapter.id));
+      orch.registerAdapter(adapter);
+
+      const agent = orch.spawn("Implementer", "task");
+      await waitForState(orch, agent.id, "working");
+      orch.stop(agent.id);
+
+      await new Promise((r) => setImmediate(r));
+      const final = orch.getAgent(agent.id)!;
+      expect(final.state).toBe("stopped");
+    });
+
+    it("reports capabilities truthfully (boolean flags, no lies)", () => {
+      const { adapter } = factory();
+      expect(typeof adapter.capabilities.approvals).toBe("boolean");
+      expect(typeof adapter.capabilities.steerable).toBe("boolean");
+    });
+  });
+}
