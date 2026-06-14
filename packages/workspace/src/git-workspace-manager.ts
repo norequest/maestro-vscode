@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import type { Diff, MergeResult, Workspace } from "@maestro/core";
 import type { WorkspaceManager } from "@maestro/core";
-import { nodeGitRunner } from "./git-runner.js";
+import { nodeGitRunner, nodeShellRunner } from "./git-runner.js";
 import type { GitRunner } from "./git-runner.js";
 
 interface AgentWorktree {
@@ -13,16 +13,40 @@ interface AgentWorktree {
 export interface GitWorkspaceManagerOptions {
   repoRoot: string;
   runner?: GitRunner;
+  /** Injectable for non-git shell commands (e.g. gh). Defaults to spawning the binary directly. */
+  shellRunner?: GitRunner;
+  /**
+   * When true, the agent branch is kept after a successful merge (cleanup call).
+   * The worktree is still removed. Default: false (deletes branch on cleanup).
+   * Discard always deletes the branch regardless of this setting.
+   */
+  retainBranchOnMerge?: boolean;
+}
+
+export interface PrOptions {
+  title: string;
+  body: string;
+  base: string;
+  remote: string;
+  draft: boolean;
+}
+
+export interface PrResult {
+  prUrl: string;
 }
 
 export class GitWorkspaceManager implements WorkspaceManager {
   private readonly runner: GitRunner;
+  private readonly shellRunner: GitRunner;
   private readonly repoRoot: string;
+  private readonly retainBranchOnMerge: boolean;
   private readonly records = new Map<string, AgentWorktree>();
 
   constructor(opts: GitWorkspaceManagerOptions) {
     this.repoRoot = opts.repoRoot;
     this.runner = opts.runner ?? nodeGitRunner;
+    this.shellRunner = opts.shellRunner ?? nodeShellRunner;
+    this.retainBranchOnMerge = opts.retainBranchOnMerge ?? false;
   }
 
   static slug(agentId: string): string {
@@ -161,12 +185,45 @@ export class GitWorkspaceManager implements WorkspaceManager {
     return { status: "clean" };
   }
 
+  /**
+   * PR mode: push the agent branch to the remote and open a pull request via
+   * `gh pr create`. This replaces the local merge when `maestro.prMode` is
+   * enabled in settings. The shellRunner is used for `gh` so the entire
+   * flow stays offline-testable with a fake runner.
+   *
+   * Does NOT call cleanup/discard: the worktree remains until the PR is merged
+   * (or the user manually discards). The caller is responsible for calling
+   * discard() after the PR is merged if branch-retention is off.
+   */
+  async pushAndPr(agentId: string, opts: PrOptions): Promise<PrResult> {
+    const rec = this.require(agentId);
+    // Push the branch to the remote
+    const pushResult = await this.runner(["push", opts.remote, rec.branch], { cwd: this.repoRoot });
+    if (pushResult.exitCode !== 0) {
+      throw new Error(`git push ${opts.remote} ${rec.branch} failed (${pushResult.exitCode}): ${pushResult.stderr.trim()}`);
+    }
+    // Create the PR via gh CLI (uses shellRunner, not runner)
+    const ghArgs: string[] = [
+      "gh", "pr", "create",
+      "--title", opts.title,
+      "--body", opts.body,
+      "--base", opts.base,
+      "--head", rec.branch,
+    ];
+    if (opts.draft) ghArgs.push("--draft");
+    const prResult = await this.shellRunner(ghArgs, { cwd: this.repoRoot });
+    if (prResult.exitCode !== 0) {
+      throw new Error(`gh pr create failed (${prResult.exitCode}): ${prResult.stderr.trim()}`);
+    }
+    return { prUrl: prResult.stdout.trim() };
+  }
+
   async discard(agentId: string): Promise<void> {
     await this.teardown(agentId, true);
   }
 
   async cleanup(agentId: string): Promise<void> {
-    await this.teardown(agentId, true);
+    await this.teardown(agentId, !this.retainBranchOnMerge);
   }
 
   private async teardown(agentId: string, deleteBranch: boolean): Promise<void> {
