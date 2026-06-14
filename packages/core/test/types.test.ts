@@ -15,6 +15,15 @@ describe("ApprovalDetail", () => {
   });
 });
 
+import { describe as describeTeam, it as itTeam, expectTypeOf } from "vitest";
+import type { Team, Role } from "../src/types.js";
+
+describeTeam("Team type", () => {
+  itTeam("has name and roles fields", () => {
+    expectTypeOf<Team>().toMatchTypeOf<{ name: string; roles: Role[] }>();
+  });
+});
+
 import { describe as describeStates, it as itStates, expect as expectStates } from "vitest";
 import type { AgentState as AgentStateT, PersistedAgentRecord, Agent as AgentT } from "../src/types.js";
 

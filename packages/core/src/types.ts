@@ -71,6 +71,12 @@ export interface Role {
   autonomy: "manual" | "auto-approve-safe" | "yolo";
 }
 
+/** A named group of roles that can be dispatched together. */
+export interface Team {
+  name: string;
+  roles: Role[];
+}
+
 /** A running instance of a role on a task. */
 export interface Agent {
   id: string;
