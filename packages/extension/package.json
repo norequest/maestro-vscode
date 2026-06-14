@@ -40,7 +40,9 @@
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "compile-integration": "tsc -p integration/tsconfig.json",
+    "test:e2e": "node build.mjs && tsc -p integration/tsconfig.json && node out/integration/runTest.js"
   },
   "dependencies": {
     "@maestro/core": "workspace:*",
@@ -51,9 +53,13 @@
     "@maestro/config": "workspace:*"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.24.0",
+    "glob": "^11.1.0",
+    "mocha": "^11.7.6",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

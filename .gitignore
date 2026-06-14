@@ -4,3 +4,9 @@ packages/*/dist/
 .conductor/.runtime/
 .DS_Store
 **/.DS_Store
+
+# VS Code integration test harness
+out/
+packages/*/out/
+.vscode-test/
+packages/*/.vscode-test/

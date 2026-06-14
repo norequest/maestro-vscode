@@ -1,5 +1,8 @@
 src/**
 test/**
+integration/**
+out/**
+.vscode-test/**
 build.mjs
 tsconfig.json
 vitest.config.ts
