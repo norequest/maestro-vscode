@@ -206,3 +206,40 @@ describe("GitWorkspaceManager.rebase", () => {
     await expect(manager.rebase("unknown")).rejects.toThrow("Unknown agent");
   });
 });
+
+// ---- Task C3: resolveMerge ----
+
+describe("GitWorkspaceManager.resolveMerge", () => {
+  it("stages all, commits the merge, returns { status: 'clean' }", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      // confirm no remaining unmerged files (simulate user already resolved them)
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    const result = await m.resolveMerge("a1");
+    expect(result).toEqual({ status: "clean" });
+    // Must stage all and commit --no-edit in the repo root
+    expect(fake.calls.some((c) => c.args.join(" ") === "add -A" && c.cwd === REPO)).toBe(true);
+    expect(fake.calls.some((c) => c.args[0] === "commit" && c.args.includes("--no-edit") && c.cwd === REPO)).toBe(true);
+  });
+
+  it("returns conflict with remaining files if user has not resolved all markers", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "unresolved.ts\n" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    const result = await m.resolveMerge("a1");
+    expect(result).toEqual({ status: "conflict", files: ["unresolved.ts"] });
+    // Must NOT commit when files remain unresolved
+    expect(fake.calls.some((c) => c.args[0] === "commit")).toBe(false);
+  });
+
+  it("throws for an unknown agent", async () => {
+    const { manager } = mgr();
+    await expect(manager.resolveMerge("unknown")).rejects.toThrow("Unknown agent");
+  });
+});

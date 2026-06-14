@@ -139,6 +139,28 @@ export class GitWorkspaceManager implements WorkspaceManager {
     return { status: "clean" };
   }
 
+  /**
+   * Finish a merge after the user has resolved conflict markers. Checks for
+   * any remaining unmerged paths first: if found, returns the conflict result
+   * (the caller should tell the user to resolve those files too). If all
+   * markers are resolved, stages everything and commits the merge.
+   *
+   * Intended call site: the VS Code extension calls this after the user
+   * closes the merge editor and indicates resolution is complete.
+   */
+  async resolveMerge(agentId: string): Promise<MergeResult> {
+    this.require(agentId); // throws for unknown agent
+    // Check whether any paths are still unmerged in the working tree
+    const remaining = (await this.runner(["diff", "--name-only", "--diff-filter=U"], { cwd: this.repoRoot }))
+      .stdout.split("\n").map((f) => f.trim()).filter(Boolean);
+    if (remaining.length > 0) {
+      return { status: "conflict", files: remaining };
+    }
+    await this.git(["add", "-A"]);
+    await this.git(["commit", "--no-edit", "-m", "Merge resolved via Maestro"]);
+    return { status: "clean" };
+  }
+
   async discard(agentId: string): Promise<void> {
     await this.teardown(agentId, true);
   }

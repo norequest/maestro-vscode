@@ -140,3 +140,33 @@ describe("GitWorkspaceManager isStale + rebase (real git)", () => {
     expect(status).toBe("");
   });
 });
+
+// ---- Task C3: resolveMerge (real git) ----
+
+describe("GitWorkspaceManager.resolveMerge (real git)", () => {
+  it("after manual resolution, commits the merge and returns clean", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    // Agent edits same line as base to create a conflict
+    writeFileSync(join(ws.path, "file.txt"), "agent-change\n");
+    await m.diff("a1");
+    writeFileSync(join(repo, "file.txt"), "base-change\n");
+    git(repo, "commit", "-q", "-am", "base edit");
+
+    // Attempt merge -> conflict
+    const conflictResult = await m.merge("a1");
+    expect(conflictResult.status).toBe("conflict");
+
+    // Simulate the user resolving the conflict: overwrite with a resolution,
+    // then stage it.
+    writeFileSync(join(repo, "file.txt"), "resolved\n");
+    git(repo, "add", "file.txt");
+
+    // resolveMerge should now commit successfully
+    const cleanResult = await m.resolveMerge("a1");
+    expect(cleanResult).toEqual({ status: "clean" });
+    // The resolved content is in the repo
+    const content = readFileSync(join(repo, "file.txt"), "utf8");
+    expect(content.trim()).toBe("resolved");
+  });
+});
