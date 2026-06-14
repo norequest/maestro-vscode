@@ -6,6 +6,8 @@ import { AcpAdapter } from "@maestro/adapter-acp";
 import { createCockpit } from "./controller.js";
 import { RosterTreeDataProvider } from "./roster.js";
 import { StageWebviewPanel } from "./stage.js";
+import { EventLogger } from "./persistence.js";
+import { FsPersistenceBackend } from "./persistence-fs.js";
 
 const DEFAULT_ROLE: Role = {
   name: "Implementer",
@@ -21,6 +23,8 @@ export function activate(context: vscode.ExtensionContext): void {
     return;
   }
   const repoRoot = folder.uri.fsPath;
+
+  const eventLogger = new EventLogger(new FsPersistenceBackend(repoRoot));
 
   const workspaces = new GitWorkspaceManager({ repoRoot });
   const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);
@@ -42,6 +46,31 @@ export function activate(context: vscode.ExtensionContext): void {
     },
     (message) => void vscode.window.showErrorMessage(`Maestro: ${message}`),
   );
+
+  // Persistence (M7): restore the previous session, then log all future events.
+  // The logger subscribes AFTER hydrate so the events hydrate() re-emits are not
+  // re-persisted (which would grow the on-disk log on every reload). The cockpit
+  // is already subscribed via createCockpit above, so hydrate's events rebuild
+  // the card set.
+  void (async () => {
+    try {
+      const records = await eventLogger.loadAll();
+      if (records.length > 0) orch.hydrate(records);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      void vscode.window.showWarningMessage(`Maestro: could not restore previous session: ${message}`);
+    }
+    const unsubPersist = orch.on((event) => eventLogger.write(event));
+    const unsubForget = orch.on((event) => {
+      if (
+        event.kind === "agent-updated" &&
+        (event.agent.state === "merged" || event.agent.state === "discarded")
+      ) {
+        void eventLogger.forget(event.agent.id);
+      }
+    });
+    context.subscriptions.push({ dispose: () => { unsubPersist(); unsubForget(); } });
+  })();
 
   context.subscriptions.push(
     roster,
