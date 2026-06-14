@@ -15,6 +15,7 @@ function fakeOrch() {
     merge: vi.fn(async (id: string) => { calls.push(`merge:${id}`); return { status: "clean" as const }; }),
     discard: vi.fn(async (id: string) => { calls.push(`discard:${id}`); }),
     sendBack: (id: string, fb: string) => { calls.push(`sendBack:${id}:${fb}`); return {} as Agent; },
+    retryCleanup: async (id: string) => { calls.push(`retryCleanup:${id}`); },
   };
   return { orch, calls, emit: (e: OrchestratorEvent) => listener?.(e) };
 }
@@ -71,6 +72,23 @@ describe("createCockpit", () => {
     const cockpit = createCockpit(orch, () => {});
     cockpit.handle({ type: "sendBack", agentId: "a1", feedback: "please add tests" });
     expect(calls).toContain("sendBack:a1:please add tests");
+  });
+
+  it("dispatches retry-cleanup to the orchestrator", () => {
+    const { orch, calls } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "retry-cleanup", agentId: "a1" });
+    expect(calls).toContain("retryCleanup:a1");
+  });
+
+  it("routes resolve-conflict/finish-merge/create-pr to the onMergeAction callback", () => {
+    const { orch } = fakeOrch();
+    const seen: string[] = [];
+    const cockpit = createCockpit(orch, () => {}, undefined, (msg) => seen.push(msg.type));
+    cockpit.handle({ type: "resolve-conflict", agentId: "a1" });
+    cockpit.handle({ type: "finish-merge", agentId: "a1" });
+    cockpit.handle({ type: "create-pr", agentId: "a1" });
+    expect(seen).toEqual(["resolve-conflict", "finish-merge", "create-pr"]);
   });
 
   it("focus updates state and dispose unsubscribes", () => {

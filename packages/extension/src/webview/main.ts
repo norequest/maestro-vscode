@@ -68,6 +68,14 @@ document.addEventListener("click", (e) => {
           decision: action === "approve" ? "allow" : "deny",
         });
       }
+    } else if (action === "resolve-conflict") {
+      vscode.postMessage({ type: "resolve-conflict", agentId: id });
+    } else if (action === "finish-merge") {
+      vscode.postMessage({ type: "finish-merge", agentId: id });
+    } else if (action === "create-pr") {
+      vscode.postMessage({ type: "create-pr", agentId: id });
+    } else if (action === "retry-cleanup") {
+      vscode.postMessage({ type: "retry-cleanup", agentId: id });
     }
     return;
   }

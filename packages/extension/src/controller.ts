@@ -12,6 +12,7 @@ export interface OrchestratorLike {
   merge(agentId: string): Promise<MergeResult>;
   discard(agentId: string): Promise<void>;
   sendBack(agentId: string, feedback: string): Agent;
+  retryCleanup(agentId: string): Promise<void>;
 }
 
 export interface Cockpit {
@@ -32,6 +33,7 @@ export function createCockpit(
   orch: OrchestratorLike,
   onState: (state: CockpitState) => void,
   onError?: (message: string) => void,
+  onMergeAction?: (msg: WebviewToHost) => void,
 ): Cockpit {
   let model = initialModel();
   const push = (): void => onState(selectState(model));
@@ -72,6 +74,14 @@ export function createCockpit(
         break;
       case "sendBack":
         orch.sendBack(message.agentId, message.feedback);
+        break;
+      case "retry-cleanup":
+        orch.retryCleanup(message.agentId).catch(fail);
+        break;
+      case "resolve-conflict":
+      case "finish-merge":
+      case "create-pr":
+        onMergeAction?.(message);
         break;
     }
   }

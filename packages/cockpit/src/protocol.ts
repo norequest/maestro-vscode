@@ -41,4 +41,8 @@ export type WebviewToHost =
   | { type: "stop"; agentId: string }
   | { type: "merge"; agentId: string }
   | { type: "discard"; agentId: string }
-  | { type: "sendBack"; agentId: string; feedback: string };
+  | { type: "sendBack"; agentId: string; feedback: string }
+  | { type: "resolve-conflict"; agentId: string }
+  | { type: "finish-merge"; agentId: string }
+  | { type: "create-pr"; agentId: string }
+  | { type: "retry-cleanup"; agentId: string };
