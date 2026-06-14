@@ -27,12 +27,67 @@ describe("validateRole", () => {
     }
   });
 
-  it("warns on an unknown engine id (does not hard-fail)", () => {
-    const result = validateRole({ ...validRoleRaw, engine: { id: "made-up-engine" } });
+  it("errors on an unknown engine id (Issue 28: unknown engine is rejected, not warned)", () => {
+    const result = validateRole({ ...validRoleRaw, engine: { id: "totally-unknown" } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes("engine.id"))).toBe(true);
+      expect(result.errors.some((e) => e.includes("totally-unknown"))).toBe(true);
+    }
+  });
+
+  it("accepts the known engine ids copilot and acp", () => {
+    const copilot = validateRole({ ...validRoleRaw, engine: { id: "copilot" } });
+    expect(copilot.ok).toBe(true);
+    const acp = validateRole({ ...validRoleRaw, engine: { id: "acp" } });
+    expect(acp.ok).toBe(true);
+  });
+
+  it("accepts a well-formed model value (Issue 29)", () => {
+    const result = validateRole({ ...validRoleRaw, engine: { id: "copilot", model: "gpt-4" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.warnings.length).toBeGreaterThan(0);
-      expect(result.warnings[0]?.message).toContain("made-up-engine");
+      expect(result.value.engine.model).toBe("gpt-4");
+    }
+  });
+
+  it("errors on a model containing a space (Issue 29)", () => {
+    const result = validateRole({ ...validRoleRaw, engine: { id: "copilot", model: "gpt 4" } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes("model"))).toBe(true);
+    }
+  });
+
+  it("errors on a model that starts with a dash (Issue 29: argument-injection guard)", () => {
+    const result = validateRole({ ...validRoleRaw, engine: { id: "copilot", model: "--evil" } });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes("model"))).toBe(true);
+    }
+  });
+
+  it("accepts a non-ASCII role.name (Issue 29: Georgian names are allowed)", () => {
+    const result = validateRole({ ...validRoleRaw, name: "Georgian რედაქტორი" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.name).toBe("Georgian რედაქტორი");
+    }
+  });
+
+  it("errors on a role.name that starts with a dash (Issue 29: argument-injection guard)", () => {
+    const result = validateRole({ ...validRoleRaw, name: "-rf" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes("name"))).toBe(true);
+    }
+  });
+
+  it("errors on a role.name containing a control character (Issue 29)", () => {
+    const result = validateRole({ ...validRoleRaw, name: "evil\x00name" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.includes("name"))).toBe(true);
     }
   });
 

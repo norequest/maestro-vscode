@@ -92,6 +92,47 @@ describe("ProcessAcpTransport NDJSON buffering", () => {
     expect((msgs.at(-1)!.params as any).message).toContain("spawn failed");
   });
 
+  it("flushes a trailing buffered line with no newline when the child closes", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    const line = JSON.stringify({
+      jsonrpc: "2.0",
+      method: "turn/complete",
+      params: { summary: "ok" },
+    });
+    // Final frame written WITHOUT a trailing newline, then a clean exit.
+    child.emit(line);
+    child.close(0);
+    const msgs = await collected;
+    expect(msgs).toHaveLength(1);
+    expect(msgs[0]!.method).toBe("turn/complete");
+  });
+
+  it("flushes a trailing buffered line when the child errors", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    const line = JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: {} });
+    child.emit(line);
+    child.fail(new Error("boom"));
+    const msgs = await collected;
+    // The buffered frame is delivered before the synthetic error.
+    expect(msgs.map((m) => m.method)).toEqual(["session/update", "error"]);
+  });
+
+  it("parses CRLF-delimited lines without leaving a stray carriage return", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    const a = JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: {} });
+    const b = JSON.stringify({ jsonrpc: "2.0", method: "turn/complete", params: { summary: "d" } });
+    child.emit(a + "\r\n" + b + "\r\n");
+    child.close(0);
+    const msgs = await collected;
+    expect(msgs.map((m) => m.method)).toEqual(["session/update", "turn/complete"]);
+  });
+
   it("send() writes a JSON line to stdin; terminate() kills the child", () => {
     const child = new FakeChild();
     const transport = new ProcessAcpTransport(child);

@@ -7,12 +7,18 @@ export function parseAcpLine(line: string): AcpMessage | null {
   if (trimmed.length === 0) return null;
   try {
     const parsed: unknown = JSON.parse(trimmed);
-    if (
-      parsed !== null &&
-      typeof parsed === "object" &&
-      "jsonrpc" in parsed &&
-      "method" in parsed
-    ) {
+    if (parsed === null || typeof parsed !== "object" || !("jsonrpc" in parsed)) {
+      return null;
+    }
+    // Accept request/notification frames (carry a string `method`) and JSON-RPC
+    // response frames (carry `error` or `result` and no method).
+    if ("method" in parsed) {
+      const method = (parsed as { method: unknown }).method;
+      // A non-string method is malformed; drop it rather than passing it on.
+      if (typeof method !== "string") return null;
+      return parsed as AcpMessage;
+    }
+    if ("error" in parsed || "result" in parsed) {
       return parsed as AcpMessage;
     }
     return null;

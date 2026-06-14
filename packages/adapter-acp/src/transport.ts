@@ -26,7 +26,8 @@ export class ProcessAcpTransport implements AcpTransport {
     child.stdout.on("data", (chunk) => {
       if (this.settled) return;
       this.buffer += chunk.toString();
-      const lines = this.buffer.split("\n");
+      // Split on LF or CRLF so CRLF endings do not leave a stray carriage return.
+      const lines = this.buffer.split(/\r?\n/);
       // The last element may be an incomplete line; keep it buffered.
       this.buffer = lines.pop() ?? "";
       for (const line of lines) {
@@ -37,12 +38,14 @@ export class ProcessAcpTransport implements AcpTransport {
     child.on("error", (err) => {
       if (this.settled) return;
       this.settled = true;
+      this.flushBuffer();
       this.queue.push({ jsonrpc: "2.0", method: "error", params: { message: err.message } });
       this.queue.end();
     });
     child.on("close", (code) => {
       if (this.settled) return;
       this.settled = true;
+      this.flushBuffer();
       if (code !== 0) {
         this.queue.push({
           jsonrpc: "2.0",
@@ -52,6 +55,19 @@ export class ProcessAcpTransport implements AcpTransport {
       }
       this.queue.end();
     });
+  }
+
+  /**
+   * Flush any residual buffered text. An ACP child can write its final frame
+   * (e.g. turn/complete) without a trailing newline and then exit; without this
+   * the terminal frame is lost and a successful run is reported as a failure.
+   */
+  private flushBuffer(): void {
+    const residual = this.buffer;
+    this.buffer = "";
+    if (residual.trim().length === 0) return;
+    const msg = parseAcpLine(residual);
+    if (msg !== null) this.queue.push(msg);
   }
 
   get messages(): AsyncIterable<AcpMessage> {

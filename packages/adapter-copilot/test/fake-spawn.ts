@@ -1,12 +1,14 @@
 import type { ChildHandle, DataStream, SpawnFn } from "../src/types.js";
 
 class FakeStream implements DataStream {
-  private listener?: (chunk: string) => void;
+  private listener?: (chunk: Buffer | string) => void;
   on(_event: "data", listener: (chunk: Buffer | string) => void): void {
-    this.listener = listener as (chunk: string) => void;
+    this.listener = listener;
   }
-  emit(text: string): void {
-    this.listener?.(text);
+  /** Emit a raw chunk, exactly as given (string or Buffer), to exercise
+   *  arbitrary chunk boundaries. */
+  emit(chunk: Buffer | string): void {
+    this.listener?.(chunk);
   }
 }
 
@@ -26,8 +28,11 @@ export class FakeChild implements ChildHandle {
   }
 
   // Test drivers:
-  out(text: string): void {
-    this.stdout.emit(text);
+  out(chunk: Buffer | string): void {
+    this.stdout.emit(chunk);
+  }
+  err(chunk: Buffer | string): void {
+    this.stderr.emit(chunk);
   }
   close(code: number | null): void {
     this.closeListener?.(code);
@@ -43,15 +48,24 @@ export function makeFakeSpawn(): {
   child: () => FakeChild | undefined;
   lastArgs: () => readonly string[] | undefined;
   lastCwd: () => string | undefined;
+  lastEnv: () => NodeJS.ProcessEnv | undefined;
 } {
   let lastChild: FakeChild | undefined;
   let lastArgs: readonly string[] | undefined;
   let lastCwd: string | undefined;
+  let lastEnv: NodeJS.ProcessEnv | undefined;
   const fn: SpawnFn = (_command, args, options) => {
     lastArgs = args;
     lastCwd = options.cwd;
+    lastEnv = options.env;
     lastChild = new FakeChild();
     return lastChild;
   };
-  return { fn, child: () => lastChild, lastArgs: () => lastArgs, lastCwd: () => lastCwd };
+  return {
+    fn,
+    child: () => lastChild,
+    lastArgs: () => lastArgs,
+    lastCwd: () => lastCwd,
+    lastEnv: () => lastEnv,
+  };
 }

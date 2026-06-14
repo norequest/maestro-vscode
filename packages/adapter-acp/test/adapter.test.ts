@@ -81,4 +81,23 @@ describe("AcpAdapter", () => {
     expect(capturedArgs).toContain("--acp");
     expect(capturedArgs).toContain("--stdio");
   });
+
+  // Issue 32-acp: undefined env values are filtered out, defined ones forwarded.
+  it("filters out env keys whose value is undefined while forwarding defined ones", () => {
+    let capturedEnv: NodeJS.ProcessEnv | undefined;
+    const fn: AcpTransportFn = (_cmd, _args, opts) => {
+      capturedEnv = opts.env;
+      return new FakeAcpTransport();
+    };
+    const adapter = new AcpAdapter({
+      transportFn: fn,
+      command: "gemini",
+      env: { KEEP: "yes", DROP: undefined, TOKEN: "abc" },
+    });
+    adapter.start(task, workspace, role);
+    expect(capturedEnv).toBeDefined();
+    expect(capturedEnv).not.toHaveProperty("DROP");
+    expect(capturedEnv!["KEEP"]).toBe("yes");
+    expect(capturedEnv!["TOKEN"]).toBe("abc");
+  });
 });

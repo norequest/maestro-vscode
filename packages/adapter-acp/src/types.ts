@@ -2,8 +2,13 @@
 export interface AcpMessage {
   jsonrpc: "2.0";
   id?: number | string;
-  method: string;
+  /**
+   * Present on request and notification frames. Absent on JSON-RPC response
+   * frames (which carry `result` or `error` instead).
+   */
+  method?: string;
   params?: Record<string, unknown>;
+  result?: unknown;
   error?: { code: number; message: string };
 }
 
@@ -12,11 +17,15 @@ export interface AcpMessage {
  * This is the documented M5 -> M6 downstream contract.
  */
 export interface AcpApprovalDetail {
-  /** Human-readable description of what the agent wants to do. */
-  description: string;
-  /** The ACP tool name (e.g. "bash", "write_file"). */
-  tool: string;
-  /** Raw args from the ACP requestPermission message, if present. */
+  /**
+   * Human-readable description of what the agent wants to do. Omitted when the
+   * wire frame carried a non-string value so the downstream core guard renders
+   * a generic label rather than a coerced "[object Object]".
+   */
+  description?: string;
+  /** The ACP tool name (e.g. "bash", "write_file"). Omitted when non-string. */
+  tool?: string;
+  /** Raw args from the ACP requestPermission message, only when a plain object. */
   args?: Record<string, unknown>;
 }
 

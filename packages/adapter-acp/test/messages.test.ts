@@ -58,6 +58,28 @@ describe("parseAcpLine", () => {
     });
     expect(parseAcpLine(line)!.method).toBe("error");
   });
+
+  it("parses a JSON-RPC error response frame with no method", () => {
+    const line = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      error: { code: -32603, message: "init failed" },
+    });
+    const msg = parseAcpLine(line);
+    expect(msg).not.toBeNull();
+    expect(msg!.error).toEqual({ code: -32603, message: "init failed" });
+  });
+
+  it("parses a JSON-RPC result response frame with no method", () => {
+    const line = JSON.stringify({ jsonrpc: "2.0", id: 2, result: { ok: true } });
+    const msg = parseAcpLine(line);
+    expect(msg).not.toBeNull();
+  });
+
+  it("drops a frame whose method is not a string", () => {
+    const line = JSON.stringify({ jsonrpc: "2.0", method: 123, params: {} });
+    expect(parseAcpLine(line)).toBeNull();
+  });
 });
 
 describe("buildInitialize", () => {

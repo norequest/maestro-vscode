@@ -119,9 +119,50 @@ export async function loadConductorDir(
   return result;
 }
 
+/** Marker directory that bounds every file the node-backed reader may touch. */
+const CONDUCTOR_DIR_NAME = ".conductor";
+
+/**
+ * Returns the nearest `.conductor` ancestor of `target` (inclusive), or null if
+ * `target` is not inside a `.conductor` directory. This is the containment
+ * boundary the node-backed reader enforces (Issue 27 / S8).
+ */
+function conductorBoundary(nodePathMod: typeof import("node:path"), target: string): string | null {
+  const resolved = nodePathMod.resolve(target);
+  const segments = resolved.split(nodePathMod.sep);
+  const idx = segments.lastIndexOf(CONDUCTOR_DIR_NAME);
+  if (idx === -1) return null;
+  return segments.slice(0, idx + 1).join(nodePathMod.sep);
+}
+
+/**
+ * True when `candidate`, once realpath-resolved, stays within `boundary`
+ * (also realpath-resolved). Used to reject symlinks in `.conductor/` that
+ * escape the directory and would otherwise be an arbitrary file-read primitive.
+ */
+async function isContained(
+  fs: typeof import("node:fs/promises"),
+  nodePathMod: typeof import("node:path"),
+  candidate: string,
+  boundary: string,
+): Promise<boolean> {
+  const realBoundary = await fs.realpath(boundary);
+  const realCandidate = await fs.realpath(candidate);
+  const rel = nodePathMod.relative(realBoundary, realCandidate);
+  // Contained iff the relative path does not climb out (`..`) and is not absolute.
+  return rel === "" || (!rel.startsWith("..") && !nodePathMod.isAbsolute(rel));
+}
+
 /**
  * A real FsReader backed by node:fs/promises.
  * Import lazily in extension code so the module remains testable.
+ *
+ * Security (Issue 27 / S8): reads are confined to the `.conductor` directory
+ * that contains the target path. Before reading, the target's realpath is
+ * resolved and asserted to stay within the realpath of that `.conductor`
+ * boundary, so a symlink such as `.conductor/roles/x.yaml -> /etc/passwd` is
+ * refused rather than followed. Directory listings skip symlinked entries so a
+ * symlinked `.yaml` is never handed back to the loader.
  */
 export async function makeNodeFsReader(): Promise<FsReader> {
   const fs = await import("node:fs/promises");
@@ -129,13 +170,24 @@ export async function makeNodeFsReader(): Promise<FsReader> {
 
   return {
     async readFile(p: string): Promise<string> {
+      const boundary = conductorBoundary(path, p);
+      if (boundary !== null) {
+        const contained = await isContained(fs, path, p, boundary).catch(() => false);
+        if (!contained) {
+          throw new Error(
+            `Refusing to read "${p}": it resolves outside the ${CONDUCTOR_DIR_NAME} directory (possible symlink escape).`,
+          );
+        }
+      }
       return fs.readFile(p, "utf-8");
     },
     async listFiles(dir: string, ext: string): Promise<string[]> {
       try {
         const entries = await fs.readdir(dir, { withFileTypes: true });
+        // Skip symlinks (isFile() is already false for them, but be explicit so
+        // a symlinked .yaml can never be listed and then read). Issue 27 / S8.
         return entries
-          .filter((e) => e.isFile() && e.name.endsWith(ext))
+          .filter((e) => !e.isSymbolicLink() && e.isFile() && e.name.endsWith(ext))
           .map((e) => e.name)
           .sort();
       } catch {

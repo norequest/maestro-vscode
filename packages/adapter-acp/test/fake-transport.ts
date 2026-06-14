@@ -68,3 +68,23 @@ export function acpTurnComplete(summary: string): AcpMessage {
 export function acpError(message: string): AcpMessage {
   return { jsonrpc: "2.0", method: "error", params: { message } };
 }
+
+/** A JSON-RPC error RESPONSE frame (no method), e.g. a failed initialize. */
+export function acpErrorResponse(id: number | string, code: number, message: string): AcpMessage {
+  return { jsonrpc: "2.0", id, error: { code, message } };
+}
+
+/** A slash-namespaced permission request, the form real ACP engines use. */
+export function acpSessionRequestPermission(
+  id: number | string | undefined,
+  tool: string,
+  description: string,
+  args?: Record<string, unknown>,
+): AcpMessage {
+  return {
+    jsonrpc: "2.0",
+    ...(id !== undefined ? { id } : {}),
+    method: "session/request_permission",
+    params: { tool, description, ...(args ? { args } : {}) },
+  };
+}

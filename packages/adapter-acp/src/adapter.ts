@@ -4,6 +4,19 @@ import { AcpSession } from "./session.js";
 import { defaultAcpTransportFn } from "./transport.js";
 import type { AcpTransportFn } from "./types.js";
 
+/**
+ * Build the spawn env from a forwarded env map, dropping keys whose value is
+ * `undefined`. This keeps full forwarding of defined vars (so engine auth still
+ * works) while avoiding passing literal `undefined` values to the child.
+ */
+function filterDefinedEnv(env: Record<string, string | undefined>): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
+
 export interface AcpAdapterOptions {
   /**
    * The CLI binary to invoke with `--acp --stdio`. Defaults to "gemini".
@@ -43,7 +56,7 @@ export class AcpAdapter implements EngineAdapter {
     }
     const transport = this.transportFn(this.command, args, {
       cwd: workspace.path,
-      env: this.env as NodeJS.ProcessEnv,
+      env: filterDefinedEnv(this.env),
     });
     const session = new AcpSession(transport, {
       instructions: role.instructions,

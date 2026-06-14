@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as path from "node:path";
 import { GitWorkspaceManager } from "../src/git-workspace-manager.js";
 import type { GitRunner } from "../src/git-runner.js";
 import { makeFakeGitRunner, startsWith } from "./fake-git-runner.js";
@@ -83,7 +84,8 @@ describe("GitWorkspaceManager create/cleanup/discard", () => {
     const fake = makeFakeGitRunner([
       { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
       { match: startsWith("status", "--porcelain"), result: { stdout: " M a.ts\n" } },
-      { match: startsWith("diff", "--name-only"), result: { stdout: "a.ts\n" } },
+      // diff --name-only -z emits NUL-delimited paths (no quoting/escaping).
+      { match: startsWith("diff", "--name-only"), result: { stdout: "a.ts\u0000" } },
       { match: (a) => a[0] === "diff" && a[1] === "base123" && a[2] === "HEAD", result: { stdout: "PATCH" } },
     ]);
     const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
@@ -110,7 +112,7 @@ describe("GitWorkspaceManager create/cleanup/discard", () => {
     const fake = makeFakeGitRunner([
       { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
       { match: startsWith("merge", "--no-commit"), result: { exitCode: 1, stdout: "CONFLICT" } },
-      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "a.ts\n" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "a.ts\u0000" } },
     ]);
     const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
     await m.create("a1");
@@ -180,7 +182,7 @@ describe("GitWorkspaceManager.rebase", () => {
     const fake = makeFakeGitRunner([
       { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
       { match: startsWith("rebase"), result: { exitCode: 1, stderr: "CONFLICT (content)" } },
-      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "foo.ts\n" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "foo.ts\u0000" } },
     ]);
     const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
     await m.create("a1");
@@ -228,7 +230,7 @@ describe("GitWorkspaceManager.resolveMerge", () => {
   it("returns conflict with remaining files if user has not resolved all markers", async () => {
     const fake = makeFakeGitRunner([
       { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
-      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "unresolved.ts\n" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "unresolved.ts\u0000" } },
     ]);
     const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
     await m.create("a1");
@@ -350,5 +352,132 @@ describe("GitWorkspaceManager branch retention", () => {
     await m.create("a1");
     await m.discard("a1");
     expect(fake.calls.some((c) => c.args.join(" ") === "branch -D agent/a1")).toBe(true);
+  });
+});
+
+// ---- Audit regressions (Issues 12, 21, 22, 31) ----
+
+describe("Issue 12: conflict-vs-failure classification and best-effort abort", () => {
+  // (a) A rebase that fails for a NON-conflict reason, where the unmerged-list
+  // probe itself ALSO fails, must be reported as a failure (throw), not parsed
+  // as a bogus conflict from the failed probe's stdout.
+  it("rebase: a failing unmerged-files probe surfaces as a failure, not a phantom conflict", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("rebase", "base123"), result: { exitCode: 128, stderr: "fatal: cannot rebase" } },
+      // The U probe itself fails AND prints something on stdout; the throwing
+      // git() helper must reject on the non-zero exit, not parse that stdout.
+      {
+        match: startsWith("diff", "--name-only", "--diff-filter=U"),
+        result: { exitCode: 128, stdout: "garbage.ts\u0000", stderr: "fatal: bad probe" },
+      },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    await expect(m.rebase("a1")).rejects.toThrow();
+    // Must NOT have returned a conflict carrying the probe's garbage stdout.
+  });
+
+  // (b) A genuine conflict still returns { status: "conflict", files } even when
+  // the subsequent abort fails (e.g. an index lock). The classification must
+  // survive a failed abort instead of being swallowed by a throw.
+  it("merge: a genuine conflict still returns conflict even if merge --abort fails", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("merge", "--no-commit"), result: { exitCode: 1, stdout: "CONFLICT" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "conflicted.ts\u0000" } },
+      // The abort FAILS (e.g. index.lock present); merge() must still return.
+      { match: startsWith("merge", "--abort"), result: { exitCode: 1, stderr: "fatal: index.lock exists" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    const result = await m.merge("a1");
+    expect(result).toEqual({ status: "conflict", files: ["conflicted.ts"] });
+    expect(fake.calls.some((c) => c.args.join(" ") === "merge --abort")).toBe(true);
+  });
+
+  it("rebase: a genuine conflict still returns conflict even if rebase --abort fails", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("rebase", "base123"), result: { exitCode: 1, stderr: "CONFLICT (content)" } },
+      { match: startsWith("diff", "--name-only", "--diff-filter=U"), result: { stdout: "foo.ts\u0000" } },
+      { match: startsWith("rebase", "--abort"), result: { exitCode: 1, stderr: "fatal: no rebase in progress?" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    await m.create("a1");
+    const result = await m.rebase("a1");
+    expect(result).toEqual({ status: "conflict", files: ["foo.ts"] });
+    expect(fake.calls.some((c) => c.args.join(" ") === "rebase --abort")).toBe(true);
+  });
+});
+
+describe("Issue 21: pushAndPr extracts the PR URL from gh output", () => {
+  function prFake(ghStdout: string) {
+    return makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+      { match: startsWith("push"), result: { exitCode: 0 } },
+      { match: (a) => a[0] === "gh", result: { stdout: ghStdout, exitCode: 0 } },
+    ]);
+  }
+
+  it("ignores noise lines and returns only the URL", async () => {
+    const fake = prFake(
+      "A new release of gh is available: 2.0.0 -> 2.1.0\n" +
+        "https://github.com/org/repo/pull/123\n" +
+        "To upgrade, run: brew upgrade gh\n",
+    );
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner, shellRunner: fake.runner });
+    await m.create("a1");
+    const result = await m.pushAndPr("a1", { title: "t", body: "b", base: "main", remote: "origin", draft: false });
+    expect(result).toEqual({ prUrl: "https://github.com/org/repo/pull/123" });
+  });
+
+  it("throws a clear error when gh returns no URL", async () => {
+    const fake = prFake("Warning: could not determine PR url\nsomething went sideways\n");
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner, shellRunner: fake.runner });
+    await m.create("a1");
+    await expect(
+      m.pushAndPr("a1", { title: "t", body: "b", base: "main", remote: "origin", draft: false }),
+    ).rejects.toThrow(/did not return a PR URL/);
+  });
+});
+
+describe("Issue 22: worktree directory is derived from the slug, not the raw agentId", () => {
+  it("a ../-bearing agentId does not create a worktree outside .conductor/wt", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    const ws = await m.create("../../etc/evil");
+    const addCall = fake.calls.find((c) => c.args[0] === "worktree" && c.args[1] === "add");
+    expect(addCall).toBeDefined();
+    const wtPath = addCall!.args[2] as string;
+    const worktreesRoot = "/repo/.conductor/wt";
+    // The path handed to git must resolve INSIDE the worktrees root: the slug
+    // neutralizes separators, so the raw id's "../" cannot climb out (a
+    // create-and-force-remove primitive). Resolve to defeat any "/../" segment.
+    const resolved = path.resolve(wtPath);
+    expect(resolved.startsWith(path.resolve(worktreesRoot) + path.sep)).toBe(true);
+    // It must be a SINGLE segment under the root (no extra "/" from the raw id)
+    // and must not be a traversal. Note: the slug dirname itself may begin with
+    // the characters ".." (e.g. "..-..-etc-evil"), which is a safe literal name,
+    // so we check for an actual "../" traversal segment, not a leading "..".
+    const relative = path.relative(worktreesRoot, resolved);
+    expect(relative.includes(path.sep)).toBe(false);
+    expect(relative === ".." || relative.startsWith(".." + path.sep)).toBe(false);
+    expect(ws.path).toBe(wtPath);
+    // The raw id still works as the in-memory map key.
+    expect(ws.agentId).toBe("../../etc/evil");
+  });
+
+  it("an agentId with a path separator collapses to one contained segment", async () => {
+    const fake = makeFakeGitRunner([
+      { match: startsWith("rev-parse", "HEAD"), result: { stdout: "base123\n" } },
+    ]);
+    const m = new GitWorkspaceManager({ repoRoot: REPO, runner: fake.runner });
+    const ws = await m.create("team/alpha");
+    const worktreesRoot = "/repo/.conductor/wt";
+    const relative = path.relative(worktreesRoot, path.resolve(ws.path));
+    expect(relative.includes(path.sep)).toBe(false);
   });
 });

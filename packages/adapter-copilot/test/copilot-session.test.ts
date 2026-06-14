@@ -21,8 +21,8 @@ describe("CopilotSession", () => {
     child.close(0);
 
     expect(await events).toEqual([
-      { kind: "output", text: "working on it\n" },
-      { kind: "output", text: "done editing files\n" },
+      { kind: "output", text: "working on it" },
+      { kind: "output", text: "done editing files" },
       { kind: "done", summary: "done editing files" },
     ]);
   });
@@ -56,12 +56,12 @@ describe("CopilotSession", () => {
     const session = new CopilotSession(child);
     session.start();
     const events = collect(session.events);
-    child.out("⠇⠋"); // pure spinner -> empty after cleaning -> dropped
+    child.out("⠇⠋\n"); // pure spinner -> empty after cleaning -> dropped
     child.out("real output\n");
     child.close(0);
     const result = await events;
     expect(result.filter((e) => e.kind === "output")).toEqual([
-      { kind: "output", text: "real output\n" },
+      { kind: "output", text: "real output" },
     ]);
   });
 
@@ -74,7 +74,7 @@ describe("CopilotSession", () => {
     session.stop();
     expect(child.killed).toBe(true);
     const result = await events;
-    expect(result).toEqual([{ kind: "output", text: "starting\n" }]);
+    expect(result).toEqual([{ kind: "output", text: "starting" }]);
   });
 
   it("swallows output emitted after stop()", async () => {
@@ -96,5 +96,91 @@ describe("CopilotSession", () => {
     child.error(new Error("late")); // guarded by settled -> no second terminal event
     const result = await events;
     expect(result).toEqual([{ kind: "done", summary: "Copilot run completed" }]);
+  });
+
+  it("emits one output event per complete line in a multi-line chunk", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    // A single raw chunk that carries two complete lines. Chunk boundaries are
+    // not line boundaries, so each line must surface as its own event.
+    child.out("first line\nsecond line\n");
+    child.close(0);
+    expect(await events).toEqual([
+      { kind: "output", text: "first line" },
+      { kind: "output", text: "second line" },
+      { kind: "done", summary: "second line" },
+    ]);
+  });
+
+  it("joins a line split across two chunks into one output event", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    // The newline lands in the second chunk, so the line is only complete then.
+    child.out("edited cac");
+    child.out("he.ts\n");
+    child.close(0);
+    expect(await events).toEqual([
+      { kind: "output", text: "edited cache.ts" },
+      { kind: "done", summary: "edited cache.ts" },
+    ]);
+  });
+
+  it("flushes a trailing line with no newline on close", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    child.out("no trailing newline here");
+    child.close(0);
+    expect(await events).toEqual([
+      { kind: "output", text: "no trailing newline here" },
+      { kind: "done", summary: "no trailing newline here" },
+    ]);
+  });
+
+  it("decodes Buffer chunks (not just strings)", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    child.out(Buffer.from("from a buffer\n", "utf8"));
+    child.close(0);
+    expect(await events).toEqual([
+      { kind: "output", text: "from a buffer" },
+      { kind: "done", summary: "from a buffer" },
+    ]);
+  });
+
+  it("includes the stderr tail in the error message on a non-zero exit", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    child.err("fatal: not a git repository\n");
+    child.close(2);
+    const result = await events;
+    expect(result.at(-1)).toMatchObject({ kind: "error" });
+    const message = (result.at(-1) as { message: string }).message;
+    expect(message).toContain("code 2");
+    expect(message).toContain("fatal: not a git repository");
+  });
+
+  it("bounds the stderr ring buffer to roughly the last 8 KB", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    const filler = "x".repeat(9000); // exceeds the 8 KB cap
+    const tail = "REAL_TAIL_MARKER";
+    child.err(filler + tail);
+    child.close(1);
+    const message = ((await events).at(-1) as { message: string }).message;
+    expect(message).toContain(tail);
+    // The early filler must have been dropped to keep the buffer bounded.
+    expect(message.length).toBeLessThan(9000);
   });
 });

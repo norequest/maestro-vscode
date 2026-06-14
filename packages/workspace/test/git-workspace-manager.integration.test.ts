@@ -43,6 +43,26 @@ describe("GitWorkspaceManager (real git)", () => {
     expect(diff.patch).toContain("hello");
   });
 
+  // Issue 7 (WS5): git quotes/C-escapes paths with spaces or non-ASCII bytes by
+  // default. diff() must use -z (NUL-delimited) so the real filename reaches the
+  // conductor's review surface intact, not a quoted/escaped mangling.
+  it("diff returns spaced and non-ASCII (Georgian) filenames intact, not quoted/escaped", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    const spaced = "with space.txt";
+    const georgian = "ფაილი.txt"; // "file" in Georgian
+    writeFileSync(join(ws.path, spaced), "a\n");
+    writeFileSync(join(ws.path, georgian), "b\n");
+    const diff = await m.diff("a1");
+    // Exact names, no surrounding quotes and no \xxx / octal escaping.
+    expect(diff.files).toContain(spaced);
+    expect(diff.files).toContain(georgian);
+    for (const f of diff.files) {
+      expect(f.startsWith('"')).toBe(false);
+      expect(f.includes("\\")).toBe(false);
+    }
+  });
+
   it("clean merge applies the agent's work to the base branch", async () => {
     const m = new GitWorkspaceManager({ repoRoot: repo });
     const ws = await m.create("a1");

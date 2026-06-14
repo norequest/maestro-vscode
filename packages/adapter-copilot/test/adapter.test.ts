@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AgentEvent, Role, Task, Workspace } from "@maestro/core";
 import { CopilotAdapter } from "../src/adapter.js";
+import type { ChildHandle, SpawnFn } from "../src/types.js";
 import { makeFakeSpawn } from "./fake-spawn.js";
 
 const role: Role = {
@@ -59,8 +60,37 @@ describe("CopilotAdapter", () => {
     fake.child()!.close(0);
 
     expect(await events).toEqual([
-      { kind: "output", text: "edited cache.ts\n" },
+      { kind: "output", text: "edited cache.ts" },
       { kind: "done", summary: "edited cache.ts" },
     ]);
+  });
+
+  it("filters undefined-valued env keys but forwards all defined ones", () => {
+    const fake = makeFakeSpawn();
+    const adapter = new CopilotAdapter({
+      spawn: fake.fn,
+      env: { GH_TOKEN: "abc", PATH: "/usr/bin", UNSET: undefined },
+    });
+
+    adapter.start(task, workspace, role);
+
+    const env = fake.lastEnv()!;
+    expect(env.GH_TOKEN).toBe("abc");
+    expect(env.PATH).toBe("/usr/bin");
+    expect("UNSET" in env).toBe(false);
+  });
+
+  it("throws a clear error when the spawned child has no piped stdio", () => {
+    // A child whose stdout was not piped (one `stdio` edit away). Node types
+    // stdout/stderr as `Readable | null`; the adapter must not launder that.
+    const badSpawn: SpawnFn = () =>
+      ({
+        stdout: null,
+        stderr: null,
+        on: () => {},
+        kill: () => {},
+      }) as unknown as ChildHandle;
+    const adapter = new CopilotAdapter({ spawn: badSpawn });
+    expect(() => adapter.start(task, workspace, role)).toThrow(/stdio streams not piped/);
   });
 });

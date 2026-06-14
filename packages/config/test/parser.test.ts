@@ -57,12 +57,12 @@ describe("parseRoleYaml", () => {
     }
   });
 
-  it("returns warnings (not errors) for unknown engine id", () => {
+  it("returns an error for an unknown engine id (Issue 28: unknown engine is rejected)", () => {
     const result = parseRoleYaml(UNKNOWN_ENGINE_YAML, "roles/made-up-reviewer.yaml");
-    expect(result.role.ok).toBe(true);
-    if (result.role.ok) {
-      expect(result.role.warnings.length).toBeGreaterThan(0);
-      expect(result.role.value.engine.id).toBe("made-up-engine");
+    expect(result.role.ok).toBe(false);
+    if (!result.role.ok) {
+      expect(result.role.errors.some((e) => e.includes("engine.id"))).toBe(true);
+      expect(result.role.errors.some((e) => e.includes("made-up-engine"))).toBe(true);
     }
   });
 

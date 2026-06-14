@@ -11,4 +11,9 @@ describe("public API", () => {
     expect(typeof core.Emitter).toBe("function");
     expect(typeof core.isTerminalState).toBe("function");
   });
+
+  it("exports the AgentState policy predicates (T8)", () => {
+    expect(typeof core.isDiscardableState).toBe("function");
+    expect(typeof core.stateNeedsAttention).toBe("function");
+  });
 });

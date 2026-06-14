@@ -3,9 +3,19 @@ import { EventQueue } from "@maestro/core";
 import { cleanOutput } from "./args.js";
 import type { ChildHandle } from "./types.js";
 
+/** Keep at most the last ~8 KB of stderr so a failing run yields a diagnostic
+ *  tail without letting an unbounded child flood memory. */
+const STDERR_RING_BYTES = 8 * 1024;
+
 export class CopilotSession implements AgentSession {
   private readonly queue = new EventQueue();
+  /** The last non-empty COMPLETE line seen across the whole run (not just the
+   *  last chunk), so summary() is correct regardless of chunk boundaries. */
   private lastText = "";
+  /** Partial trailing line not yet terminated by a newline. */
+  private stdoutTail = "";
+  /** Bounded tail of stderr for diagnostics on a non-zero exit. */
+  private stderrTail = "";
   private settled = false;
 
   constructor(private readonly child: ChildHandle) {}
@@ -18,22 +28,70 @@ export class CopilotSession implements AgentSession {
   start(): void {
     this.child.stdout.on("data", (chunk) => {
       if (this.settled) return; // ignore late output after done/error/stop
-      const text = cleanOutput(chunk.toString());
-      if (text.trim().length === 0) return;
-      this.lastText = text;
-      this.queue.push({ kind: "output", text });
+      this.consumeStdout(this.decode(chunk));
+    });
+    // stderr is piped; read it so the pipe never back-pressures the child and so
+    // a failing copilot can report a diagnostic, not just an exit code.
+    this.child.stderr.on("data", (chunk) => {
+      this.appendStderr(this.decode(chunk));
     });
     this.child.on("error", (err) => this.fail(`Failed to run copilot: ${err.message}`));
     this.child.on("close", (code) => {
       if (this.settled) return;
       this.settled = true;
+      this.flushStdoutTail();
       if (code === 0) {
         this.queue.push({ kind: "done", summary: this.summary() });
       } else {
-        this.queue.push({ kind: "error", message: `copilot exited with code ${code ?? "unknown"}` });
+        const tail = this.stderrTail.trim();
+        const suffix = tail ? `: ${tail}` : "";
+        this.queue.push({
+          kind: "error",
+          message: `copilot exited with code ${code ?? "unknown"}${suffix}`,
+        });
       }
       this.queue.end();
     });
+  }
+
+  private decode(chunk: Buffer | string): string {
+    return Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+  }
+
+  /** Split accumulated stdout on newlines, emitting one output event per
+   *  complete line and retaining the partial remainder. */
+  private consumeStdout(text: string): void {
+    this.stdoutTail += text;
+    let nl = this.stdoutTail.indexOf("\n");
+    while (nl !== -1) {
+      const rawLine = this.stdoutTail.slice(0, nl);
+      this.stdoutTail = this.stdoutTail.slice(nl + 1);
+      this.emitLine(rawLine);
+      nl = this.stdoutTail.indexOf("\n");
+    }
+  }
+
+  /** Emit the partial trailing line, if any, when the stream ends. */
+  private flushStdoutTail(): void {
+    if (this.stdoutTail.length > 0) {
+      const remainder = this.stdoutTail;
+      this.stdoutTail = "";
+      this.emitLine(remainder);
+    }
+  }
+
+  private emitLine(rawLine: string): void {
+    const text = cleanOutput(rawLine);
+    if (text.trim().length === 0) return; // skip spinner-only / blank lines
+    this.lastText = text;
+    this.queue.push({ kind: "output", text });
+  }
+
+  private appendStderr(text: string): void {
+    this.stderrTail += text;
+    if (this.stderrTail.length > STDERR_RING_BYTES) {
+      this.stderrTail = this.stderrTail.slice(-STDERR_RING_BYTES);
+    }
   }
 
   private summary(): string {

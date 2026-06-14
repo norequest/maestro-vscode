@@ -67,12 +67,44 @@ export class GitWorkspaceManager implements WorkspaceManager {
     return r.stdout;
   }
 
+  /**
+   * Split NUL-delimited git output (from `-z`) into filenames. With `-z`, git
+   * disables its default path quoting/C-escaping, so paths with spaces or
+   * non-ASCII bytes (e.g. Georgian filenames) come through intact. Splitting on
+   * "\n" + trim() would mangle those; this splits on the NUL byte instead.
+   */
+  private static splitNul(out: string): string[] {
+    return out.split("\u0000").filter((f) => f.length > 0);
+  }
+
+  /**
+   * Collect the unmerged ("U") paths via the throwing git() helper so the
+   * probe's own exit code is checked: a failed probe surfaces as an error
+   * rather than silently parsing partial stdout as a conflict list. NUL-
+   * delimited so non-ASCII / spaced conflict paths reach the conductor intact.
+   */
+  private async unmergedFiles(cwd = this.repoRoot): Promise<string[]> {
+    const out = await this.git(["diff", "--name-only", "--diff-filter=U", "-z"], cwd);
+    return GitWorkspaceManager.splitNul(out);
+  }
+
   async create(agentId: string): Promise<Workspace> {
     const slug = GitWorkspaceManager.slug(agentId);
     if (slug.length === 0) {
       throw new Error(`Agent id "${agentId}" produces an empty slug and cannot be a branch name`);
     }
-    const wtPath = path.join(this.repoRoot, ".conductor", "wt", agentId);
+    // Derive the worktree dir from the SAME slug used for the branch. Using the
+    // raw agentId here would let a "../"-bearing id escape the worktrees root
+    // (a create-and-force-remove primitive) and risks collisions. The raw
+    // agentId stays only as the in-memory map key.
+    const worktreesRoot = path.join(this.repoRoot, ".conductor", "wt");
+    const wtPath = path.join(worktreesRoot, slug);
+    // Defense in depth: even with the slug, assert the resolved path stays
+    // inside the worktrees root before handing it to `git worktree add`.
+    const resolved = path.resolve(wtPath);
+    if (!resolved.startsWith(path.resolve(worktreesRoot) + path.sep)) {
+      throw new Error(`Agent id "${agentId}" resolves to a worktree path outside ${worktreesRoot}`);
+    }
     const branch = `agent/${slug}`;
     const baseSha = (await this.git(["rev-parse", "HEAD"])).trim();
     await this.runner(["worktree", "prune"], { cwd: this.repoRoot });
@@ -89,10 +121,12 @@ export class GitWorkspaceManager implements WorkspaceManager {
       await this.git(["add", "-A"], rec.path);
       await this.git(["commit", "-m", "maestro: agent work snapshot"], rec.path);
     }
-    const files = (await this.git(["diff", "--name-only", rec.baseSha, "HEAD"], rec.path))
-      .split("\n")
-      .map((f) => f.trim())
-      .filter(Boolean);
+    // `-z` makes git emit NUL-delimited, unquoted paths so filenames with
+    // spaces or non-ASCII bytes (e.g. Georgian) survive intact. Splitting on
+    // "\n" + trim() over the default (quoted/escaped) output corrupts them.
+    const files = GitWorkspaceManager.splitNul(
+      await this.git(["diff", "--name-only", "-z", rec.baseSha, "HEAD"], rec.path),
+    );
     const patch = await this.git(["diff", rec.baseSha, "HEAD"], rec.path);
     return { files, patch };
   }
@@ -108,22 +142,35 @@ export class GitWorkspaceManager implements WorkspaceManager {
     const rec = this.require(agentId);
     const attempt = await this.runner(["merge", "--no-commit", "--no-ff", rec.branch], { cwd: this.repoRoot });
     if (attempt.exitCode !== 0) {
-      const conflicted = (await this.git(["diff", "--name-only", "--diff-filter=U"]))
-        .split("\n").map((f) => f.trim()).filter(Boolean);
+      const conflicted = await this.unmergedFiles();
       if (conflicted.length === 0) {
         // Non-zero exit with no unmerged paths is a real failure (bad ref, dirty
         // tree, etc.), not a content conflict. Clear any partial merge state with a
         // best-effort abort, then surface the underlying error.
-        await this.runner(["merge", "--abort"], { cwd: this.repoRoot });
+        await this.bestEffortAbort(["merge", "--abort"]);
         throw new Error(`git merge ${rec.branch} failed (${attempt.exitCode}): ${attempt.stderr.trim()}`);
       }
-      // Genuine conflict: a merge is in progress, so abort must succeed. Use the
-      // throwing helper so a stuck repo surfaces instead of being silently left mid-merge.
-      await this.git(["merge", "--abort"]);
+      // Genuine conflict: abort to leave the repo clean, but do so best-effort so
+      // a failing abort (e.g. an index lock) still RETURNS the conflict result
+      // rather than throwing and losing the classification.
+      await this.bestEffortAbort(["merge", "--abort"]);
       return { status: "conflict", files: conflicted };
     }
     await this.git(["commit", "--no-edit", "-m", `Merge ${rec.branch} via Maestro`]);
     return { status: "clean" };
+  }
+
+  /**
+   * Run an abort (`merge --abort` / `rebase --abort`) via the non-throwing
+   * runner so a failed abort does not mask a conflict-vs-failure classification
+   * the caller has already decided. A failed abort is surfaced as a warning,
+   * not an exception.
+   */
+  private async bestEffortAbort(args: string[], cwd = this.repoRoot): Promise<void> {
+    const r = await this.runner(args, { cwd });
+    if (r.exitCode !== 0) {
+      console.warn(`git ${args.join(" ")} failed (${r.exitCode}): ${r.stderr.trim()}`);
+    }
   }
 
   /**
@@ -150,12 +197,18 @@ export class GitWorkspaceManager implements WorkspaceManager {
     // Run rebase inside the worktree: rebase the agent's branch commits onto newBase.
     const attempt = await this.runner(["rebase", newBase], { cwd: rec.path });
     if (attempt.exitCode !== 0) {
-      const conflicted = (await this.runner(["diff", "--name-only", "--diff-filter=U"], { cwd: rec.path }))
-        .stdout.split("\n").map((f) => f.trim()).filter(Boolean);
-      await this.runner(["rebase", "--abort"], { cwd: rec.path });
+      // Probe via the throwing git() helper (in the worktree) so the probe's own
+      // exit code is checked: a failed probe surfaces instead of having its
+      // partial stdout misread as a conflict list.
+      const conflicted = await this.unmergedFiles(rec.path);
       if (conflicted.length === 0) {
+        // Non-conflict failure: abort (best-effort) and surface the real error.
+        await this.bestEffortAbort(["rebase", "--abort"], rec.path);
         throw new Error(`git rebase ${newBase} failed (${attempt.exitCode}): ${attempt.stderr.trim()}`);
       }
+      // Genuine conflict: best-effort abort so a failing abort still returns the
+      // conflict classification rather than throwing.
+      await this.bestEffortAbort(["rebase", "--abort"], rec.path);
       return { status: "conflict", files: conflicted };
     }
     // Success: update the stored baseSha so subsequent isStale/diff/merge use the new base.
@@ -174,9 +227,10 @@ export class GitWorkspaceManager implements WorkspaceManager {
    */
   async resolveMerge(agentId: string): Promise<MergeResult> {
     this.require(agentId); // throws for unknown agent
-    // Check whether any paths are still unmerged in the working tree
-    const remaining = (await this.runner(["diff", "--name-only", "--diff-filter=U"], { cwd: this.repoRoot }))
-      .stdout.split("\n").map((f) => f.trim()).filter(Boolean);
+    // Check whether any paths are still unmerged in the working tree. Probe via
+    // the throwing git() helper so a failed probe surfaces rather than parsing
+    // partial stdout as a (possibly empty) "resolved" result and committing.
+    const remaining = await this.unmergedFiles(this.repoRoot);
     if (remaining.length > 0) {
       return { status: "conflict", files: remaining };
     }
@@ -215,7 +269,27 @@ export class GitWorkspaceManager implements WorkspaceManager {
     if (prResult.exitCode !== 0) {
       throw new Error(`gh pr create failed (${prResult.exitCode}): ${prResult.stderr.trim()}`);
     }
-    return { prUrl: prResult.stdout.trim() };
+    // gh may print extra lines (tips, warnings) around the PR URL. Extract the
+    // last line that actually looks like a URL rather than trusting all of stdout.
+    const prUrl = GitWorkspaceManager.extractPrUrl(prResult.stdout);
+    if (!prUrl) {
+      throw new Error(`gh pr create did not return a PR URL. Output: ${prResult.stdout.trim()}`);
+    }
+    return { prUrl };
+  }
+
+  /**
+   * Pull the PR URL out of `gh pr create` output. gh can emit extra lines
+   * (upgrade notices, hints) alongside the URL, so we scan for the LAST line
+   * that is an http(s) URL and return it. Returns undefined if none is found.
+   */
+  private static extractPrUrl(stdout: string): string | undefined {
+    const urlLine = stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => /^https?:\/\/\S+$/.test(l))
+      .pop();
+    return urlLine;
   }
 
   async discard(agentId: string): Promise<void> {

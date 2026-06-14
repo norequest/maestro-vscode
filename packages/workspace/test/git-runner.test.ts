@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nodeGitRunner } from "../src/git-runner.js";
+import { nodeGitRunner, nodeShellRunner, SHELL_RUNNER_ALLOWLIST } from "../src/git-runner.js";
 import { makeFakeGitRunner, startsWith } from "./fake-git-runner.js";
 
 describe("makeFakeGitRunner", () => {
@@ -18,5 +18,18 @@ describe("nodeGitRunner", () => {
     const r = await nodeGitRunner(["--version"]);
     expect(r.exitCode).toBe(0);
     expect(r.stdout).toContain("git version");
+  });
+});
+
+// Issue 31 (S5): nodeShellRunner must not spawn an arbitrary args[0]; only
+// allowlisted binaries (today just "gh") may be spawned.
+describe("nodeShellRunner allowlist", () => {
+  it("rejects a non-allowlisted binary instead of spawning it", async () => {
+    await expect(nodeShellRunner(["rm", "-rf", "/"])).rejects.toThrow(/non-allowlisted/);
+  });
+
+  it("only allows gh", () => {
+    expect(SHELL_RUNNER_ALLOWLIST).toEqual(["gh"]);
+    expect(SHELL_RUNNER_ALLOWLIST.includes("gh")).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import type { AgentSession, ApprovalDecision, EngineAdapter } from "./adapter.js";
 import { Emitter } from "./emitter.js";
-import { isTerminalState } from "./events.js";
+import { isDiscardableState, isTerminalState } from "./events.js";
 import type {
   Agent,
   AgentEvent,
@@ -25,6 +25,10 @@ export class Orchestrator {
   private readonly adapters = new Map<string, EngineAdapter>();
   private readonly queue: string[] = [];
   private readonly stopping = new Set<string>();
+  // Per-agent run generation, bumped on each launch and sendBack. An async
+  // diff-on-done captures the generation at kickoff and bails if it changed, so
+  // a late diff cannot land on a now-relaunched agent.
+  private readonly generations = new Map<string, number>();
   private readonly emitter = new Emitter<OrchestratorEvent>();
   private readonly idGen: () => string;
   private running = 0;
@@ -82,6 +86,9 @@ export class Orchestrator {
   }
 
   private async launch(agent: Agent): Promise<void> {
+    // Bump the run generation so any in-flight diff-on-done from a previous run
+    // can detect it is stale and bail.
+    this.generations.set(agent.id, (this.generations.get(agent.id) ?? 0) + 1);
     const adapter = this.adapters.get(agent.role.engine.id);
     if (!adapter) {
       this.fail(agent, `No adapter for engine ${agent.role.engine.id}`);
@@ -96,6 +103,15 @@ export class Orchestrator {
         this.release();
         return;
       }
+    }
+    // A stop() that arrived while the workspace was being created leaves the
+    // agent preparing with no session. Honor that intent now: do NOT start the
+    // engine, finish in "stopped", and release the slot this launch consumed.
+    if (this.stopping.has(agent.id)) {
+      this.stopping.delete(agent.id);
+      this.update(agent, "stopped");
+      this.release();
+      return;
     }
     this.update(agent, "working");
     agent.engineCapabilities = {
@@ -145,10 +161,16 @@ export class Orchestrator {
         const d = event.detail;
         if (d !== null && typeof d === "object" && "tool" in d && "description" in d) {
           const rec = d as Record<string, unknown>;
-          agent.approvalDetail = {
-            tool: String(rec["tool"]),
-            description: String(rec["description"]),
-          };
+          // `in` only proves the key exists, not that it is a string. Only set
+          // approvalDetail when BOTH are actually strings; never String()-coerce
+          // a non-string into "[object Object]". The agent still parks in
+          // awaiting-approval, the panel just shows no specific detail.
+          if (typeof rec["tool"] === "string" && typeof rec["description"] === "string") {
+            agent.approvalDetail = {
+              tool: rec["tool"],
+              description: rec["description"],
+            };
+          }
         }
         this.update(agent, "awaiting-approval");
         break;
@@ -193,14 +215,23 @@ export class Orchestrator {
   private computeDiff(agent: Agent): void {
     if (!isWorkspaceManager(this.workspaces)) return; // plain provider -> no-op
     const ws = this.workspaces;
+    // Capture the run generation at kickoff. If sendBack() (or a relaunch) bumps
+    // it before diff() resolves, this result is stale and must NOT land on the
+    // now-running agent. Also require the agent to still be "done": once it has
+    // moved on, applying a diff is meaningless.
+    const generation = this.generations.get(agent.id) ?? 0;
+    const isStale = (): boolean =>
+      agent.state !== "done" || (this.generations.get(agent.id) ?? 0) !== generation;
     void ws
       .diff(agent.id)
       .then((diff) => {
+        if (isStale()) return; // a relaunch happened; drop the late diff
         if (agent.diff !== undefined) return; // adapter won the race
         agent.diff = diff;
         this.emitter.emit({ kind: "agent-updated", agent });
       })
       .catch((error) => {
+        if (isStale()) return; // a relaunch happened; drop the late failure
         if (agent.diff !== undefined) return; // diff already populated; ignore late failure
         agent.diffError = errorMessage(error);
         this.emitter.emit({ kind: "agent-updated", agent });
@@ -228,9 +259,29 @@ export class Orchestrator {
 
   stop(agentId: string): void {
     const session = this.sessions.get(agentId);
-    if (!session) return;
-    this.stopping.add(agentId);
-    session.stop();
+    if (session) {
+      // Live session: signal the engine and let consume() finish the agent in
+      // "stopped" rather than "error" on stream end.
+      this.stopping.add(agentId);
+      session.stop();
+      return;
+    }
+    const agent = this.agents.get(agentId);
+    if (!agent) return;
+    // Queued: never launched, never consumed a running slot. Drop it from the
+    // queue and stop it directly. Do NOT release (it never incremented running).
+    const queueIndex = this.queue.indexOf(agentId);
+    if (queueIndex !== -1) {
+      this.queue.splice(queueIndex, 1);
+      this.update(agent, "stopped");
+      return;
+    }
+    // Preparing with no session yet (workspace creation in flight): record the
+    // stop intent so launch() aborts after create() resolves, releasing the
+    // slot it consumed without starting the engine.
+    if (agent.state === "preparing") {
+      this.stopping.add(agentId);
+    }
   }
 
   async merge(agentId: string): Promise<MergeResult> {
@@ -242,12 +293,14 @@ export class Orchestrator {
     if (!isWorkspaceManager(ws)) {
       throw new Error("Workspace provider does not support merge");
     }
-    let releaseLock!: () => void;
-    const acquired = new Promise<void>((r) => { releaseLock = r; });
-    const prev = this.mergeLock;
-    this.mergeLock = prev.then(() => acquired);
-    await prev;
+    // Acquire the serialization lock. `release` is guaranteed to run on EVERY
+    // path (including an early throw or a rejected predecessor), so a failed
+    // merge can never deadlock every later merge.
+    const { predecessor, release } = this.acquireMergeLock();
     try {
+      // Tolerate a rejected predecessor: a failed merge still releases its lock,
+      // but if it rejected we must not let that rejection propagate here.
+      await predecessor.catch(() => undefined);
       const result = await ws.merge(agentId);
       if (result.status === "conflict") {
         agent.conflict = { files: result.files };
@@ -265,8 +318,25 @@ export class Orchestrator {
       }
       return result;
     } finally {
-      releaseLock();
+      release();
     }
+  }
+
+  /**
+   * Chain a new link onto the merge serialization queue. Returns the previous
+   * link (which the caller awaits before entering the critical section) and the
+   * release function for THIS link. The caller awaits `predecessor` inside a try
+   * whose finally calls `release`. Because release is unconditional, a throw
+   * anywhere in the critical section still resolves the link for the next
+   * waiter, so the lock cannot deadlock.
+   */
+  private acquireMergeLock(): { predecessor: Promise<void>; release: () => void } {
+    const predecessor = this.mergeLock;
+    let release!: () => void;
+    this.mergeLock = new Promise<void>((r) => {
+      release = r;
+    });
+    return { predecessor, release };
   }
 
   async retryCleanup(agentId: string): Promise<void> {
@@ -298,13 +368,24 @@ export class Orchestrator {
 
   async discard(agentId: string): Promise<void> {
     const agent = this.requireAgent(agentId);
-    if (!this.canDiscard(agent.state)) {
+    if (!isDiscardableState(agent.state)) {
       throw new Error(`Agent ${agentId} cannot be discarded (state: ${agent.state})`);
     }
     const ws = this.workspaces;
     if (isWorkspaceManager(ws)) {
-      await ws.discard(agentId);
+      // discard() removes/prunes the worktree in the repo root, touching the
+      // same shared index merge() does, so it serializes through the same lock
+      // to avoid interleaving with an in-flight merge and corrupting the index.
+      const { predecessor, release } = this.acquireMergeLock();
+      try {
+        await predecessor.catch(() => undefined);
+        await ws.discard(agentId);
+      } finally {
+        release();
+      }
     } else {
+      // Non-WorkspaceManager (Fake provider) touches no shared index; stays
+      // synchronous and unserialized.
       await ws.cleanup(agentId);
     }
     this.update(agent, "discarded");
@@ -321,7 +402,13 @@ export class Orchestrator {
    */
   hydrate(records: readonly PersistedAgentRecord[]): void {
     for (const record of records) {
-      const agent: Agent = { ...record.agent };
+      // Copy the mutable log array so later consume() pushes don't mutate the
+      // caller's snapshot, and so hydrating the same records twice yields
+      // independent log arrays rather than one aliased array shared across agents.
+      const agent: Agent = {
+        ...record.agent,
+        log: Array.isArray(record.agent.log) ? [...record.agent.log] : [],
+      };
       if (agent.workspace === undefined && record.workspacePath !== undefined) {
         agent.workspace = {
           agentId: agent.id,
@@ -358,6 +445,10 @@ export class Orchestrator {
         `Cannot send back agent ${agentId} (state: ${agent.state}); only done or conflict agents can be sent back`,
       );
     }
+    // Bump the run generation now (not just at relaunch): if a diff-on-done from
+    // the previous run is still in flight, this immediately marks it stale so its
+    // late resolution can't clear/overwrite this now-relaunched agent's diff.
+    this.generations.set(agent.id, (this.generations.get(agent.id) ?? 0) + 1);
     agent.summary = undefined;
     agent.diff = undefined;
     agent.diffError = undefined;
@@ -373,17 +464,6 @@ export class Orchestrator {
     this.update(agent, "preparing");
     this.tryStart(agent);
     return agent;
-  }
-
-  private canDiscard(state: AgentState): boolean {
-    return (
-      state === "done" ||
-      state === "error" ||
-      state === "stopped" ||
-      state === "conflict" ||
-      state === "detached" ||
-      state === "merge-cleanup-failed"
-    );
   }
 
   private requireAgent(agentId: string): Agent {

@@ -98,15 +98,43 @@ export function runConformanceSuite(label: string, factory: AdapterFactory): voi
 
       await waitForTerminal(orch, agent.id);
 
-      const final = orch.getAgent(agent.id)!;
-      expect(["done", "error"]).toContain(final.state);
-      // Capability-aware: structured-event adapters must emit a status event;
+      const final = orch.getAgent(agent.id);
+      expect(final).toBeDefined();
+      expect(["done", "error"]).toContain(final!.state);
+      // Both Copilot (unstructured) and ACP (structured) emit `output` events, so
+      // a real output carrying the emitted text must reach the stream. Asserting
+      // the text rules out a no-op `emitOutput` slipping through on length alone.
+      expect(
+        events.some((e) => e.kind === "output" && e.text.includes("doing work")),
+      ).toBe(true);
+      // Capability-aware: structured-event adapters must also emit a status event;
       // unstructured adapters (e.g. Copilot) just need to stream something.
       if (adapter.capabilities.structuredEvents) {
         expect(events.some((e) => e.kind === "status")).toBe(true);
       } else {
         expect(events.length).toBeGreaterThan(0);
       }
+    });
+
+    it("maps an engine failure to a terminal error state and ends the stream", async () => {
+      const { adapter, failWithError } = factory();
+      const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
+      orch.registerRole(makeRole(adapter.id));
+      orch.registerAdapter(adapter);
+
+      const agent = orch.spawn("Implementer", "task");
+      await waitForState(orch, agent.id, "working");
+
+      failWithError();
+
+      // waitForTerminal resolves only if the stream terminates; a hang would
+      // surface as a test timeout, which is exactly the regression we guard.
+      await waitForTerminal(orch, agent.id);
+
+      const final = orch.getAgent(agent.id);
+      expect(final).toBeDefined();
+      // Capability-agnostic: every adapter must surface an engine failure as `error`.
+      expect(final!.state).toBe("error");
     });
 
     it("honors stop(): agent reaches stopped, stream ends without error", async () => {
@@ -120,8 +148,9 @@ export function runConformanceSuite(label: string, factory: AdapterFactory): voi
       orch.stop(agent.id);
 
       await waitForTerminal(orch, agent.id);
-      const final = orch.getAgent(agent.id)!;
-      expect(final.state).toBe("stopped");
+      const final = orch.getAgent(agent.id);
+      expect(final).toBeDefined();
+      expect(final!.state).toBe("stopped");
     });
 
     it("reports capabilities truthfully (boolean flags, no lies)", () => {

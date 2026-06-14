@@ -13,14 +13,32 @@ import { COPILOT_CAPABILITIES } from "./capabilities.js";
 import { CopilotSession } from "./copilot-session.js";
 import type { ChildHandle, SpawnFn } from "./types.js";
 
-/** Default: spawn the real `copilot` binary with piped stdio. The cast bridges
- *  Node's ChildProcess (nullable stdio) to our ChildHandle at the boundary. */
-const defaultSpawn: SpawnFn = (command, args, options) =>
-  nodeSpawn(command, [...args], {
+/** Default: spawn the real `copilot` binary with piped stdio. Node types
+ *  stdout/stderr as `Readable | null`, so we narrow them before crossing into
+ *  ChildHandle (whose streams are non-null) instead of laundering with a double
+ *  cast that a single `stdio` edit could silently break. */
+const defaultSpawn: SpawnFn = (command, args, options) => {
+  const child = nodeSpawn(command, [...args], {
     cwd: options.cwd,
     env: options.env,
     stdio: ["ignore", "pipe", "pipe"],
-  }) as unknown as ChildHandle;
+  });
+  if (!child.stdout || !child.stderr) {
+    throw new Error("copilot: stdio streams not piped");
+  }
+  return child as ChildHandle;
+};
+
+/** Drop keys whose value is `undefined` so spawn never receives undefined-valued
+ *  env entries. All defined vars are forwarded unchanged (no allowlist that
+ *  could strip the auth token). */
+function definedEnv(env: Record<string, string | undefined>): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) out[key] = value;
+  }
+  return out;
+}
 
 export interface CopilotAdapterOptions {
   /** Injectable for testing; defaults to node:child_process.spawn. */
@@ -52,8 +70,11 @@ export class CopilotAdapter implements EngineAdapter {
     const args = buildArgs(task, workspace, role);
     const child = this.spawnFn(this.command, args, {
       cwd: workspace.path,
-      env: this.env as NodeJS.ProcessEnv,
+      env: definedEnv(this.env),
     });
+    if (!child.stdout || !child.stderr) {
+      throw new Error("copilot: stdio streams not piped");
+    }
     const session = new CopilotSession(child);
     session.start();
     return session;

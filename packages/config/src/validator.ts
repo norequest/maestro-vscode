@@ -14,6 +14,18 @@ function isNumber(v: unknown): v is number {
   return typeof v === "number";
 }
 
+/**
+ * Allowed characters for an engine model id. Anchored so the first character
+ * must be alphanumeric. This forbids a leading dash, which prevents a model
+ * value from being interpreted as a CLI flag if any downstream code ever
+ * builds a command string from it (argument-injection defense, Issue 29 / S4).
+ */
+const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
+
+/** Matches ASCII control characters (\x00-\x1f), which must never appear in a role name. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\x00-\x1f]/;
+
 export function validateRole(raw: unknown): ValidationResult<Role> {
   const errors: string[] = [];
   const warnings: ValidationWarning[] = [];
@@ -24,6 +36,18 @@ export function validateRole(raw: unknown): ValidationResult<Role> {
 
   if (!isString(raw["name"]) || raw["name"].trim() === "") {
     errors.push("role.name must be a non-empty string");
+  } else {
+    // role.name may legitimately contain spaces or non-ASCII / Georgian
+    // characters, so we do NOT impose an ASCII allowlist. We only block names
+    // that could be interpreted as a CLI flag (leading dash) or that smuggle
+    // control characters downstream (argument-injection defense, Issue 29 / S4).
+    const name = raw["name"].trim();
+    if (name.startsWith("-")) {
+      errors.push("role.name must not start with a dash");
+    }
+    if (CONTROL_CHARS.test(raw["name"])) {
+      errors.push("role.name must not contain control characters");
+    }
   }
   if (!isString(raw["instructions"]) || raw["instructions"].trim() === "") {
     errors.push("role.instructions must be a non-empty string");
@@ -33,16 +57,29 @@ export function validateRole(raw: unknown): ValidationResult<Role> {
   if (!isRecord(engine)) {
     errors.push("role.engine must be an object with an id field");
   } else {
+    // Invariant: an adapter's command / binary must NEVER be sourced from
+    // .conductor/ config. Only the fixed, registered adapters (KNOWN_ENGINE_IDS)
+    // are ever spawned. engine.id selects among those adapters by name; it does
+    // not supply an executable path. An unknown engine.id is therefore an ERROR
+    // (not a warning): a role naming an engine we cannot run must be rejected
+    // (Issue 28 / S9).
     if (!isString(engine["id"]) || engine["id"].trim() === "") {
       errors.push("role.engine.id must be a non-empty string");
     } else if (!KNOWN_ENGINE_IDS.has(engine["id"])) {
-      warnings.push({
-        field: "engine.id",
-        message: `unknown engine id "${engine["id"]}"; known ids: ${[...KNOWN_ENGINE_IDS].join(", ")}. This may work once the engine adapter is registered.`,
-      });
+      errors.push(
+        `role.engine.id "${engine["id"]}" is not a known engine; known ids: ${[...KNOWN_ENGINE_IDS].join(", ")}`,
+      );
     }
-    if (engine["model"] !== undefined && !isString(engine["model"])) {
-      errors.push("role.engine.model must be a string if provided");
+    if (engine["model"] !== undefined) {
+      if (!isString(engine["model"])) {
+        errors.push("role.engine.model must be a string if provided");
+      } else if (!MODEL_PATTERN.test(engine["model"])) {
+        // Charset guard so a model value can never become a CLI flag or smuggle
+        // shell-unsafe characters (argument-injection defense, Issue 29 / S4).
+        errors.push(
+          "role.engine.model must start with an alphanumeric character and contain only letters, digits, and the characters . _ : -",
+        );
+      }
     }
   }
 
