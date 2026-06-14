@@ -1,10 +1,13 @@
 const NONCE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-/** Deterministic-length random nonce. Runs in the extension host (Math.random allowed). */
+/** A 32-char alphanumeric CSP nonce from the Web Crypto CSPRNG (a global in
+ *  both Node 18+ and the browser, so this file stays browser-bundle-safe). */
 export function makeNonce(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
   let s = "";
-  for (let i = 0; i < 32; i++) {
-    s += NONCE_ALPHABET.charAt(Math.floor(Math.random() * NONCE_ALPHABET.length));
+  for (const b of bytes) {
+    s += NONCE_ALPHABET.charAt(b % NONCE_ALPHABET.length);
   }
   return s;
 }

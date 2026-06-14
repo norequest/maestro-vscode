@@ -2,9 +2,10 @@ import type { CardVM } from "@maestro/cockpit";
 import { escapeHtml } from "./html.js";
 
 function actions(card: CardVM): string {
-  const stop = `<button data-action="stop" data-id="${card.id}">Stop</button>`;
-  const merge = `<button data-action="merge" data-id="${card.id}">Merge</button>`;
-  const discard = `<button data-action="discard" data-id="${card.id}">Discard</button>`;
+  const id = escapeHtml(card.id);
+  const stop = `<button data-action="stop" data-id="${id}">Stop</button>`;
+  const merge = `<button data-action="merge" data-id="${id}">Merge</button>`;
+  const discard = `<button data-action="discard" data-id="${id}">Discard</button>`;
   switch (card.state) {
     case "working":
     case "awaiting-approval":
@@ -40,7 +41,7 @@ function detail(card: CardVM): string {
 /** Pure HTML for one agent card. Engine output is always escaped. */
 export function renderCardHTML(card: CardVM): string {
   const auto = !card.attention && card.engineId === "copilot" ? `<span class="badge">auto</span>` : "";
-  return `<section class="card state-${card.state}${card.attention ? " attention" : ""}" data-id="${card.id}">
+  return `<section class="card state-${card.state}${card.attention ? " attention" : ""}" data-id="${escapeHtml(card.id)}">
   <header><span class="role">${escapeHtml(card.roleName)}</span><span class="engine">${escapeHtml(card.engineId)}</span>${auto}<span class="status">${card.state}</span></header>
   <pre class="output">${escapeHtml(card.output)}</pre>
   ${detail(card)}
