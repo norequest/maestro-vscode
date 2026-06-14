@@ -10,8 +10,7 @@ import type {
   Role,
   Task,
 } from "./types.js";
-import { isWorkspaceManager } from "./workspace.js";
-import type { WorkspaceProvider } from "./workspace.js";
+import { isWorkspaceManager, type WorkspaceProvider } from "./workspace.js";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -183,6 +182,7 @@ export class Orchestrator {
         this.emitter.emit({ kind: "agent-updated", agent });
       })
       .catch((error) => {
+        if (agent.diff !== undefined) return; // diff already populated; ignore late failure
         agent.diffError = errorMessage(error);
         this.emitter.emit({ kind: "agent-updated", agent });
       });

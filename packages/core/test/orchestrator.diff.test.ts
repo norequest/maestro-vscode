@@ -4,11 +4,12 @@ import type { Role } from "../src/index.js";
 
 const role: Role = { name: "Impl", instructions: "", engine: { id: "fake" }, autonomy: "manual" };
 
-function waitFor(orch: Orchestrator, agentId: string, pred: () => boolean): Promise<void> {
+function waitFor(orch: Orchestrator, pred: () => boolean): Promise<void> {
   return new Promise((resolve) => {
-    const check = () => { if (pred()) resolve(); };
-    orch.on(check);
-    check();
+    const unsub = orch.on(() => {
+      if (pred()) { unsub(); resolve(); }
+    });
+    if (pred()) { unsub(); resolve(); }
   });
 }
 
@@ -24,7 +25,7 @@ describe("Orchestrator diff-on-done", () => {
     );
 
     const agent = orch.spawn("Impl", "task");
-    await waitFor(orch, agent.id, () => orch.getAgent(agent.id)?.diff !== undefined);
+    await waitFor(orch, () => orch.getAgent(agent.id)?.diff !== undefined);
 
     const final = orch.getAgent(agent.id)!;
     expect(final.state).toBe("done");
@@ -44,8 +45,8 @@ describe("Orchestrator diff-on-done", () => {
     );
 
     const agent = orch.spawn("Impl", "task");
-    await waitFor(orch, agent.id, () => orch.getAgent(agent.id)?.state === "done");
-    await new Promise((r) => setTimeout(r, 0)); // let any async diff settle
+    await waitFor(orch, () => orch.getAgent(agent.id)?.state === "done");
+    // No settle needed: computeDiff is gated by event.diff === undefined, so it never fires here.
 
     expect(orch.getAgent(agent.id)!.diff).toEqual({ files: ["real.ts"], patch: "real" });
     expect(manager.diffed).not.toContain(agent.id); // computeDiff skipped (diff present)
