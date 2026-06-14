@@ -105,6 +105,26 @@ describe("parseTeamYaml", () => {
       expect(result.team.warnings.length).toBeGreaterThan(0);
     }
   });
+
+  it("returns a parse error for malformed YAML without throwing (TG10)", () => {
+    let result: ReturnType<typeof parseTeamYaml>;
+    expect(() => {
+      result = parseTeamYaml("{ unclosed: [bracket", "teams/broken.yaml", knownRoles);
+    }).not.toThrow();
+    expect(result!.team.ok).toBe(false);
+    if (!result!.team.ok) {
+      expect(result!.team.errors[0]).toContain("YAML parse error");
+      expect(result!.team.errors[0]).toContain("teams/broken.yaml");
+    }
+  });
+
+  it("rejects a non-object top-level YAML document (TG10)", () => {
+    const result = parseTeamYaml("- just\n- a list\n", "teams/list.yaml", knownRoles);
+    expect(result.team.ok).toBe(false);
+    if (!result.team.ok) {
+      expect(result.team.errors.some((e) => e.includes("team must be an object"))).toBe(true);
+    }
+  });
 });
 
 describe("parseConfigYaml", () => {
@@ -121,6 +141,26 @@ describe("parseConfigYaml", () => {
     expect(result.config.ok).toBe(true);
     if (result.config.ok) {
       expect(result.config.value.maxParallelAgents).toBe(3);
+    }
+  });
+
+  it("returns a parse error for malformed YAML without throwing (TG10)", () => {
+    let result: ReturnType<typeof parseConfigYaml>;
+    expect(() => {
+      result = parseConfigYaml("{ unclosed: [bracket", "config.yaml");
+    }).not.toThrow();
+    expect(result!.config.ok).toBe(false);
+    if (!result!.config.ok) {
+      expect(result!.config.errors[0]).toContain("YAML parse error");
+      expect(result!.config.errors[0]).toContain("config.yaml");
+    }
+  });
+
+  it("rejects a non-object top-level YAML document (TG10)", () => {
+    const result = parseConfigYaml("- just\n- a list\n", "config.yaml");
+    expect(result.config.ok).toBe(false);
+    if (!result.config.ok) {
+      expect(result.config.errors.some((e) => e.includes("config must be an object"))).toBe(true);
     }
   });
 });

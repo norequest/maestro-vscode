@@ -155,6 +155,37 @@ describe("CopilotSession", () => {
     ]);
   });
 
+  // TG17: send() and respond() are v1 no-ops (called by Orchestrator.steer()
+  // and Orchestrator.approve()). They must not throw and must do nothing
+  // observable, since `copilot -p` is one-shot with no interactive channel.
+  it("send() is a no-op that does not throw and emits nothing", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+
+    expect(() => session.send("please focus on the failing test")).not.toThrow();
+
+    child.close(0);
+    const result = await events;
+    // No output came from send(); only the clean-exit done event is present.
+    expect(result).toEqual([{ kind: "done", summary: "Copilot run completed" }]);
+  });
+
+  it("respond() is a no-op that does not throw and emits nothing", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+
+    expect(() => session.respond("approval-1", "allow")).not.toThrow();
+    expect(() => session.respond("approval-2", "deny")).not.toThrow();
+
+    child.close(0);
+    const result = await events;
+    expect(result).toEqual([{ kind: "done", summary: "Copilot run completed" }]);
+  });
+
   it("includes the stderr tail in the error message on a non-zero exit", async () => {
     const child = new FakeChild();
     const session = new CopilotSession(child);

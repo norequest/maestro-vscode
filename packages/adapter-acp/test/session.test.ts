@@ -46,6 +46,23 @@ describe("AcpSession", () => {
     expect(result.at(-1)).toMatchObject({ kind: "done", summary: "all done" });
   });
 
+  // TG5 (C5): a transport stream that ends without a turn/complete or error
+  // frame must still end the event queue so a collector does not hang forever.
+  it("ends the event stream when the transport ends without a terminal frame", async () => {
+    const { transport, session } = makeSession();
+    const events = collect(session.events);
+
+    transport.receive(acpSessionUpdate("some progress\n"));
+    // End the inbound stream WITHOUT a turn/complete or error frame.
+    transport.end();
+
+    // If consume() did not end the queue, this await would never resolve.
+    const result = await events;
+    expect(result.some((e) => e.kind === "output")).toBe(true);
+    expect(result.some((e) => e.kind === "done")).toBe(false);
+    expect(result.some((e) => e.kind === "error")).toBe(false);
+  });
+
   it("emits status:awaiting-approval then approval event on requestPermission", async () => {
     const { transport, session } = makeSession("manual");
     const events = collect(session.events);

@@ -60,10 +60,19 @@ describe("reduce", () => {
     expect(m.cards.get("a1")!.error).toBe("boom");
   });
 
-  it("caps output to the last 16000 chars", () => {
+  it("caps output to the last 16000 chars, keeping the TAIL not the head (TG16)", () => {
     let m = reduce(initialModel(), added(agent()));
-    m = reduce(m, out("a1", "x".repeat(20000)));
-    expect(m.cards.get("a1")!.output.length).toBe(16000);
+    // Build output longer than the cap whose final chars are a known marker.
+    // The cap must preserve the most recent chars (slice from the end), so the
+    // card output must END WITH the marker, proving slice(len - CAP) not slice(0, CAP).
+    const marker = "TAILMARKER";
+    const padded = "x".repeat(20000) + marker;
+    m = reduce(m, out("a1", padded));
+    const output = m.cards.get("a1")!.output;
+    expect(output.length).toBe(16000);
+    expect(output.endsWith(marker)).toBe(true);
+    // The head must be dropped: the very first 'x' chars are gone (only the tail survives).
+    expect(output).toBe(padded.slice(padded.length - 16000));
   });
 
   it("ignores output for an unknown agent", () => {

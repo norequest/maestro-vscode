@@ -164,6 +164,21 @@ describe("EventLogger", () => {
     await new EventLogger(backend).forget("a1");
     expect(await backend.listAgentIds()).toEqual([]);
   });
+
+  it("loadAll skips a corrupt JSONL line but keeps the valid records (Issue 8/TG8)", async () => {
+    const backend = new MemoryPersistenceBackend();
+    // A valid line, then a garbage non-JSON line, then another valid line for the
+    // same id. deserializeEvent returns null for the garbage; loadAll must drop
+    // it (no throw) and still rebuild the record from the surviving events.
+    await backend.append("a1", serializeEvent({ kind: "agent-added", agent: agent({ state: "working" }) }));
+    await backend.append("a1", "this is not json at all\n");
+    await backend.append("a1", serializeEvent({ kind: "agent-updated", agent: agent({ state: "done", summary: "finished" }) }));
+    const records = await new EventLogger(backend).loadAll();
+    // One record, reflecting the LAST valid state, corrupt line skipped.
+    expect(records).toHaveLength(1);
+    expect(records[0]!.agent.state).toBe("done");
+    expect(records[0]!.agent.summary).toBe("finished");
+  });
 });
 
 describe("EventLogger persist/forget ordering (Issue 8)", () => {
