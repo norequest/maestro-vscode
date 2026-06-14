@@ -26,6 +26,13 @@
       "view/title": [
         { "command": "maestro.spawnAgent", "when": "view == maestro.roster", "group": "navigation" }
       ]
+    },
+    "configuration": {
+      "title": "Maestro",
+      "properties": {
+        "maestro.prMode": { "type": "boolean", "default": false, "description": "Create a pull request (push branch + gh pr create) instead of a local merge." },
+        "maestro.prDraft": { "type": "boolean", "default": false, "description": "Open pull requests as drafts when PR mode is on." }
+      }
     }
   },
   "scripts": {

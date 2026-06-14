@@ -39,6 +39,56 @@ export function activate(context: vscode.ExtensionContext): void {
   const roster = new RosterTreeDataProvider();
   const stage = new StageWebviewPanel(context.extensionUri, (msg) => cockpit.handle(msg));
 
+  const prModeEnabled = (): boolean =>
+    vscode.workspace.getConfiguration("maestro").get<boolean>("prMode", false);
+
+  const handleMergeAction = async (msg: { type: string; agentId?: string }): Promise<void> => {
+    if (!msg.agentId) return;
+    const agent = orch.getAgent(msg.agentId);
+    if (!agent) return;
+    if (msg.type === "resolve-conflict") {
+      const files = agent.conflict?.files ?? [];
+      for (const relPath of files) {
+        const uri = vscode.Uri.joinPath(vscode.Uri.file(repoRoot), relPath);
+        await vscode.commands.executeCommand("vscode.open", uri);
+      }
+      const { buildConflictResolveMessage } = await import("./merge-helpers.js");
+      void vscode.window.showInformationMessage(buildConflictResolveMessage(files));
+    } else if (msg.type === "finish-merge") {
+      try {
+        const result = await workspaces.resolveMerge(agent.id);
+        if (result.status === "clean") {
+          await workspaces.cleanup(agent.id);
+          orch.finishConflictResolution(agent.id);
+        } else {
+          void vscode.window.showWarningMessage(
+            `Still unresolved: ${result.files.join(", ")}. Fix all markers and click Finish Merge again.`,
+          );
+        }
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Finish merge failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else if (msg.type === "create-pr") {
+      if (!prModeEnabled()) {
+        void vscode.window.showInformationMessage("PR mode is off. Enable maestro.prMode in settings.");
+        return;
+      }
+      const { buildPrTitle, buildPrBody } = await import("./merge-helpers.js");
+      try {
+        const result = await workspaces.pushAndPr(agent.id, {
+          title: buildPrTitle(agent.role.name, agent.task.description),
+          body: buildPrBody(agent.summary, agent.diff?.files ?? []),
+          base: "main",
+          remote: "origin",
+          draft: vscode.workspace.getConfiguration("maestro").get<boolean>("prDraft", false),
+        });
+        void vscode.window.showInformationMessage(`PR created: ${result.prUrl}`);
+      } catch (err) {
+        void vscode.window.showErrorMessage(`Create PR failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  };
+
   const cockpit = createCockpit(
     orch,
     (state) => {
@@ -46,6 +96,7 @@ export function activate(context: vscode.ExtensionContext): void {
       stage.post(state);
     },
     (message) => void vscode.window.showErrorMessage(`Maestro: ${message}`),
+    handleMergeAction,
   );
 
   // Persistence (M7): restore the previous session, then log all future events.
