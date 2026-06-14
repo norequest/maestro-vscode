@@ -7,6 +7,7 @@ const TERMINAL: ReadonlySet<AgentState> = new Set<AgentState>([
   "merged",
   "discarded",
   "detached",
+  "merge-cleanup-failed",
 ]);
 
 export function isTerminalState(state: AgentState): boolean {

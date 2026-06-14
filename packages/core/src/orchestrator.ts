@@ -28,6 +28,8 @@ export class Orchestrator {
   private readonly emitter = new Emitter<OrchestratorEvent>();
   private readonly idGen: () => string;
   private running = 0;
+  // Merges serialize: each call chains onto this lock before touching the git index.
+  private mergeLock: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly config: OrchestratorConfig,
@@ -240,15 +242,58 @@ export class Orchestrator {
     if (!isWorkspaceManager(ws)) {
       throw new Error("Workspace provider does not support merge");
     }
-    const result = await ws.merge(agentId);
-    if (result.status === "conflict") {
-      agent.conflict = { files: result.files };
-      this.update(agent, "conflict"); // worktree preserved, no cleanup
+    let releaseLock!: () => void;
+    const acquired = new Promise<void>((r) => { releaseLock = r; });
+    const prev = this.mergeLock;
+    this.mergeLock = prev.then(() => acquired);
+    await prev;
+    try {
+      const result = await ws.merge(agentId);
+      if (result.status === "conflict") {
+        agent.conflict = { files: result.files };
+        this.update(agent, "conflict");
+        return result;
+      }
+      // Clean merge: the code is landed. A cleanup failure must NOT hide the
+      // successful merge; surface it as a distinct terminal state.
+      try {
+        await ws.cleanup(agentId);
+        this.update(agent, "merged");
+      } catch (cleanupError) {
+        agent.error = `Merge succeeded but worktree cleanup failed: ${errorMessage(cleanupError)}`;
+        this.update(agent, "merge-cleanup-failed");
+      }
       return result;
+    } finally {
+      releaseLock();
+    }
+  }
+
+  async retryCleanup(agentId: string): Promise<void> {
+    const agent = this.requireAgent(agentId);
+    if (agent.state !== "merge-cleanup-failed") {
+      throw new Error(`Agent ${agentId} is not in merge-cleanup-failed state`);
+    }
+    const ws = this.workspaces;
+    if (!isWorkspaceManager(ws)) {
+      throw new Error("Workspace provider does not support cleanup");
     }
     await ws.cleanup(agentId);
+    agent.error = undefined;
     this.update(agent, "merged");
-    return result;
+  }
+
+  /**
+   * After an external conflict resolution (user fixed markers, resolveMerge
+   * returned clean, cleanup ran), move the agent from conflict to merged.
+   */
+  finishConflictResolution(agentId: string): void {
+    const agent = this.requireAgent(agentId);
+    if (agent.state !== "conflict") {
+      throw new Error(`Agent ${agentId} is not in conflict state (state: ${agent.state})`);
+    }
+    agent.conflict = undefined;
+    this.update(agent, "merged");
   }
 
   async discard(agentId: string): Promise<void> {
@@ -336,7 +381,8 @@ export class Orchestrator {
       state === "error" ||
       state === "stopped" ||
       state === "conflict" ||
-      state === "detached"
+      state === "detached" ||
+      state === "merge-cleanup-failed"
     );
   }
 
