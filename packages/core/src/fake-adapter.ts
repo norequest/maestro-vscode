@@ -31,6 +31,8 @@ export class FakeEngineAdapter implements EngineAdapter {
   lastSession?: FakeSession;
   /** The role passed to the most recent start(), for test assertions. */
   lastRole?: Role;
+  /** All tasks passed to start(), in order, for test assertions. */
+  readonly startedTasks: Task[] = [];
 
   constructor(options: FakeAdapterOptions) {
     this.id = options.id ?? "fake";
@@ -45,7 +47,8 @@ export class FakeEngineAdapter implements EngineAdapter {
     );
   }
 
-  start(_task: Task, _workspace: Workspace, role?: Role): FakeSession {
+  start(task: Task, _workspace: Workspace, role?: Role): FakeSession {
+    this.startedTasks.push(task);
     const session = new FakeSession(this.script);
     this.lastSession = session;
     this.lastRole = role;
