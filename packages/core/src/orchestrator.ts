@@ -11,6 +11,7 @@ import type {
   PersistedAgentRecord,
   Role,
   Task,
+  Team,
 } from "./types.js";
 import { isWorkspaceManager, type WorkspaceProvider } from "./workspace.js";
 
@@ -74,6 +75,22 @@ export class Orchestrator {
     this.emitter.emit({ kind: "agent-added", agent });
     this.tryStart(agent);
     return agent;
+  }
+
+  /**
+   * Dispatch a whole team in one call: for each role in order, register it (so
+   * spawn can resolve it by name) then spawn an agent on the shared description.
+   * Returns the new agents in role order. An empty team returns []. This is a thin
+   * convenience over registerRole + spawn, so the concurrency queue and
+   * maxParallelAgents behavior are inherited unchanged: launching a team larger
+   * than the parallel limit starts the first N and queues the rest exactly as
+   * repeated spawn() calls would.
+   */
+  launchTeam(team: Team, description: string): Agent[] {
+    return team.roles.map((role) => {
+      this.registerRole(role);
+      return this.spawn(role.name, description);
+    });
   }
 
   private tryStart(agent: Agent): void {

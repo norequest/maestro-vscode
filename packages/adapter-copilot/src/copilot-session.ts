@@ -1,14 +1,23 @@
 import type { AgentEvent, AgentSession, ApprovalDecision } from "@maestro/core";
 import { EventQueue } from "@maestro/core";
-import { cleanOutput } from "./args.js";
+import { cleanOutput, type OutputFormat } from "./args.js";
+import { renderJsonLine } from "./json-output.js";
 import type { ChildHandle } from "./types.js";
 
 /** Keep at most the last ~8 KB of stderr so a failing run yields a diagnostic
  *  tail without letting an unbounded child flood memory. */
 const STDERR_RING_BYTES = 8 * 1024;
 
+export interface CopilotSessionOptions {
+  /** Wire format Copilot streams on stdout. Defaults to `"text"` (v1 behavior).
+   *  In `"json"` mode each complete line is parsed as JSON and mapped to a
+   *  structured output event, with a tolerant fallback to the raw line. */
+  outputFormat?: OutputFormat;
+}
+
 export class CopilotSession implements AgentSession {
   private readonly queue = new EventQueue();
+  private readonly outputFormat: OutputFormat;
   /** The last non-empty COMPLETE line seen across the whole run (not just the
    *  last chunk), so summary() is correct regardless of chunk boundaries. */
   private lastText = "";
@@ -18,7 +27,12 @@ export class CopilotSession implements AgentSession {
   private stderrTail = "";
   private settled = false;
 
-  constructor(private readonly child: ChildHandle) {}
+  constructor(
+    private readonly child: ChildHandle,
+    opts: CopilotSessionOptions = {},
+  ) {
+    this.outputFormat = opts.outputFormat ?? "text";
+  }
 
   get events(): AsyncIterable<AgentEvent> {
     return this.queue;
@@ -81,8 +95,12 @@ export class CopilotSession implements AgentSession {
   }
 
   private emitLine(rawLine: string): void {
-    const text = cleanOutput(rawLine);
-    if (text.trim().length === 0) return; // skip spinner-only / blank lines
+    const cleaned = cleanOutput(rawLine);
+    if (cleaned.trim().length === 0) return; // skip spinner-only / blank lines
+    // In json mode, parse the line into a structured event; an invalid or
+    // unrecognized line degrades to the raw cleaned text (never throws, never
+    // drops the stream). In text mode this is exactly the v1 behavior.
+    const text = this.outputFormat === "json" ? renderJsonLine(cleaned) : cleaned;
     this.lastText = text;
     this.queue.push({ kind: "output", text });
   }

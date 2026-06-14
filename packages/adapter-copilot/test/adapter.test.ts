@@ -31,6 +31,49 @@ describe("CopilotAdapter", () => {
     });
   });
 
+  it("keeps default (text) capabilities reporting no structured events", () => {
+    const text = new CopilotAdapter({ spawn: makeFakeSpawn().fn });
+    const explicitText = new CopilotAdapter({ spawn: makeFakeSpawn().fn, outputFormat: "text" });
+    expect(text.capabilities.structuredEvents).toBe(false);
+    expect(explicitText.capabilities.structuredEvents).toBe(false);
+  });
+
+  it("advertises structured events only when constructed in json mode, never approvals", () => {
+    const json = new CopilotAdapter({ spawn: makeFakeSpawn().fn, outputFormat: "json" });
+    expect(json.capabilities).toEqual({
+      streaming: true,
+      structuredEvents: true,
+      approvals: false,
+      steerable: false,
+    });
+  });
+
+  it("spawns with --output-format json only in json mode", () => {
+    const fakeText = makeFakeSpawn();
+    new CopilotAdapter({ spawn: fakeText.fn }).start(task, workspace, role);
+    expect(fakeText.lastArgs()).not.toContain("--output-format");
+
+    const fakeJson = makeFakeSpawn();
+    new CopilotAdapter({ spawn: fakeJson.fn, outputFormat: "json" }).start(task, workspace, role);
+    expect(fakeJson.lastArgs()).toContain("--output-format");
+    expect(fakeJson.lastArgs()).toContain("json");
+  });
+
+  it("parses structured JSON output into formatted events in json mode", async () => {
+    const fake = makeFakeSpawn();
+    const adapter = new CopilotAdapter({ spawn: fake.fn, outputFormat: "json" });
+    const session = adapter.start(task, workspace, role);
+    const events = collect(session.events);
+
+    fake.child()!.out(JSON.stringify({ type: "tool", name: "edit", input: { path: "cache.ts" } }) + "\n");
+    fake.child()!.close(0);
+
+    const result = await events;
+    expect(result.filter((e) => e.kind === "output")).toEqual([
+      { kind: "output", text: "▸ edit: cache.ts" },
+    ]);
+  });
+
   it("health reflects the injected env", async () => {
     expect((await new CopilotAdapter({ env: { GH_TOKEN: "x" } }).health()).ok).toBe(true);
     expect((await new CopilotAdapter({ env: {} }).health()).ok).toBe(false);

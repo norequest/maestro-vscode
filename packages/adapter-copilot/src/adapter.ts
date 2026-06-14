@@ -7,9 +7,9 @@ import type {
   Task,
   Workspace,
 } from "@maestro/core";
-import { buildArgs } from "./args.js";
+import { buildArgs, type OutputFormat } from "./args.js";
 import { resolveAuth } from "./auth.js";
-import { COPILOT_CAPABILITIES } from "./capabilities.js";
+import { capabilitiesFor } from "./capabilities.js";
 import { CopilotSession } from "./copilot-session.js";
 import type { ChildHandle, SpawnFn } from "./types.js";
 
@@ -47,19 +47,30 @@ export interface CopilotAdapterOptions {
   env?: Record<string, string | undefined>;
   /** The binary name; defaults to "copilot". */
   command?: string;
+  /**
+   * OPT-IN structured-events mode. `"text"` (default) keeps the v1 plain-text
+   * stream unchanged; `"json"` adds `--output-format json` and parses the
+   * structured stream into formatted output events. The exact CLI JSON schema
+   * is not confirmed, so json mode degrades gracefully per line; see
+   * {@link renderJsonLine}.
+   */
+  outputFormat?: OutputFormat;
 }
 
 export class CopilotAdapter implements EngineAdapter {
   readonly id = "copilot";
-  readonly capabilities = COPILOT_CAPABILITIES;
+  readonly capabilities;
   private readonly spawnFn: SpawnFn;
   private readonly env: Record<string, string | undefined>;
   private readonly command: string;
+  private readonly outputFormat: OutputFormat;
 
   constructor(opts: CopilotAdapterOptions = {}) {
     this.spawnFn = opts.spawn ?? defaultSpawn;
     this.env = opts.env ?? process.env;
     this.command = opts.command ?? "copilot";
+    this.outputFormat = opts.outputFormat ?? "text";
+    this.capabilities = capabilitiesFor(this.outputFormat);
   }
 
   health(): Promise<HealthStatus> {
@@ -67,7 +78,7 @@ export class CopilotAdapter implements EngineAdapter {
   }
 
   start(task: Task, workspace: Workspace, role: Role): AgentSession {
-    const args = buildArgs(task, workspace, role);
+    const args = buildArgs(task, workspace, role, this.outputFormat);
     const child = this.spawnFn(this.command, args, {
       cwd: workspace.path,
       env: definedEnv(this.env),
@@ -75,7 +86,7 @@ export class CopilotAdapter implements EngineAdapter {
     if (!child.stdout || !child.stderr) {
       throw new Error("copilot: stdio streams not piped");
     }
-    const session = new CopilotSession(child);
+    const session = new CopilotSession(child, { outputFormat: this.outputFormat });
     session.start();
     return session;
   }

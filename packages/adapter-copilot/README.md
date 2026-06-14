@@ -17,11 +17,21 @@ v1.0.52+ recommended).
 `gpt-5`, `gemini-3-pro`, `auto`, etc. (subscription-entitlement dependent). Set it
 on the role's `engine.model`.
 
-## v1 scope and limitations
+## Output format
 
-- **Plain-text streaming.** Output is streamed as `output` events; there are no
-  structured per-tool events. (`--output-format json` exists but its schema is
-  undocumented — a future upgrade.)
+- **Default: plain-text streaming.** Output is streamed as `output` events. This
+  is the v1 behavior and the mode the conformance suite runs against.
+- **Opt-in JSON mode.** Construct the adapter with `{ outputFormat: "json" }` to
+  add `--output-format json` and parse the structured stream into formatted
+  output events (assistant text rendered verbatim; tool calls rendered as
+  `▸ <name>: <path-or-command>`). The installed CLI's exact JSON schema is not
+  confirmed, so parsing is tolerant: any line that is not valid JSON, or is an
+  unrecognized shape, degrades to the raw line. The stream is never dropped and
+  parsing never throws. In json mode the instance advertises
+  `structuredEvents: true`; in text mode it stays `false`. `approvals` is `false`
+  in both modes (`copilot -p` is headless and autonomous).
+
+## v1 scope and limitations
 - **No interactive approval.** Each agent runs `--allow-all --no-ask-user`, which is
   safe because it is sandboxed to its own worktree; the conductor reviews the **diff**
   before merging. Per-tool approval awaits the ACP-mode upgrade.
