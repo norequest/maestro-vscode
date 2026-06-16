@@ -30,12 +30,14 @@ function elapsed(card: CardVM): string {
 
 function anatomy(card: CardVM): string {
   const hasAny =
-    card.soul || card.toolsCount !== undefined || (card.skills?.length ?? 0) > 0;
+    card.soul || (card.toolsCount ?? 0) > 0 || (card.skills?.length ?? 0) > 0;
   if (!hasAny) return "";
   const parts: string[] = [];
   if (card.soul) parts.push(`<span class="an-soul">☽ soul</span>`);
-  if (card.toolsCount !== undefined)
-    parts.push(`<span class="an-tools">🔧 ${card.toolsCount}</span>`);
+  if ((card.toolsCount ?? 0) > 0) {
+    const amberClass = (card.toolsCanWrite ?? 0) > 0 ? " amber" : "";
+    parts.push(`<span class="an-tools${amberClass}">🔧 ${card.toolsCount}</span>`);
+  }
   if (card.skills?.length)
     parts.push(
       `<span class="an-skills">◆ ${escapeHtml(card.skills[0]!)} ${card.skills.length}</span>`

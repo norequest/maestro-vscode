@@ -39,6 +39,18 @@ describe("renderCardHTML", () => {
   it("omits the anatomy row in P1 (no soul/tools/skills)", () => {
     expect(renderCardHTML(card())).not.toContain('class="anatomy"');
   });
+  it("P4: renders anatomy row with soul, tools count, and skill when role has them", () => {
+    const html = renderCardHTML(card({ soul: true, toolsCount: 2, toolsCanWrite: 1, skills: ["run-tests"] }));
+    expect(html).toContain('class="anatomy"');
+    expect(html).toContain("soul");
+    expect(html).toContain("2");
+    expect(html).toContain("run-tests");
+    expect(html).toContain("amber");
+  });
+  it("P4: bare card (soul=false, toolsCount=0, skills=[]) renders NO anatomy row", () => {
+    const html = renderCardHTML(card({ soul: false, toolsCount: 0, toolsCanWrite: 0, skills: [] }));
+    expect(html).not.toContain('class="anatomy"');
+  });
   it("escapes engine output and goal so text cannot inject markup", () => {
     const html = renderCardHTML(card({ goal: "<img src=x onerror=alert(1)>", output: "<script>bad" }));
     expect(html).not.toContain("<img src=x");

@@ -1,4 +1,4 @@
-import { stateNeedsAttention, type Agent, type OrchestratorEvent } from "@maestro/core";
+import { stateNeedsAttention, countGrants, type Agent, type OrchestratorEvent } from "@maestro/core";
 import { laneFor } from "./lane.js";
 import type { CardVM } from "./protocol.js";
 
@@ -26,6 +26,7 @@ function diffStatFromPatch(patch: string): { adds: number; dels: number } {
 
 function cardFromAgent(agent: Agent, prevOutput: string, prevStartedAt: number | undefined): CardVM {
   const startedAt = prevStartedAt ?? (agent.state === "working" ? Date.now() : undefined);
+  const grants = countGrants(agent.role.tools);
   return {
     id: agent.id,
     roleName: agent.role.name,
@@ -46,6 +47,10 @@ function cardFromAgent(agent: Agent, prevOutput: string, prevStartedAt: number |
     goal: agent.task.goal,
     diffStat: agent.diff ? diffStatFromPatch(agent.diff.patch) : undefined,
     startedAt,
+    soul: agent.role.soul !== undefined,
+    toolsCount: grants.granted,
+    toolsCanWrite: grants.canWrite,
+    skills: agent.role.skills ?? [],
   };
 }
 

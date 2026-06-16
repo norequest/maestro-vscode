@@ -38,11 +38,13 @@ export interface CardVM {
   diffStat?: { adds: number; dels: number };
   /** Unix ms timestamp of the first time this card entered "working" state. */
   startedAt?: number;
-  /** P4 anatomy placeholder: whether a Soul is attached. */
+  /** P4 anatomy: whether a Soul is attached (false when no soul). */
   soul?: boolean;
-  /** P4 anatomy placeholder: number of tools available to this agent. */
+  /** P4 anatomy: total number of tools granted to this agent. */
   toolsCount?: number;
-  /** P4 anatomy placeholder: skill names attached to this agent. */
+  /** P4 anatomy: number of tools that carry write permission. */
+  toolsCanWrite?: number;
+  /** P4 anatomy: skill names attached to this agent. */
   skills?: string[];
 }
 

@@ -126,10 +126,38 @@ describe("reduce", () => {
     expect(m.cards.get("a1")!.lane).toBe("conflict");
   });
 
-  it("leaves the anatomy placeholders undefined in P1", () => {
+  it("anatomy fields are always populated: bare role yields false/0/0/[] (P4 supersedes P1 placeholder)", () => {
     const c = reduce(initialModel(), added(agent())).cards.get("a1")!;
-    expect(c.soul).toBeUndefined();
-    expect(c.toolsCount).toBeUndefined();
-    expect(c.skills).toBeUndefined();
+    expect(c.soul).toBe(false);
+    expect(c.toolsCount).toBe(0);
+    expect(c.toolsCanWrite).toBe(0);
+    expect(c.skills).toEqual([]);
+  });
+
+  it("P4: populates soul/toolsCount/toolsCanWrite/skills from role with soul+tools+skills", () => {
+    const a = agent({
+      role: {
+        name: "Reviewer",
+        instructions: "",
+        engine: { id: "copilot" },
+        autonomy: "auto-approve-safe",
+        soul: "reviewer",
+        tools: { builtins: { read: ["Read"], write: ["Git"] } },
+        skills: ["run-tests"],
+      },
+    });
+    const c = reduce(initialModel(), added(a)).cards.get("a1")!;
+    expect(c.soul).toBe(true);
+    expect(c.toolsCount).toBe(2);
+    expect(c.toolsCanWrite).toBe(1);
+    expect(c.skills).toEqual(["run-tests"]);
+  });
+
+  it("P4: bare role (no soul/tools/skills) produces soul=false, toolsCount=0, toolsCanWrite=0, skills=[]", () => {
+    const c = reduce(initialModel(), added(agent())).cards.get("a1")!;
+    expect(c.soul).toBe(false);
+    expect(c.toolsCount).toBe(0);
+    expect(c.toolsCanWrite).toBe(0);
+    expect(c.skills).toEqual([]);
   });
 });
