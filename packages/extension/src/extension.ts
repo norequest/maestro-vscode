@@ -267,13 +267,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
       if (!description) return;
 
+      const goal = await vscode.window.showInputBox({
+        prompt: `Goal for ${selectedRole.name} (the why; optional)`,
+        placeHolder: "so that the refactor cannot silently break checkout",
+      });
+      // goal === undefined means escaped; "" means confirmed-empty. Treat empty as no goal.
+
       // Register the selected role (idempotent: overwrites by name). Handles roles
       // loaded from YAML that were not pre-registered at setup time.
       orch.registerRole(selectedRole);
 
       stage.reveal();
       try {
-        cockpit.handle({ type: "spawn", roleName: selectedRole.name, description });
+        cockpit.handle({ type: "spawn", roleName: selectedRole.name, description, ...(goal ? { goal } : {}) });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         void vscode.window.showErrorMessage(`Maestro: could not spawn agent: ${message}`);

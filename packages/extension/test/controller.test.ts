@@ -6,9 +6,10 @@ import { createCockpit, type OrchestratorLike } from "../src/controller.js";
 function fakeOrch() {
   let listener: ((e: OrchestratorEvent) => void) | undefined;
   const calls: string[] = [];
+  const spawnArgs: Array<[string, string, string | undefined]> = [];
   const orch: OrchestratorLike = {
     on(l) { listener = l; return () => { listener = undefined; }; },
-    spawn: (r, d) => { calls.push(`spawn:${r}:${d}`); return {} as Agent; },
+    spawn: (r, d, g?) => { calls.push(`spawn:${r}:${d}`); spawnArgs.push([r, d, g]); return {} as Agent; },
     steer: (id, i) => { calls.push(`steer:${id}:${i}`); },
     approve: (id, ap, dec) => { calls.push(`approve:${id}:${ap}:${dec}`); },
     stop: (id) => { calls.push(`stop:${id}`); },
@@ -18,7 +19,7 @@ function fakeOrch() {
     retryCleanup: async (id: string) => { calls.push(`retryCleanup:${id}`); },
     markPrCreated: async (id: string) => { calls.push(`markPrCreated:${id}`); },
   };
-  return { orch, calls, emit: (e: OrchestratorEvent) => listener?.(e) };
+  return { orch, calls, spawnArgs, emit: (e: OrchestratorEvent) => listener?.(e) };
 }
 const agent = (id: string): Agent => ({
   id, task: { id: `t-${id}`, description: "x", roleName: "Implementer" },
@@ -99,6 +100,22 @@ describe("createCockpit", () => {
     const cockpit = createCockpit(orch, () => {}, onError);
     expect(() => cockpit.handle({ type: "spawn", roleName: "R", description: "d" })).not.toThrow();
     expect(onError).toHaveBeenCalledWith(expect.stringContaining("spawn blew up"));
+  });
+
+  it("forwards goal to orch.spawn when provided", () => {
+    const { orch, spawnArgs } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "spawn", roleName: "Implementer", description: "fix", goal: "why" });
+    expect(spawnArgs).toHaveLength(1);
+    expect(spawnArgs[0]).toEqual(["Implementer", "fix", "why"]);
+  });
+
+  it("forwards undefined goal to orch.spawn when goal is omitted", () => {
+    const { orch, spawnArgs } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "spawn", roleName: "Implementer", description: "fix" });
+    expect(spawnArgs).toHaveLength(1);
+    expect(spawnArgs[0]).toEqual(["Implementer", "fix", undefined]);
   });
 
   it("focus updates state and dispose unsubscribes", () => {

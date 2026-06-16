@@ -59,6 +59,14 @@ describe("isWebviewMessage runtime guard", () => {
     expect(isWebviewMessage({ type: "spawn", roleName: "Implementer" })).toBe(false);
   });
 
+  it("accepts a spawn with an optional goal string", () => {
+    expect(isWebviewMessage({ type: "spawn", roleName: "r", description: "d", goal: "g" })).toBe(true);
+  });
+
+  it("rejects a spawn where goal is present but not a string", () => {
+    expect(isWebviewMessage({ type: "spawn", roleName: "r", description: "d", goal: 123 })).toBe(false);
+  });
+
   it("rejects an approve with a bad decision", () => {
     expect(isWebviewMessage({ type: "approve", agentId: "a1", approvalId: "r1", decision: "maybe" })).toBe(false);
   });

@@ -5,7 +5,7 @@ import { initialModel, reduce, selectState, setFocus } from "@maestro/cockpit";
 /** The slice of Orchestrator the cockpit drives. Keeps the controller unit-testable. */
 export interface OrchestratorLike {
   on(listener: (event: OrchestratorEvent) => void): () => void;
-  spawn(roleName: string, description: string): Agent;
+  spawn(roleName: string, description: string, goal?: string): Agent;
   steer(agentId: string, input: string): void;
   approve(agentId: string, approvalId: string, decision: ApprovalDecision): void;
   stop(agentId: string): void;
@@ -70,7 +70,7 @@ export function createCockpit(
           push();
           break;
         case "spawn":
-          orch.spawn(message.roleName, message.description);
+          orch.spawn(message.roleName, message.description, message.goal);
           break;
         case "steer":
           orch.steer(message.agentId, message.input);

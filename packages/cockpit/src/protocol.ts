@@ -58,7 +58,7 @@ export type HostToWebview = { type: "state"; state: CockpitState };
 export type WebviewToHost =
   | { type: "ready" }
   | { type: "focus"; agentId: string }
-  | { type: "spawn"; roleName: string; description: string }
+  | { type: "spawn"; roleName: string; description: string; goal?: string }
   | { type: "steer"; agentId: string; input: string }
   | { type: "approve"; agentId: string; approvalId: string; decision: "allow" | "deny" }
   | { type: "stop"; agentId: string }
@@ -120,7 +120,7 @@ export function isWebviewMessage(msg: unknown): msg is WebviewToHost {
     case "retry-cleanup":
       return isString(m["agentId"]);
     case "spawn":
-      return isString(m["roleName"]) && isString(m["description"]);
+      return isString(m["roleName"]) && isString(m["description"]) && (m["goal"] === undefined || isString(m["goal"]));
     case "steer":
       return isString(m["agentId"]) && isString(m["input"]);
     case "sendBack":
