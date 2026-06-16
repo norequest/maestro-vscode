@@ -65,11 +65,11 @@ export class Orchestrator {
     return this.agents.get(id);
   }
 
-  spawn(roleName: string, description: string): Agent {
+  spawn(roleName: string, description: string, goal?: string): Agent {
     const role = this.roles.get(roleName);
     if (!role) throw new Error(`Unknown role: ${roleName}`);
     const id = this.idGen();
-    const task: Task = { id: `task-${id}`, description, roleName };
+    const task: Task = { id: `task-${id}`, description, roleName, ...(goal ? { goal } : {}) };
     const agent: Agent = { id, task, role, state: "preparing", log: [] };
     this.agents.set(id, agent);
     this.emitter.emit({ kind: "agent-added", agent });

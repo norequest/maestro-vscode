@@ -3,6 +3,8 @@ export interface Task {
   id: string;
   description: string;
   roleName: string;
+  /** The "why" for this dispatch, shown as the faint italic goal line on the card. */
+  goal?: string;
 }
 
 /** An isolated checkout an agent works in (real worktree comes in a later milestone). */
