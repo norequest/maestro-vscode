@@ -1,5 +1,6 @@
 import { stringify as stringifyYaml } from "yaml";
 import type { Role, Team } from "@maestro/core";
+import type { SkillManifest } from "./skill-types.js";
 
 /**
  * Serialize a Role to a YAML string suitable for writing to .conductor/roles/<name>.yaml.
@@ -13,8 +14,24 @@ export function serializeRole(role: Role): string {
       ? { id: role.engine.id, model: role.engine.model }
       : { id: role.engine.id },
     autonomy: role.autonomy,
+    ...(role.skills !== undefined ? { skills: role.skills } : {}),
   };
   return stringifyYaml(doc, { lineWidth: 120 });
+}
+
+/**
+ * Serialize a SkillManifest and body text to a SKILL.md string.
+ * Produces a YAML frontmatter block followed by the body text.
+ * Suitable for writing to .conductor/skills/<name>/SKILL.md.
+ */
+export function serializeSkill(manifest: SkillManifest, body: string): string {
+  const frontmatterDoc: Record<string, unknown> = {
+    name: manifest.name,
+    description: manifest.description,
+    ...(manifest.allowedTools !== undefined ? { "allowed-tools": manifest.allowedTools } : {}),
+  };
+  const frontmatter = stringifyYaml(frontmatterDoc, { lineWidth: 120 });
+  return `---\n${frontmatter}---\n${body}`;
 }
 
 /**
