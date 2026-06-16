@@ -18,5 +18,6 @@ describe("Orchestrator Task.goal", () => {
     orch.registerRole({ name: "Impl", instructions: "", engine: { id: "fake" }, autonomy: "manual" });
     const a = orch.spawn("Impl", "do the thing");
     expect(a.task.goal).toBeUndefined();
+    expect("goal" in a.task).toBe(false); // structurally absent, not undefined-valued
   });
 });
