@@ -4,6 +4,11 @@
 
 This roadmap turns the [Conducting Board design reference](../2026-06-16-conducting-board-design/README.md) (the spec, prototyped in Claude Design) into shipped extension behavior. It follows the project's proven milestone pattern: a roadmap plus one TDD implementation plan per phase, each in the same house style as the `2026-06-14-maestro-*.md` milestone docs (Goal, Architecture, Scope IN/OUT, File Structure, red→green→commit tasks, Self-Review), executed with `superpowers:subagent-driven-development`.
 
+## Status
+
+- **P1 · Conducting Board · SHIPPED** (branch `feat/conducting-board`). The laned board (Working / Needs you / Conflict / Done) is real over today's data model: `Task.goal` threads through `Orchestrator.spawn` (R7); the cockpit owns the canonical `laneFor(state)` table (R1) and an enriched `CardVM` (goal, taskDescription, diffStat, startedAt, lane, anatomy placeholders); the extension renders rich read-mostly cards plus a right-hand drawer (Instructions / Output / Diff with a capability-gated Approve / Deny · Steer · Send-back bar) over the design's fixed dark-graphite tokens (R2). The spawn command captures an optional goal. Gate green (513 tests across 8 packages; both bundles emit; headless activation smoke passes). Seams R1 / R2 / R7 are now established for later phases.
+- **P2-P6 · pending.**
+
 ## Sequencing principle
 
 Get the **Conducting Board visible and real first** (the surface whose absence prompted this redesign), then deepen. **Every phase ships real capability, not a facade.** Each phase maps to one or more design docs and is grounded in the current code: the pure `@maestro/cockpit` presenter, the thin `@maestro/extension` shell, and the M1 to M9 core (orchestrator, workspace, config, adapters).
