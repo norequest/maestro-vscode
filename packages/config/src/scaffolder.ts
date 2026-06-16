@@ -11,6 +11,8 @@ export interface FsWriter {
   exists(path: string): Promise<boolean>;
   /** Create a directory and all parents. No-op if it already exists. */
   mkdir(path: string): Promise<void>;
+  /** Remove a directory and all its contents recursively. Refuses to remove paths outside .conductor (containment guard). */
+  removeDir(path: string): Promise<void>;
 }
 
 export const STARTER_ROLE: Role = {
@@ -97,6 +99,15 @@ export async function makeNodeFsWriter(): Promise<FsWriter> {
     },
     async mkdir(p: string): Promise<void> {
       await fs.mkdir(p, { recursive: true });
+    },
+    async removeDir(p: string): Promise<void> {
+      // Containment guard: refuse to remove anything outside .conductor
+      const resolved = (await import("node:path")).resolve(p);
+      const segments = resolved.split((await import("node:path")).sep);
+      if (!segments.includes(".conductor")) {
+        throw new Error(`Refusing to removeDir "${p}": path is not inside a .conductor directory.`);
+      }
+      await fs.rm(p, { recursive: true, force: true });
     },
   };
 }

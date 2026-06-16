@@ -9,8 +9,10 @@ import { teamQuickPickItems } from "./team-picker.js";
 import { StageWebviewPanel } from "./stage.js";
 import { EventLogger } from "./persistence.js";
 import { FsPersistenceBackend } from "./persistence-fs.js";
-import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter, DEFAULT_CONFIG } from "@maestro/config";
+import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter, DEFAULT_CONFIG, composeSpawnDescription, loadSkills } from "@maestro/config";
 import { isKnownEngineId, loadComposerData } from "./composer-data.js";
+import { makeConfigGateway } from "./config-gateway.js";
+import { LibraryWebviewPanel } from "./library.js";
 
 const DEFAULT_ROLE: Role = {
   name: "Implementer",
@@ -33,6 +35,7 @@ interface Conducting {
   readonly workspaces: GitWorkspaceManager;
   readonly cockpit: ReturnType<typeof createCockpit>;
   readonly stage: StageWebviewPanel;
+  readonly library: LibraryWebviewPanel;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -208,7 +211,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push({ dispose: () => cockpit.dispose() });
 
-    conducting = { repoRoot, orch, workspaces, cockpit, stage };
+    const gateway = makeConfigGateway(repoRoot);
+    const library = new LibraryWebviewPanel(context.extensionUri, gateway);
+    conducting = { repoRoot, orch, workspaces, cockpit, stage, library };
   }
 
   // Commands and the tree view register unconditionally. Handlers below read the
@@ -223,6 +228,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       conducting.stage.reveal();
+    }),
+    vscode.commands.registerCommand("maestro.openLibrary", () => {
+      if (!conducting) {
+        void vscode.window.showWarningMessage(NO_FOLDER_MESSAGE);
+        return;
+      }
+      conducting.library.reveal();
     }),
     vscode.commands.registerCommand("maestro.focusAgent", (agentId?: string) => {
       if (!conducting) {
@@ -307,9 +319,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // loaded from YAML that were not pre-registered at setup time.
       orch.registerRole(selectedRole);
 
+      // R3 minimal append; P4 moves this into the adapter preamble.
+      const fsReaderForSkills = await makeNodeFsReader();
+      const skillBundle = await loadSkills(repoRoot, fsReaderForSkills).catch(() => ({ bodies: new Map<string, string>() }));
+      const spawnDescription = composeSpawnDescription(selectedRole, skillBundle.bodies, description);
+
       stage.reveal();
       try {
-        cockpit.handle({ type: "spawn", roleName: selectedRole.name, description, ...(goal ? { goal } : {}) });
+        cockpit.handle({ type: "spawn", roleName: selectedRole.name, description: spawnDescription, ...(goal ? { goal } : {}) });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         void vscode.window.showErrorMessage(`Maestro: could not spawn agent: ${message}`);

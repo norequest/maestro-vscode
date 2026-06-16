@@ -1,0 +1,70 @@
+/* Library webview styles. Graphite palette (R2: no var(--vscode-*)). */
+:root {
+  --bg-page:#1a1a1a; --bg-card:#242424; --bg-raised:#2d2d2d; --bg-code:#1e1e1e;
+  --border-default:#3a3a3a; --border-hover:#4a4a4a;
+  --text-primary:#e8e8e8; --text-secondary:#a0a0a0; --text-tertiary:#6a6a6a; --text-ghost:#5a5a5a;
+  --amber:#f0a030; --blue:#4a9eff; --green:#4caf50; --red:#e05050;
+}
+body { background:var(--bg-page); color:var(--text-primary); font-family:"Manrope","Inter",sans-serif; margin:0; padding:12px; }
+
+/* ─── Tab bar ────────────────────────────────────────────────────────────────── */
+.tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border-default); margin-bottom:12px; }
+.tab-bar .tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--text-secondary); cursor:pointer; font-family:inherit; font-size:13px; padding:8px 14px; }
+.tab-bar .tab:hover { color:var(--text-primary); }
+.tab-bar .tab.active { color:var(--text-primary); border-bottom-color:var(--blue); }
+
+/* ─── Toolbar ────────────────────────────────────────────────────────────────── */
+.lib-toolbar { margin-bottom:12px; }
+.lib-new-btn { background:var(--blue); color:#0a1a2e; border:none; border-radius:6px; padding:6px 14px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.lib-new-btn:hover { background:#6ab0ff; }
+
+/* ─── Skill grid ─────────────────────────────────────────────────────────────── */
+.skill-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+.skill-card { background:var(--bg-card); border:1px solid var(--border-default); border-radius:6px; padding:12px; cursor:pointer; }
+.skill-card:hover { border-color:var(--border-hover); box-shadow:0 2px 8px rgba(0,0,0,.4); }
+.skill-card.amber { border-left:3px solid var(--amber); }
+.skill-header { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.skill-name { font-weight:600; color:var(--text-primary); }
+.plugin-badge { background:var(--bg-raised); color:var(--text-secondary); font-size:10px; border-radius:4px; padding:1px 6px; }
+.skill-desc { color:var(--text-secondary); font-size:12px; margin:0 0 6px; }
+.tools-hint { color:var(--text-tertiary); font-size:11px; font-family:monospace; margin-bottom:4px; }
+.used-by { color:var(--text-ghost); font-size:11px; }
+
+/* ─── Role list (Agents tab) ─────────────────────────────────────────────────── */
+.role-list { display:flex; flex-direction:column; gap:8px; }
+.role-list-empty { color:var(--text-tertiary); }
+.role-item { background:var(--bg-card); border:1px solid var(--border-default); border-radius:6px; padding:10px 12px; display:flex; align-items:center; gap:8px; }
+.role-name { font-weight:600; color:var(--text-primary); }
+.role-engine { background:var(--bg-raised); color:var(--text-secondary); border-radius:4px; padding:0 6px; font-size:11px; }
+.role-skills { color:var(--text-tertiary); font-size:11px; margin-top:2px; }
+
+/* ─── Skill editor ───────────────────────────────────────────────────────────── */
+.skill-editor { background:var(--bg-card); border:1px solid var(--border-default); border-radius:6px; padding:16px; max-width:600px; }
+.editor-label { display:block; font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:.06em; color:var(--text-tertiary); margin-bottom:6px; }
+.editor-body { width:100%; min-height:120px; background:var(--bg-code); border:1px solid var(--border-default); border-radius:4px; color:var(--text-primary); font-size:13px; font-family:monospace; padding:8px; box-sizing:border-box; resize:vertical; outline:none; }
+.editor-body:focus { border-color:var(--blue); }
+.editor-body-section, .editor-tools-section, .editor-used-by-section { margin-bottom:14px; }
+.tools-note { font-weight:400; text-transform:none; letter-spacing:0; color:var(--text-ghost); }
+.used-by-chips { display:flex; flex-wrap:wrap; gap:4px; }
+.used-by-chip { background:var(--bg-raised); border-radius:4px; padding:2px 8px; font-size:11px; color:var(--text-secondary); }
+.engine-id { color:var(--text-ghost); font-size:10px; }
+.blast-caution { color:var(--amber); font-size:12px; margin-top:6px; }
+.delete-section { margin-bottom:14px; }
+.delete-btn { background:var(--red); color:#fff; border:none; border-radius:6px; padding:5px 12px; cursor:pointer; font-family:inherit; font-size:13px; }
+.delete-warning { color:var(--text-tertiary); font-size:12px; margin:4px 0 0; }
+.editor-actions { display:flex; gap:8px; }
+.save-btn { background:var(--blue); color:#0a1a2e; border:none; border-radius:6px; padding:6px 16px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+.save-btn:hover { background:#6ab0ff; }
+.cancel-btn { background:var(--bg-raised); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:6px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; }
+.cancel-btn:hover { border-color:var(--border-hover); color:var(--text-primary); }
+
+/* ─── Picker ─────────────────────────────────────────────────────────────────── */
+.skill-picker { display:flex; flex-direction:column; gap:6px; }
+.picker-empty { color:var(--text-tertiary); }
+.picker-row { display:flex; align-items:center; gap:8px; background:var(--bg-card); border:1px solid var(--border-default); border-radius:6px; padding:8px 10px; }
+.picker-skill-name { flex:1; color:var(--text-primary); font-size:13px; }
+.attach-btn { background:var(--bg-raised); border:1px solid var(--border-default); border-radius:6px; padding:4px 10px; font-size:12px; color:var(--text-secondary); cursor:pointer; font-family:inherit; }
+.attach-btn:hover { border-color:var(--border-hover); color:var(--text-primary); }
+
+/* ─── Empty states ───────────────────────────────────────────────────────────── */
+.lib-empty { color:var(--text-tertiary); }

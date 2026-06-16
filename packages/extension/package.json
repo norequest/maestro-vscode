@@ -23,12 +23,14 @@
       { "command": "maestro.newAgent", "title": "Maestro: New Agent", "icon": "$(add)" },
       { "command": "maestro.spawnAgent", "title": "Maestro: Spawn Agent (quick)", "icon": "$(add)" },
       { "command": "maestro.launchTeam", "title": "Maestro: Launch Team", "icon": "$(organization)" },
-      { "command": "maestro.openStage", "title": "Maestro: Open Stage" }
+      { "command": "maestro.openStage", "title": "Maestro: Open Stage" },
+      { "command": "maestro.openLibrary", "title": "Maestro: Open Library", "icon": "$(library)" }
     ],
     "menus": {
       "view/title": [
         { "command": "maestro.newAgent", "when": "view == maestro.roster", "group": "navigation" },
-        { "command": "maestro.launchTeam", "when": "view == maestro.roster", "group": "navigation" }
+        { "command": "maestro.launchTeam", "when": "view == maestro.roster", "group": "navigation" },
+        { "command": "maestro.openLibrary", "when": "view == maestro.roster", "group": "navigation" }
       ]
     },
     "configuration": {

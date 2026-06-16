@@ -23,6 +23,9 @@ function makeFakeWriter(): { writer: FsWriter; written: Map<string, string>; dir
     async mkdir(p: string): Promise<void> {
       dirs.add(p);
     },
+    async removeDir(_p: string): Promise<void> {
+      // no-op in fake: scaffoldIfMissing never removes directories
+    },
   };
 
   return { writer, written, dirs };
