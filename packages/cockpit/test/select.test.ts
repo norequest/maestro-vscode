@@ -26,4 +26,24 @@ describe("selectState", () => {
     const m = reduce(initialModel(), add(agent("a1", "working")));
     expect(selectState({ ...m, focusedId: "a1" }).focusedId).toBe("a1");
   });
+
+  it("keeps attention-first, id-stable order inside a lane", () => {
+    let m = initialModel();
+    m = reduce(m, add(agent("a3", "done")));
+    m = reduce(m, add(agent("a1", "merged")));
+    m = reduce(m, add(agent("a2", "done")));
+    const doneLane = selectState(m).cards.filter((c) => c.lane === "done").map((c) => c.id);
+    expect(doneLane).toEqual(["a2", "a3", "a1"]);
+  });
+
+  it("puts every card in a lane derived from its state", () => {
+    let m = initialModel();
+    m = reduce(m, add(agent("w", "working")));
+    m = reduce(m, add(agent("n", "awaiting-approval")));
+    m = reduce(m, add(agent("c", "conflict")));
+    const byId = new Map(selectState(m).cards.map((c) => [c.id, c.lane]));
+    expect(byId.get("w")).toBe("working");
+    expect(byId.get("n")).toBe("needsYou");
+    expect(byId.get("c")).toBe("conflict");
+  });
 });
