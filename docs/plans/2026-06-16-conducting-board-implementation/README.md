@@ -7,7 +7,8 @@ This roadmap turns the [Conducting Board design reference](../2026-06-16-conduct
 ## Status
 
 - **P1 · Conducting Board · SHIPPED** (branch `feat/conducting-board`). The laned board (Working / Needs you / Conflict / Done) is real over today's data model: `Task.goal` threads through `Orchestrator.spawn` (R7); the cockpit owns the canonical `laneFor(state)` table (R1) and an enriched `CardVM` (goal, taskDescription, diffStat, startedAt, lane, anatomy placeholders); the extension renders rich read-mostly cards plus a right-hand drawer (Instructions / Output / Diff with a capability-gated Approve / Deny · Steer · Send-back bar) over the design's fixed dark-graphite tokens (R2). The spawn command captures an optional goal. Gate green (513 tests across 8 packages; both bundles emit; headless activation smoke passes). Seams R1 / R2 / R7 are now established for later phases.
-- **P2-P6 · pending.**
+- **P2 · Dispatch and Teams · SHIPPED** (branch `feat/conducting-board`). The bare spawn InputBox is replaced by a real Dispatch composer rendered inside the board webview (graphite, R2): pick a `.conductor/roles` preset (or type an ad-hoc role), pick an engine family + model variant, write a Goal (R7) and a Task, and Dispatch a card into Working. Pure work lands in the cockpit (`composer.ts` selector + `dispatch` `WebviewToHost` variant) and core (`spawn` gains a `SpawnOptions` bag and a `dispatch(spec)` that registers ad-hoc roles, all back-compatible; the P1 positional-goal seam reconciled). The extension adds the `composer-data` loader, the `render-composer` panel, the `maestro.newAgent` command (now the Roster `+`), a host-side engine-allowlist guard refusing unknown engines (R6), and keeps the InputBox as "Spawn Agent (quick)". Launch Team reuses the existing `maestro.launchTeam`. Gate green (544 tests; both bundles emit; activation registers `maestro.newAgent`).
+- **P3-P6 · pending.**
 
 ## Sequencing principle
 
