@@ -26,21 +26,26 @@ describe("render.ts: diffError on a done card (Issue 23)", () => {
   });
 });
 
-describe("render.ts: auto badge is gated off liveness (Issue 17-consume)", () => {
-  it("shows the auto badge for a live agent whose engine lacks approvals", () => {
-    // The auto badge was dropped from the card in P1 (dropped per design).
-    // Verify the card still renders and includes the role.
+describe("render.ts: the card carries no auto/autonomy badge in P1 (deferred to P4 anatomy row)", () => {
+  // Tombstone: the capability-driven `auto` badge (audit Issue 17-consume) lived on
+  // the card pre-P1. P1 makes the card read-mostly; autonomy moves to the P4 anatomy
+  // row. There is no positive badge assertion to make in P1, so these guard genuine
+  // ABSENCE on every kind of card (live and terminal) until P4 reintroduces it there.
+  it("renders no auto badge on a live agent whose engine lacks approvals", () => {
     const html = renderCardHTML(card({ state: "working", engineCapabilities: { approvals: false, steerable: true } }));
-    expect(html).toContain("Implementer");
+    expect(html).not.toContain(">auto<");
+    expect(html).not.toContain('class="badge"');
   });
 
-  it("does NOT show the auto badge on a detached (terminal, dead) card", () => {
+  it("renders no auto badge on a detached (terminal, dead) card", () => {
     const html = renderCardHTML(card({ state: "detached", attention: true, engineCapabilities: { approvals: false, steerable: true } }));
     expect(html).not.toContain(">auto<");
+    expect(html).not.toContain('class="badge"');
   });
 
-  it("does NOT show the auto badge on a merged card", () => {
+  it("renders no auto badge on a merged card", () => {
     const html = renderCardHTML(card({ state: "merged", engineCapabilities: { approvals: false, steerable: true } }));
     expect(html).not.toContain(">auto<");
+    expect(html).not.toContain('class="badge"');
   });
 });

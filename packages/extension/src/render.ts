@@ -9,7 +9,9 @@ const LANE_TITLES: Record<Lane, string> = {
   conflict: "Conflict",
   done: "Done",
 };
-const LANE_ORDER: readonly Lane[] = ["working", "needsYou", "conflict", "done"];
+// A fixed 4-tuple (not Lane[]) so dropping a lane is a length/type error; the set
+// must stay in sync with LANE_TITLES above (its Record<Lane,...> is the compile gate).
+const LANE_ORDER: readonly [Lane, Lane, Lane, Lane] = ["working", "needsYou", "conflict", "done"];
 
 // ─── Card helpers ─────────────────────────────────────────────────────────────
 
@@ -126,6 +128,12 @@ function actions(card: CardVM): string {
     case "merged":
     case "discarded":
       return "";
+    default: {
+      // Exhaustiveness guard: a new AgentState is a loud compile error here.
+      const _exhaustive: never = card.state;
+      void _exhaustive;
+      return "";
+    }
   }
 }
 
