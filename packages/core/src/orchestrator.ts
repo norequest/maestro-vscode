@@ -5,11 +5,13 @@ import type {
   Agent,
   AgentEvent,
   AgentState,
+  DispatchSpec,
   MergeResult,
   OrchestratorConfig,
   OrchestratorEvent,
   PersistedAgentRecord,
   Role,
+  SpawnOptions,
   Task,
   Team,
 } from "./types.js";
@@ -65,16 +67,57 @@ export class Orchestrator {
     return this.agents.get(id);
   }
 
-  spawn(roleName: string, description: string, goal?: string): Agent {
-    const role = this.roles.get(roleName);
-    if (!role) throw new Error(`Unknown role: ${roleName}`);
+  spawn(roleName: string, description: string, opts: SpawnOptions = {}): Agent {
+    const base = this.roles.get(roleName);
+    if (!base) throw new Error(`Unknown role: ${roleName}`);
+    const role: Role =
+      opts.engineId !== undefined || opts.model !== undefined
+        ? {
+            ...base,
+            engine: {
+              id: opts.engineId ?? base.engine.id,
+              ...((opts.model ?? base.engine.model) !== undefined
+                ? { model: opts.model ?? base.engine.model }
+                : {}),
+            },
+          }
+        : base;
     const id = this.idGen();
-    const task: Task = { id: `task-${id}`, description, roleName, ...(goal ? { goal } : {}) };
+    const task: Task = {
+      id: `task-${id}`,
+      description,
+      roleName,
+      ...(opts.goal !== undefined ? { goal: opts.goal } : {}),
+    };
     const agent: Agent = { id, task, role, state: "preparing", log: [] };
     this.agents.set(id, agent);
     this.emitter.emit({ kind: "agent-added", agent });
     this.tryStart(agent);
     return agent;
+  }
+
+  dispatch(spec: DispatchSpec): Agent {
+    if (spec.roleName) {
+      return this.spawn(spec.roleName, spec.description, {
+        ...(spec.goal !== undefined ? { goal: spec.goal } : {}),
+        ...(spec.engineId !== undefined ? { engineId: spec.engineId } : {}),
+        ...(spec.model !== undefined ? { model: spec.model } : {}),
+      });
+    }
+    if (spec.newRoleName) {
+      const role: Role = {
+        name: spec.newRoleName,
+        instructions: `Ad-hoc role dispatched from the Conducting Board. ${spec.description}`,
+        engine: {
+          id: spec.engineId ?? "copilot",
+          ...(spec.model !== undefined ? { model: spec.model } : {}),
+        },
+        autonomy: "auto-approve-safe",
+      };
+      this.registerRole(role);
+      return this.spawn(role.name, spec.description, spec.goal !== undefined ? { goal: spec.goal } : {});
+    }
+    throw new Error("dispatch requires either roleName or newRoleName");
   }
 
   /**

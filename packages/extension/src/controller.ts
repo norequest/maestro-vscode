@@ -1,11 +1,12 @@
-import type { Agent, ApprovalDecision, MergeResult, OrchestratorEvent } from "@maestro/core";
+import type { Agent, ApprovalDecision, DispatchSpec, MergeResult, OrchestratorEvent, SpawnOptions } from "@maestro/core";
 import type { CockpitState, WebviewToHost } from "@maestro/cockpit";
 import { initialModel, reduce, selectState, setFocus } from "@maestro/cockpit";
 
 /** The slice of Orchestrator the cockpit drives. Keeps the controller unit-testable. */
 export interface OrchestratorLike {
   on(listener: (event: OrchestratorEvent) => void): () => void;
-  spawn(roleName: string, description: string, goal?: string): Agent;
+  spawn(roleName: string, description: string, opts?: SpawnOptions): Agent;
+  dispatch(spec: DispatchSpec): Agent;
   steer(agentId: string, input: string): void;
   approve(agentId: string, approvalId: string, decision: ApprovalDecision): void;
   stop(agentId: string): void;
@@ -70,7 +71,7 @@ export function createCockpit(
           push();
           break;
         case "spawn":
-          orch.spawn(message.roleName, message.description, message.goal);
+          orch.spawn(message.roleName, message.description, message.goal !== undefined ? { goal: message.goal } : undefined);
           break;
         case "steer":
           orch.steer(message.agentId, message.input);
@@ -92,6 +93,16 @@ export function createCockpit(
           break;
         case "retry-cleanup":
           orch.retryCleanup(message.agentId).catch(fail);
+          break;
+        case "dispatch":
+          orch.dispatch({
+            roleName: message.roleName,
+            newRoleName: message.newRoleName,
+            engineId: message.engineId,
+            model: message.model,
+            goal: message.goal,
+            description: message.description,
+          });
           break;
         case "resolve-conflict":
         case "finish-merge":

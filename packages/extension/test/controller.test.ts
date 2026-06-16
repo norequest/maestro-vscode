@@ -1,15 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Agent, OrchestratorEvent } from "@maestro/core";
+import type { Agent, DispatchSpec, OrchestratorEvent } from "@maestro/core";
 import type { CockpitState } from "@maestro/cockpit";
 import { createCockpit, type OrchestratorLike } from "../src/controller.js";
 
 function fakeOrch() {
   let listener: ((e: OrchestratorEvent) => void) | undefined;
   const calls: string[] = [];
-  const spawnArgs: Array<[string, string, string | undefined]> = [];
+  const spawnArgs: Array<[string, string, { goal?: string; engineId?: string; model?: string } | undefined]> = [];
   const orch: OrchestratorLike = {
     on(l) { listener = l; return () => { listener = undefined; }; },
-    spawn: (r, d, g?) => { calls.push(`spawn:${r}:${d}`); spawnArgs.push([r, d, g]); return {} as Agent; },
+    spawn: (r, d, opts?) => { calls.push(`spawn:${r}:${d}`); spawnArgs.push([r, d, opts]); return {} as Agent; },
+    dispatch: (_spec: DispatchSpec) => { calls.push(`dispatch`); return {} as Agent; },
     steer: (id, i) => { calls.push(`steer:${id}:${i}`); },
     approve: (id, ap, dec) => { calls.push(`approve:${id}:${ap}:${dec}`); },
     stop: (id) => { calls.push(`stop:${id}`); },
@@ -107,7 +108,7 @@ describe("createCockpit", () => {
     const cockpit = createCockpit(orch, () => {});
     cockpit.handle({ type: "spawn", roleName: "Implementer", description: "fix", goal: "why" });
     expect(spawnArgs).toHaveLength(1);
-    expect(spawnArgs[0]).toEqual(["Implementer", "fix", "why"]);
+    expect(spawnArgs[0]).toEqual(["Implementer", "fix", { goal: "why" }]);
   });
 
   it("forwards undefined goal to orch.spawn when goal is omitted", () => {

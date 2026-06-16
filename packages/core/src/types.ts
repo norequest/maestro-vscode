@@ -122,3 +122,9 @@ export type OrchestratorEvent =
 export interface OrchestratorConfig {
   maxParallelAgents: number;
 }
+
+/** Per-dispatch overrides applied without mutating the registered Role. */
+export interface SpawnOptions { goal?: string; engineId?: string; model?: string; }
+
+/** A single-agent dispatch: either a preset roleName or a free-text newRoleName, plus the task. */
+export interface DispatchSpec { roleName?: string; newRoleName?: string; engineId?: string; model?: string; goal?: string; description: string; }

@@ -8,7 +8,7 @@ describe("Orchestrator Task.goal", () => {
     const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
     orch.registerAdapter(new FakeEngineAdapter({ script: [] }));
     orch.registerRole({ name: "Impl", instructions: "", engine: { id: "fake" }, autonomy: "manual" });
-    const a = orch.spawn("Impl", "do the thing", "so that checkout cannot silently break");
+    const a = orch.spawn("Impl", "do the thing", { goal: "so that checkout cannot silently break" });
     expect(a.task.goal).toBe("so that checkout cannot silently break");
   });
 
