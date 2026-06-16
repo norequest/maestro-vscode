@@ -3,13 +3,14 @@ import type { Agent, OrchestratorEvent } from "@maestro/core";
 import { initialModel, reduce, setFocus } from "../src/reducer.js";
 
 function agent(over: Partial<Agent> = {}): Agent {
+  const { task, ...rest } = over;
   return {
     id: "a1",
-    task: { id: "t1", description: "do it", roleName: "Implementer" },
+    task: { id: "t1", description: "do it", roleName: "Implementer", ...task },
     role: { name: "Implementer", instructions: "", engine: { id: "copilot" }, autonomy: "auto-approve-safe" },
     state: "preparing",
     log: [],
-    ...over,
+    ...rest,
   };
 }
 const added = (a: Agent): OrchestratorEvent => ({ kind: "agent-added", agent: a });
@@ -85,5 +86,50 @@ describe("reduce", () => {
     const m1 = setFocus(m0, "a1");
     expect(m1.focusedId).toBe("a1");
     expect(m0.focusedId).toBeUndefined();
+  });
+
+  it("carries goal, taskDescription, and lane onto the card", () => {
+    const m = reduce(initialModel(), added(agent({ task: { id: "t1", description: "wire the board", roleName: "Implementer", goal: "so that the board is real" } })));
+    const c = m.cards.get("a1")!;
+    expect(c.goal).toBe("so that the board is real");
+    expect(c.taskDescription).toBe("wire the board");
+    expect(c.lane).toBe("working");
+  });
+
+  it("derives diffStat by counting + and - patch lines (ignoring +++/--- headers)", () => {
+    const patch = ["--- a/x.ts", "+++ b/x.ts", "@@", "-old line", "+new line", "+second add", " ctx"].join("\n");
+    const m = reduce(initialModel(), updated(agent({ state: "done", diff: { files: ["x.ts"], patch } })));
+    expect(m.cards.get("a1")!.diffStat).toEqual({ adds: 2, dels: 1 });
+  });
+
+  it("has no diffStat until a diff exists", () => {
+    const m = reduce(initialModel(), added(agent()));
+    expect(m.cards.get("a1")!.diffStat).toBeUndefined();
+  });
+
+  it("stamps startedAt when the card first enters working and preserves it after", () => {
+    let m = reduce(initialModel(), added(agent()));
+    expect(m.cards.get("a1")!.startedAt).toBeUndefined();
+    m = reduce(m, updated(agent({ state: "working" })));
+    const started = m.cards.get("a1")!.startedAt;
+    expect(typeof started).toBe("number");
+    m = reduce(m, updated(agent({ state: "done", summary: "ok" })));
+    expect(m.cards.get("a1")!.startedAt).toBe(started);
+  });
+
+  it("lane tracks state transitions (working -> needsYou on error, conflict on conflict)", () => {
+    let m = reduce(initialModel(), added(agent({ state: "working" })));
+    expect(m.cards.get("a1")!.lane).toBe("working");
+    m = reduce(m, updated(agent({ state: "error", error: "boom" })));
+    expect(m.cards.get("a1")!.lane).toBe("needsYou");
+    m = reduce(m, updated(agent({ state: "conflict", conflict: { files: ["x.ts"] } })));
+    expect(m.cards.get("a1")!.lane).toBe("conflict");
+  });
+
+  it("leaves the anatomy placeholders undefined in P1", () => {
+    const c = reduce(initialModel(), added(agent())).cards.get("a1")!;
+    expect(c.soul).toBeUndefined();
+    expect(c.toolsCount).toBeUndefined();
+    expect(c.skills).toBeUndefined();
   });
 });

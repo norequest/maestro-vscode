@@ -1,4 +1,5 @@
 import { stateNeedsAttention, type Agent, type OrchestratorEvent } from "@maestro/core";
+import { laneFor } from "./lane.js";
 import type { CardVM } from "./protocol.js";
 
 /** Max accumulated output chars kept per agent (keeps state snapshots bounded). */
@@ -14,7 +15,17 @@ export function initialModel(): CockpitModel {
   return { cards: new Map() };
 }
 
-function cardFromAgent(agent: Agent, prevOutput: string): CardVM {
+function diffStatFromPatch(patch: string): { adds: number; dels: number } {
+  let adds = 0, dels = 0;
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) adds++;
+    else if (line.startsWith("-") && !line.startsWith("---")) dels++;
+  }
+  return { adds, dels };
+}
+
+function cardFromAgent(agent: Agent, prevOutput: string, prevStartedAt: number | undefined): CardVM {
+  const startedAt = prevStartedAt ?? (agent.state === "working" ? Date.now() : undefined);
   return {
     id: agent.id,
     roleName: agent.role.name,
@@ -30,6 +41,11 @@ function cardFromAgent(agent: Agent, prevOutput: string): CardVM {
     approvalDetail: agent.approvalDetail,
     engineCapabilities: agent.engineCapabilities,
     attention: stateNeedsAttention(agent.state),
+    lane: laneFor(agent.state),
+    taskDescription: agent.task.description,
+    goal: agent.task.goal,
+    diffStat: agent.diff ? diffStatFromPatch(agent.diff.patch) : undefined,
+    startedAt,
   };
 }
 
@@ -43,12 +59,12 @@ export function reduce(model: CockpitModel, event: OrchestratorEvent): CockpitMo
   const cards = new Map(model.cards);
   switch (event.kind) {
     case "agent-added":
-      cards.set(event.agent.id, cardFromAgent(event.agent, ""));
+      cards.set(event.agent.id, cardFromAgent(event.agent, "", undefined));
       break;
     case "agent-updated": {
       // agent-added always precedes agent-updated per the orchestrator contract.
       const prev = cards.get(event.agent.id);
-      cards.set(event.agent.id, cardFromAgent(event.agent, prev?.output ?? ""));
+      cards.set(event.agent.id, cardFromAgent(event.agent, prev?.output ?? "", prev?.startedAt));
       break;
     }
     case "agent-event": {

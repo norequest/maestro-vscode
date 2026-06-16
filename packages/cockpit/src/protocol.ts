@@ -27,6 +27,22 @@ export interface CardVM {
    * detached, merge-cleanup-failed.
    */
   attention: boolean;
+  /** Which lane on the Conducting Board this card belongs to. */
+  lane: Lane;
+  /** The active task's description text. */
+  taskDescription: string;
+  /** The "why" from task.goal; shown as a faint italic line on the card. */
+  goal?: string;
+  /** Counts of added/deleted lines in the diff patch, excluding file headers. */
+  diffStat?: { adds: number; dels: number };
+  /** Unix ms timestamp of the first time this card entered "working" state. */
+  startedAt?: number;
+  /** P4 anatomy placeholder: whether a Soul is attached. */
+  soul?: boolean;
+  /** P4 anatomy placeholder: number of tools available to this agent. */
+  toolsCount?: number;
+  /** P4 anatomy placeholder: skill names attached to this agent. */
+  skills?: string[];
 }
 
 /** The whole cockpit, a pure function of orchestrator events. `cards` are pre-ordered. */
