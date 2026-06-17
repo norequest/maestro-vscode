@@ -12,3 +12,4 @@ export * from "./skill-index.js";
 export * from "./compose.js";
 export * from "./souls.js";
 export * from "./grant-gate.js";
+export * from "./discover/index.js";
