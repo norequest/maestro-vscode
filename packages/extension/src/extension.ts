@@ -11,8 +11,9 @@ import { EventLogger } from "./persistence.js";
 import { FsPersistenceBackend } from "./persistence-fs.js";
 import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter, DEFAULT_CONFIG, composeSpawnDescription, loadSkills } from "@maestro/config";
 import { isKnownEngineId, loadComposerData } from "./composer-data.js";
-import { makeConfigGateway } from "./config-gateway.js";
+import { makeConfigGateway, makeAnatomyGateway } from "./config-gateway.js";
 import { LibraryWebviewPanel } from "./library.js";
+import { AnatomyWebviewPanel } from "./anatomy.js";
 
 const DEFAULT_ROLE: Role = {
   name: "Implementer",
@@ -36,6 +37,7 @@ interface Conducting {
   readonly cockpit: ReturnType<typeof createCockpit>;
   readonly stage: StageWebviewPanel;
   readonly library: LibraryWebviewPanel;
+  readonly anatomy: AnatomyWebviewPanel;
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -213,7 +215,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     const gateway = makeConfigGateway(repoRoot);
     const library = new LibraryWebviewPanel(context.extensionUri, gateway);
-    conducting = { repoRoot, orch, workspaces, cockpit, stage, library };
+    const anatomyGateway = makeAnatomyGateway(repoRoot);
+    const anatomy = new AnatomyWebviewPanel(context.extensionUri, anatomyGateway);
+    conducting = { repoRoot, orch, workspaces, cockpit, stage, library, anatomy };
   }
 
   // Commands and the tree view register unconditionally. Handlers below read the
@@ -235,6 +239,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       conducting.library.reveal();
+    }),
+    vscode.commands.registerCommand("maestro.openAnatomy", async () => {
+      if (!conducting) {
+        void vscode.window.showWarningMessage(NO_FOLDER_MESSAGE);
+        return;
+      }
+      const { repoRoot, anatomy } = conducting;
+
+      const fsReader = await makeNodeFsReader();
+      const loaded = await loadConductorDir(repoRoot, fsReader).catch(() => null);
+
+      if (!loaded || loaded.roles.length === 0) {
+        void vscode.window.showInformationMessage("Maestro: no roles defined in .conductor/roles/.");
+        return;
+      }
+
+      if (loaded.errors.length > 0) {
+        const msgs = loaded.errors.map((e) => `${e.source}: ${e.errors.join("; ")}`).join("\n");
+        void vscode.window.showWarningMessage(`Maestro: config errors in .conductor/:\n${msgs}`);
+      }
+
+      let selectedRole: Role;
+      if (loaded.roles.length === 1) {
+        selectedRole = loaded.roles[0]!;
+      } else {
+        const picks = loaded.roles.map((r) => ({
+          label: r.name,
+          description: `${r.engine.id} · ${r.autonomy}`,
+          role: r,
+        }));
+        const picked = await vscode.window.showQuickPick(picks, {
+          title: "Select a role to edit",
+          placeHolder: "Role",
+        });
+        if (!picked) return;
+        selectedRole = picked.role;
+      }
+
+      await anatomy.open(selectedRole.name);
     }),
     vscode.commands.registerCommand("maestro.focusAgent", (agentId?: string) => {
       if (!conducting) {
