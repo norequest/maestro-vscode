@@ -1,0 +1,15 @@
+---
+name: Style Guide
+description: Enforces the project style guide for TypeScript files.
+alwaysApply: false
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+---
+
+When writing TypeScript:
+- Use `const` over `let` when the value is not reassigned
+- Prefer arrow functions for callbacks
+- Always add explicit return types to exported functions
+- Use early returns to reduce nesting
+- No em dashes in comments or strings (use commas or colons instead)

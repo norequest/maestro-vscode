@@ -1,0 +1,7 @@
+name: Implementer
+instructions: Implement the requested feature in this worktree. Write tests, make them green, then commit.
+engine:
+  id: copilot
+autonomy: auto-approve-safe
+skills:
+  - run-tests
