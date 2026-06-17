@@ -74,6 +74,7 @@ export type WebviewToHost =
   | { type: "finish-merge"; agentId: string }
   | { type: "create-pr"; agentId: string }
   | { type: "retry-cleanup"; agentId: string }
+  | { type: "open-review"; agentId: string }
   | {
       type: "dispatch";
       /** A registered/preset role to spawn. */
@@ -103,6 +104,7 @@ const AGENT_ID_TYPES = new Set([
   "finish-merge",
   "create-pr",
   "retry-cleanup",
+  "open-review",
 ]);
 
 function isString(value: unknown): value is string {
@@ -142,6 +144,7 @@ export function isWebviewMessage(msg: unknown): msg is WebviewToHost {
     case "finish-merge":
     case "create-pr":
     case "retry-cleanup":
+    case "open-review":
       return isString(m["agentId"]);
     case "spawn":
       return isString(m["roleName"]) && isString(m["description"]) && (m["goal"] === undefined || isString(m["goal"]));

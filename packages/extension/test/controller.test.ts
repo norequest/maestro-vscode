@@ -165,4 +165,76 @@ describe("createCockpit", () => {
     cockpit.handle({ type: "dispatch", roleName: "Ghost", description: "x" });
     expect(onError).toHaveBeenCalledWith(expect.stringContaining("Unknown role"));
   });
+
+  // ─── Decision-bar dispatch lock-down tests ────────────────────────────────
+
+  it("sendBack dispatches to orch.sendBack with id and feedback", () => {
+    const { orch, calls } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "sendBack", agentId: "a7", feedback: "needs more tests" });
+    expect(calls).toContain("sendBack:a7:needs more tests");
+  });
+
+  it("merge dispatches to orch.merge with id", async () => {
+    const { orch, calls } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "merge", agentId: "a2" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toContain("merge:a2");
+  });
+
+  it("discard dispatches to orch.discard with id", async () => {
+    const { orch, calls } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "discard", agentId: "a3" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toContain("discard:a3");
+  });
+
+  it("retry-cleanup dispatches to orch.retryCleanup with id", async () => {
+    const { orch, calls } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    cockpit.handle({ type: "retry-cleanup", agentId: "a4" });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toContain("retryCleanup:a4");
+  });
+
+  it("create-pr routes to onMergeAction with type create-pr", () => {
+    const { orch } = fakeOrch();
+    const seen: string[] = [];
+    const cockpit = createCockpit(orch, () => {}, undefined, (msg) => seen.push(msg.type));
+    cockpit.handle({ type: "create-pr", agentId: "a5" });
+    expect(seen).toContain("create-pr");
+  });
+
+  it("finish-merge routes to onMergeAction with type finish-merge", () => {
+    const { orch } = fakeOrch();
+    const seen: string[] = [];
+    const cockpit = createCockpit(orch, () => {}, undefined, (msg) => seen.push(msg.type));
+    cockpit.handle({ type: "finish-merge", agentId: "a5" });
+    expect(seen).toContain("finish-merge");
+  });
+
+  it("resolve-conflict routes to onMergeAction with type resolve-conflict", () => {
+    const { orch } = fakeOrch();
+    const seen: string[] = [];
+    const cockpit = createCockpit(orch, () => {}, undefined, (msg) => seen.push(msg.type));
+    cockpit.handle({ type: "resolve-conflict", agentId: "a5" });
+    expect(seen).toContain("resolve-conflict");
+  });
+
+  it("open-review calls the injected onOpenReview with the agent id", () => {
+    const { orch } = fakeOrch();
+    const reviewed: string[] = [];
+    const cockpit = createCockpit(orch, () => {}, undefined, undefined, (id) => reviewed.push(id));
+    cockpit.handle({ type: "open-review", agentId: "a9" });
+    expect(reviewed).toEqual(["a9"]);
+  });
+
+  it("open-review is a no-op when no onOpenReview callback is provided", () => {
+    const { orch } = fakeOrch();
+    const cockpit = createCockpit(orch, () => {});
+    // Should not throw when no callback is provided
+    expect(() => cockpit.handle({ type: "open-review", agentId: "a9" })).not.toThrow();
+  });
 });

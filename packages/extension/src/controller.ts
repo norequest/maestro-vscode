@@ -45,6 +45,7 @@ export function createCockpit(
   onState: (state: CockpitState) => void,
   onError?: (message: string) => void,
   onMergeAction?: (msg: MergeActionMessage) => void,
+  onOpenReview?: (agentId: string) => void,
 ): Cockpit {
   let model = initialModel();
   const push = (): void => onState(selectState(model));
@@ -108,6 +109,9 @@ export function createCockpit(
         case "finish-merge":
         case "create-pr":
           onMergeAction?.(message);
+          break;
+        case "open-review":
+          onOpenReview?.(message.agentId);
           break;
         default: {
           // A new WebviewToHost variant without a handler is a COMPILE error.

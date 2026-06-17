@@ -88,3 +88,15 @@ describe("isWebviewMessage · dispatch", () => {
     expect(isWebviewMessage({ type: "dispatch", roleName: "X", description: "y" })).toBe(true);
   });
 });
+
+describe("isWebviewMessage · open-review", () => {
+  it("accepts a valid open-review with agentId", () => {
+    expect(isWebviewMessage({ type: "open-review", agentId: "a1" })).toBe(true);
+  });
+  it("rejects open-review missing agentId", () => {
+    expect(isWebviewMessage({ type: "open-review" })).toBe(false);
+  });
+  it("rejects open-review with non-string agentId", () => {
+    expect(isWebviewMessage({ type: "open-review", agentId: 42 })).toBe(false);
+  });
+});
