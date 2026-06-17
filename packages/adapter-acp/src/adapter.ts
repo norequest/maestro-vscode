@@ -62,6 +62,9 @@ export class AcpAdapter implements EngineAdapter {
       instructions: role.instructions,
       model: role.engine.model,
       autonomy: role.autonomy,
+      soulDoc: task.soulDoc,
+      tools: role.tools,
+      skillBodies: task.skillBodies,
     });
     session.start(task);
     return session;

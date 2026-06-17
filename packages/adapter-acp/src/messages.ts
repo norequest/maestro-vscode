@@ -31,7 +31,7 @@ let _nextId = 1;
 
 /** Build an ACP `initialize` request to kick off a session. */
 export function buildInitialize(opts: {
-  instructions: string;
+  systemPrompt: string;
   permissionMode: AcpPermissionMode;
   model?: string;
 }): AcpMessage {
@@ -40,7 +40,7 @@ export function buildInitialize(opts: {
     id: _nextId++,
     method: "initialize",
     params: {
-      systemPrompt: opts.instructions,
+      systemPrompt: opts.systemPrompt,
       permissionMode: opts.permissionMode,
       ...(opts.model ? { model: opts.model } : {}),
     },
