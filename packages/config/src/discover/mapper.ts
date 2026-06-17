@@ -2,6 +2,7 @@ import type { Role } from "@maestro/core";
 import { validateRole } from "../validator.js";
 import { KNOWN_ENGINE_IDS } from "../types.js";
 import type { DiscoveredItem } from "./types.js";
+import type { McpInventory } from "./mcp.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -34,14 +35,8 @@ export interface AdoptDraft {
   autonomyClampNote?: string;
 }
 
-/**
- * A minimal inventory of MCP servers available in the workspace.
- * The real McpInventory arrives in a later group; this stub is sufficient for
- * the mapper's write-gate logic. The scanner replaces this with the real type.
- */
-export interface McpInventory {
-  servers: Array<{ name: string; writeCapable: boolean }>;
-}
+// Re-export McpInventory so existing imports from mapper.ts continue to work.
+export type { McpInventory };
 
 // ---------------------------------------------------------------------------
 // Internal helpers

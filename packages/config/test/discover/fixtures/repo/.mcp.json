@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "description": "Read-only filesystem access"
+    },
+    "code-search": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-search"],
+      "description": "Search codebase"
+    }
+  }
+}
