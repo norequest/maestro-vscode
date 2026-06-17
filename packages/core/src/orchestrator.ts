@@ -10,6 +10,7 @@ import type {
   OrchestratorConfig,
   OrchestratorEvent,
   PersistedAgentRecord,
+  PreambleResolver,
   Role,
   SpawnOptions,
   Task,
@@ -37,6 +38,7 @@ export class Orchestrator {
   private running = 0;
   // Merges serialize: each call chains onto this lock before touching the git index.
   private mergeLock: Promise<void> = Promise.resolve();
+  private preambleResolver?: PreambleResolver;
 
   constructor(
     private readonly config: OrchestratorConfig,
@@ -49,6 +51,10 @@ export class Orchestrator {
 
   registerAdapter(adapter: EngineAdapter): void {
     this.adapters.set(adapter.id, adapter);
+  }
+
+  setPreambleResolver(fn: PreambleResolver): void {
+    this.preambleResolver = fn;
   }
 
   registerRole(role: Role): void {
@@ -172,6 +178,15 @@ export class Orchestrator {
       this.update(agent, "stopped");
       this.release();
       return;
+    }
+    if (this.preambleResolver) {
+      try {
+        const resolved = await this.preambleResolver(agent.role);
+        if (resolved.soulDoc !== undefined) agent.task = { ...agent.task, soulDoc: resolved.soulDoc };
+        if (resolved.skillBodies !== undefined) agent.task = { ...agent.task, skillBodies: resolved.skillBodies };
+      } catch {
+        // resolver failure is non-fatal; continue without soul/skills
+      }
     }
     this.update(agent, "working");
     agent.engineCapabilities = {

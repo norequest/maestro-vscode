@@ -5,6 +5,10 @@ export interface Task {
   roleName: string;
   /** The "why" for this dispatch, shown as the faint italic goal line on the card. */
   goal?: string;
+  /** Resolved at spawn; not persisted. */
+  soulDoc?: SoulDoc;
+  /** Resolved skill bodies at spawn; not persisted. */
+  skillBodies?: string[];
 }
 
 /** An isolated checkout an agent works in (real worktree comes in a later milestone). */
@@ -158,3 +162,6 @@ export interface SpawnOptions { goal?: string; engineId?: string; model?: string
 
 /** A single-agent dispatch: either a preset roleName or a free-text newRoleName, plus the task. */
 export interface DispatchSpec { roleName?: string; newRoleName?: string; engineId?: string; model?: string; goal?: string; description: string; }
+
+/** Async resolver injected by the extension to avoid fs imports in core. */
+export type PreambleResolver = (role: Role) => Promise<{ soulDoc?: SoulDoc; skillBodies?: string[] }>;
