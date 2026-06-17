@@ -6,6 +6,10 @@ import {
   renderPickerRows,
   renderRoleList,
 } from "../library-render.js";
+import { selectDiscover } from "../discover-view.js";
+import type { DiscoverGroup } from "../discover-view.js";
+import { renderDiscoverTab } from "../discover-render.js";
+import type { DiscoveredItem, McpInventory } from "@maestro/config";
 
 interface VsCodeApi {
   postMessage(msg: LibraryToHost): void;
@@ -18,6 +22,15 @@ const root = document.getElementById("root");
 // ─── Editor state (body textarea content tracked locally) ─────────────────────
 
 let editorBody = "";
+
+// ─── Discover tab state ───────────────────────────────────────────────────────
+
+let discoverItems: DiscoveredItem[] = [];
+let discoverFilter = "";
+let discoverChip: DiscoverGroup | "all" = "all";
+let discoverScanning = false;
+let discoverMcp: McpInventory = { servers: [] };
+let lastSnapshot: LibrarySnapshot | undefined;
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -44,9 +57,11 @@ function render(snap: LibrarySnapshot): void {
       case "teams":
         body = renderTeamList(snap.teams);
         break;
-      case "discover":
-        body = `<p class="lib-empty">Plugin skill discovery is coming in P5.</p>`;
+      case "discover": {
+        const vm = selectDiscover(discoverItems, discoverFilter, discoverChip, discoverScanning);
+        body = renderDiscoverTab(vm);
         break;
+      }
       default: {
         const _exhaustive: never = snap.tab;
         void _exhaustive;
@@ -98,10 +113,23 @@ window.addEventListener("message", (e: MessageEvent<HostToLibrary>) => {
         // The body is a separate field not in SkillCardVM. For P3 the editor textarea starts empty.
         // The user types the body. This is intentional (P4 wires the body read).
       }
+      lastSnapshot = data.snapshot;
+      // When switching TO the discover tab for the first time, auto-scan
+      if (data.snapshot.tab === "discover" && discoverItems.length === 0 && !discoverScanning) {
+        discoverScanning = true;
+        vscode.postMessage({ type: "scan-repo" });
+      }
       render(data.snapshot);
       break;
+    case "discover-results":
+      discoverItems = data.items;
+      discoverMcp = data.mcp;
+      discoverScanning = false;
+      if (lastSnapshot) render(lastSnapshot);
+      break;
     default: {
-      // No other HostToLibrary variants exist currently.
+      const _exhaustive: never = data;
+      void _exhaustive;
       break;
     }
   }
@@ -195,6 +223,54 @@ document.addEventListener("click", (e) => {
     }
     return;
   }
+
+  // scan-repo button
+  if (target.closest<HTMLElement>('[data-action="scan-repo"]')) {
+    discoverScanning = true;
+    if (lastSnapshot) render(lastSnapshot);
+    vscode.postMessage({ type: "scan-repo" });
+    return;
+  }
+
+  // discover filter chip
+  const chipBtn = target.closest<HTMLElement>('[data-chip]');
+  if (chipBtn && chipBtn.dataset["chip"]) {
+    discoverChip = chipBtn.dataset["chip"] as DiscoverGroup | "all";
+    if (lastSnapshot) render(lastSnapshot);
+    return;
+  }
+
+  // browse-source
+  const browseBtn = target.closest<HTMLElement>('[data-action="browse-source"][data-item-id]');
+  if (browseBtn) {
+    const itemId = browseBtn.dataset["itemId"];
+    if (itemId) vscode.postMessage({ type: "browse-source", itemId });
+    return;
+  }
+
+  // adopt-agent
+  const adoptAgentBtn = target.closest<HTMLElement>('[data-action="adopt-agent"][data-item-id]');
+  if (adoptAgentBtn) {
+    const itemId = adoptAgentBtn.dataset["itemId"];
+    if (itemId) vscode.postMessage({ type: "adopt-agent", itemId });
+    return;
+  }
+
+  // adopt-skill
+  const adoptSkillBtn = target.closest<HTMLElement>('[data-action="adopt-skill"][data-item-id]');
+  if (adoptSkillBtn) {
+    const itemId = adoptSkillBtn.dataset["itemId"];
+    if (itemId) vscode.postMessage({ type: "adopt-skill", itemId });
+    return;
+  }
+
+  // discover-dispatch (deferred: post browse-source as no-op for now)
+  const dispatchBtn2 = target.closest<HTMLElement>('[data-action="discover-dispatch"][data-item-id]');
+  if (dispatchBtn2) {
+    const itemId = dispatchBtn2.dataset["itemId"];
+    if (itemId) vscode.postMessage({ type: "browse-source", itemId }); // deferred to P2 composer
+    return;
+  }
 });
 
 // ─── Input tracking ───────────────────────────────────────────────────────────
@@ -205,6 +281,10 @@ document.addEventListener("input", (e) => {
   const action = (target as HTMLInputElement | HTMLTextAreaElement).dataset["action"];
   if (action === "edit-body") {
     editorBody = (target as HTMLTextAreaElement).value;
+  }
+  if (action === "discover-filter") {
+    discoverFilter = (target as HTMLInputElement).value;
+    if (lastSnapshot) render(lastSnapshot);
   }
 });
 
