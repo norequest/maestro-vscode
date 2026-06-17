@@ -9,7 +9,7 @@ import { teamQuickPickItems } from "./team-picker.js";
 import { StageWebviewPanel } from "./stage.js";
 import { EventLogger } from "./persistence.js";
 import { FsPersistenceBackend } from "./persistence-fs.js";
-import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter, DEFAULT_CONFIG, composeSpawnDescription, loadSkills } from "@maestro/config";
+import { loadConductorDir, makeNodeFsReader, scaffoldIfMissing, makeNodeFsWriter, DEFAULT_CONFIG, loadSkills, loadSoul } from "@maestro/config";
 import { isKnownEngineId, loadComposerData } from "./composer-data.js";
 import { makeConfigGateway, makeAnatomyGateway } from "./config-gateway.js";
 import { LibraryWebviewPanel } from "./library.js";
@@ -87,6 +87,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // autonomy. No ACP role is seeded in M5; this registration is forward-compat.
     orch.registerAdapter(new AcpAdapter({ command: "gemini" }));
     orch.registerRole(DEFAULT_ROLE);
+
+    // P4: inject preamble resolver so soul+skills are threaded onto the task at spawn time.
+    // Core stays pure (no fs/config imports in @maestro/core). The resolver is extension-local.
+    orch.setPreambleResolver(async (role) => {
+      const reader = await makeNodeFsReader();
+      const skillsResult = await loadSkills(repoRoot, reader).catch(() => ({ bodies: new Map<string, string>() }));
+      const skillBodies = (role.skills ?? [])
+        .map((n) => skillsResult.bodies.get(n))
+        .filter((b): b is string => typeof b === "string");
+      let soulDoc;
+      if (role.soul) {
+        const s = await loadSoul(repoRoot, role.soul, reader).catch(() => null);
+        if (s && "soul" in s) soulDoc = s.soul;
+      }
+      return {
+        soulDoc,
+        ...(skillBodies.length ? { skillBodies } : {}),
+      };
+    });
 
     const prModeEnabled = (): boolean =>
       vscode.workspace.getConfiguration("maestro").get<boolean>("prMode", false);
@@ -362,14 +381,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       // loaded from YAML that were not pre-registered at setup time.
       orch.registerRole(selectedRole);
 
-      // R3 minimal append; P4 moves this into the adapter preamble.
-      const fsReaderForSkills = await makeNodeFsReader();
-      const skillBundle = await loadSkills(repoRoot, fsReaderForSkills).catch(() => ({ bodies: new Map<string, string>() }));
-      const spawnDescription = composeSpawnDescription(selectedRole, skillBundle.bodies, description);
-
       stage.reveal();
       try {
-        cockpit.handle({ type: "spawn", roleName: selectedRole.name, description: spawnDescription, ...(goal ? { goal } : {}) });
+        cockpit.handle({ type: "spawn", roleName: selectedRole.name, description, ...(goal ? { goal } : {}) });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         void vscode.window.showErrorMessage(`Maestro: could not spawn agent: ${message}`);
