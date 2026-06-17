@@ -30,7 +30,7 @@ function makeFakeFs(
         throw new Error(`EACCES: permission denied: ${path}`);
       }
       if (Object.prototype.hasOwnProperty.call(files, path)) {
-        return files[path];
+        return files[path] as string;
       }
       throw new Error(`ENOENT: no such file or directory: ${path}`);
     },
@@ -336,7 +336,7 @@ describe("discoverWorkspace", () => {
 
   it("gracefully handles a workspace with only MCP config files", async () => {
     const mcpOnly: Record<string, string> = {
-      [`${ROOT}/.mcp.json`]: FIXTURE_FILES[`${ROOT}/.mcp.json`],
+      [`${ROOT}/.mcp.json`]: FIXTURE_FILES[`${ROOT}/.mcp.json`] as string,
     };
     const fs = makeFakeFs(mcpOnly);
     const result = await discoverWorkspace(ROOT, fs);

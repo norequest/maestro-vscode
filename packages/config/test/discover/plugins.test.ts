@@ -62,7 +62,7 @@ Scan the provided code for OWASP Top 10 vulnerabilities.
 function makeFakeFs(files: Record<string, string>): FsScanner {
   return {
     async readFile(path: string): Promise<string> {
-      if (path in files) return files[path];
+      if (path in files) return files[path] as string;
       throw new Error(`ENOENT: ${path}`);
     },
     async listFiles(): Promise<string[]> {
