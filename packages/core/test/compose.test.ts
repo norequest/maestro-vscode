@@ -124,3 +124,12 @@ describe("composePreamble", () => {
     expect(out).not.toContain("# Skills");
   });
 });
+
+describe("composePreamble · empty task (ACP systemPrompt case)", () => {
+  it("omits the Task block entirely when the task is empty", () => {
+    const out = composePreamble({ instructions: "Review the diff.", task: "" });
+    expect(out).toContain("# Instructions");
+    expect(out).not.toContain("# Task");
+    expect(out.endsWith("Review the diff.")).toBe(true);
+  });
+});

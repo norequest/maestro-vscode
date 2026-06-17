@@ -79,7 +79,12 @@ export function composePreamble(parts: PreambleParts): string {
     blocks.push(`# Skills (standing procedures)\n${skillBodies}`);
   }
 
-  blocks.push(`# Task\n${parts.task.trim()}`);
+  // The Task block is omitted when the task is empty, so a caller that wants the
+  // preamble MINUS the task (the ACP systemPrompt, which delivers the task as the
+  // first user turn) gets no trailing empty "# Task" header.
+  if (parts.task.trim()) {
+    blocks.push(`# Task\n${parts.task.trim()}`);
+  }
 
   return blocks.join("\n\n");
 }
