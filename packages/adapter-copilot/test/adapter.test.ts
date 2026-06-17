@@ -87,17 +87,17 @@ describe("CopilotAdapter", () => {
     const events = collect(session.events);
 
     expect(fake.lastCwd()).toBe("/tmp/wt/a1");
-    expect(fake.lastArgs()).toEqual([
-      "-C",
-      "/tmp/wt/a1",
-      "-p",
-      "add caching",
-      "-s",
-      "--no-ask-user",
-      "--allow-all",
-      "--model",
-      "claude-sonnet-4.6",
-    ]);
+    const spawnArgs = fake.lastArgs()!;
+    expect(spawnArgs[0]).toBe("-C");
+    expect(spawnArgs[1]).toBe("/tmp/wt/a1");
+    expect(spawnArgs[2]).toBe("-p");
+    expect(spawnArgs[3]).toContain("add caching");
+    expect(spawnArgs[3]).toContain("# Instructions");
+    expect(spawnArgs[4]).toBe("-s");
+    expect(spawnArgs[5]).toBe("--no-ask-user");
+    expect(spawnArgs[6]).toBe("--allow-all");
+    expect(spawnArgs[7]).toBe("--model");
+    expect(spawnArgs[8]).toBe("claude-sonnet-4.6");
 
     fake.child()!.out("edited cache.ts\n");
     fake.child()!.close(0);

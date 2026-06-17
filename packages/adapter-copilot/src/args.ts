@@ -1,4 +1,5 @@
 import type { Role, Task, Workspace } from "@maestro/core";
+import { composePreamble, renderToolsForPreamble } from "@maestro/core";
 
 /**
  * The wire format Copilot is asked to stream on stdout.
@@ -23,7 +24,14 @@ export function buildArgs(
   role: Role,
   outputFormat: OutputFormat = "text",
 ): string[] {
-  const args = ["-C", workspace.path, "-p", task.description, "-s", "--no-ask-user", "--allow-all"];
+  const preamble = composePreamble({
+    soul: task.soulDoc,
+    instructions: role.instructions,
+    tools: renderToolsForPreamble(role.tools),
+    skills: task.skillBodies,
+    task: task.description,
+  });
+  const args = ["-C", workspace.path, "-p", preamble, "-s", "--no-ask-user", "--allow-all"];
   if (outputFormat === "json") {
     args.push("--output-format", "json");
   }
