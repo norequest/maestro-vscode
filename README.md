@@ -4,15 +4,12 @@ Conduct a team of AI coding agents in isolated git worktrees, without leaving VS
 
 Maestro dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/ACP), watches them stream on one board, and lets you review each agent's diff before anything merges. Because it drives each engine's CLI, it reuses that tool's existing login. No API key.
 
-> Pre-release (working name, extension `v0.1.10`). The orchestration core is built and tested: 8 packages, 1609 tests, installable from a VSIX.
+> Beta. Published to the VS Code Marketplace as a pre-release (extension `v0.1.10`). The orchestration core is built and tested: 8 packages, 1609 tests.
 
 ## Demo
 
-<!-- For the VS Code Marketplace listing, swap this relative path for the absolute raw URL
-     https://raw.githubusercontent.com/norequest/maestro-vscode/main/media/demo.gif
-     (the Marketplace does not resolve relative paths). -->
-<p align="center"><img src="media/demo.gif" width="340" alt="Maestro: conduct a team of AI coding agents in VS Code" /></p>
-<p align="center"><a href="media/maestro-dev.mp4">Watch the full video</a></p>
+<p align="center"><img src="https://raw.githubusercontent.com/norequest/maestro-vscode/main/media/demo.gif" width="340" alt="Maestro: conduct a team of AI coding agents in VS Code" /></p>
+<p align="center"><a href="https://raw.githubusercontent.com/norequest/maestro-vscode/main/media/maestro-dev.mp4">Download the full-quality video (MP4)</a></p>
 
 ## Features
 
@@ -35,9 +32,9 @@ Maestro dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/ACP), 
 
 ## Quick start
 
-1. Install the packaged VSIX (Maestro is not on the Marketplace yet):
+1. Install from the VS Code Marketplace (search "Maestro: Conduct AI Coding Agents" in the Extensions view, or run the command). This is a pre-release (beta) build:
    ```bash
-   code --install-extension packages/extension/maestro-<version>.vsix
+   code --install-extension norequest.maestro-conductor
    ```
 2. Open a folder that is a git repository.
 3. Click the Maestro icon in the activity bar to open the Conducting Board (or run "Maestro: Open Conducting Board").

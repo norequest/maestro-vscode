@@ -1,8 +1,9 @@
 {
-  "name": "maestro",
-  "displayName": "Maestro",
+  "name": "maestro-conductor",
+  "displayName": "Maestro: Conduct AI Coding Agents",
   "description": "Conduct a team of AI coding agents in isolated git worktrees.",
   "version": "0.1.10",
+  "icon": "media/icon.png",
   "license": "MIT",
   "publisher": "norequest",
   "repository": {
@@ -109,6 +110,7 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "node build.mjs",
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
     "typecheck": "tsc --noEmit",

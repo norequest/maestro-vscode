@@ -9,3 +9,6 @@ tsconfig.json
 vitest.config.ts
 **/*.map
 node_modules/**
+resources/**
+.github/**
+.conductor/**
