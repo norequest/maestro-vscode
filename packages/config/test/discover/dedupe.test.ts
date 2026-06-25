@@ -59,10 +59,10 @@ describe("dedupeDiscoveredAgents: conductor-role vs copilot mirror", () => {
     expect(out[0]!.source).toBe(".conductor/roles/implementer.yaml");
   });
 
-  it("collapses two 'tornike' items (conductor-role + copilot-agent) to the conductor-role", () => {
+  it("collapses two 'writer' items (conductor-role + copilot-agent) to the conductor-role", () => {
     const input = [
-      agent("conductor-role", "tornike", ".conductor/roles/tornike.yaml"),
-      agent("copilot-agent", "tornike", ".github/agents/tornike.agent.md"),
+      agent("conductor-role", "writer", ".conductor/roles/writer.yaml"),
+      agent("copilot-agent", "writer", ".github/agents/writer.agent.md"),
     ];
     const out = dedupeDiscoveredAgents(input);
     expect(out).toHaveLength(1);

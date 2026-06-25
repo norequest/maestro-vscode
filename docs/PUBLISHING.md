@@ -1,7 +1,7 @@
 # Publishing Maestro to the Visual Studio Marketplace
 
 This is the tailored, step-by-step guide for shipping **this** extension
-(`packages/extension`, published as `prixio.maestro`) from this pnpm workspace
+(`packages/extension`, published as `norequest.maestro`) from this pnpm workspace
 monorepo to the Visual Studio Marketplace.
 
 Verified against the official VS Code docs
@@ -12,7 +12,7 @@ Facts about this extension (from `packages/extension/package.json`):
 
 - `name`: `maestro`
 - `displayName`: `Maestro`
-- `publisher`: `prixio`  (so the Marketplace item id will be `prixio.maestro`)
+- `publisher`: `norequest`  (so the Marketplace item id will be `norequest.maestro`)
 - `version`: `0.1.10`
 - `engines.vscode`: `^1.90.0`
 - `main`: `./dist/extension.js`  (esbuild bundle)
@@ -48,7 +48,7 @@ after you fix the BLOCKING gaps in section 3 (a real PNG `"icon"`).
 
 ---
 
-## 1. One-time publisher setup (`prixio`)
+## 1. One-time publisher setup (`norequest`)
 
 You do this once per Marketplace publisher, not per release.
 
@@ -59,21 +59,21 @@ Azure DevOps organization tied to a Microsoft account (Entra ID or a personal
 Microsoft account both work).
 
 1. Sign in at `https://dev.azure.com` with the Microsoft account you want to
-   own the `prixio` publisher.
+   own the `norequest` publisher.
 2. If you have no organization yet, create one (any name; the org name is
-   unrelated to the `prixio` publisher id, it is only the PAT's home).
+   unrelated to the `norequest` publisher id, it is only the PAT's home).
 
-### 1b. Create the Marketplace publisher `prixio`
+### 1b. Create the Marketplace publisher `norequest`
 
 1. Go to the Marketplace management portal: `https://marketplace.visualstudio.com/manage`
 2. Sign in with the same Microsoft account.
 3. Click **Create publisher**.
-4. Set the publisher **ID** to exactly `prixio`.
+4. Set the publisher **ID** to exactly `norequest`.
 
    This is load-bearing: the publisher id MUST equal the `"publisher"` field in
-   `packages/extension/package.json` (`"publisher": "prixio"`). If they differ,
+   `packages/extension/package.json` (`"publisher": "norequest"`). If they differ,
    `vsce publish` is rejected. Do not change one without the other.
-5. Set a display **Name** (for example `Prixio`) and save.
+5. Set a display **Name** (for example `Norequest`) and save.
 
 ### 1c. Create a Personal Access Token (PAT)
 
@@ -108,7 +108,7 @@ command.
 
 ```bash
 # interactive: paste the PAT when prompted
-npx @vscode/vsce login prixio
+npx @vscode/vsce login norequest
 ```
 
 Or skip login entirely and pass the PAT inline on each publish (good for CI):
@@ -156,7 +156,7 @@ on disk.
 - `description` = "Conduct a team of AI coding agents in isolated git
   worktrees." Present and meaningful. Good.
 - `version` = `0.1.10`. Valid semver. See the pre-1.0 note below.
-- `publisher` = `prixio`. Matches the publisher you create in section 1. Good.
+- `publisher` = `norequest`. Matches the publisher you create in section 1. Good.
 - `engines.vscode` = `^1.90.0`. Present. Good.
 - `categories` = `["Other", "AI", "Machine Learning"]`. Present. (`"AI"` is a
   real Marketplace category; `"Machine Learning"` and `"Other"` are valid too.)
@@ -279,7 +279,7 @@ npx @vscode/vsce publish major --no-dependencies   # 0.1.10 -> 1.0.0
 npx @vscode/vsce publish 0.2.3 --no-dependencies   # set an exact version
 ```
 
-Add `-p "<PAT>"` to any of these if you did not run `vsce login prixio`.
+Add `-p "<PAT>"` to any of these if you did not run `vsce login norequest`.
 
 ### Why `--no-dependencies` is mandatory here
 
@@ -308,7 +308,7 @@ already contains everything." That is exactly correct for a bundled extension.
 ## 5. Post-publish
 
 - **Verify the listing.** Open
-  `https://marketplace.visualstudio.com/items?itemName=prixio.maestro`.
+  `https://marketplace.visualstudio.com/items?itemName=norequest.maestro`.
   Confirm: icon tile renders (this is where a missing/SVG icon shows up),
   README overview, version `0.1.10`, categories, and the repository link.
   Propagation to search/install can take a few minutes.
@@ -316,15 +316,15 @@ already contains everything." That is exactly correct for a bundled extension.
   install by id:
 
   ```bash
-  code --install-extension prixio.maestro
+  code --install-extension norequest.maestro
   ```
 
 - **Manage / hub.** All listing management (stats, Q&A, unpublish, transfer) is
-  at `https://marketplace.visualstudio.com/manage/publishers/prixio`.
+  at `https://marketplace.visualstudio.com/manage/publishers/norequest`.
 - **Unpublish a version or the whole extension:**
 
   ```bash
-  npx @vscode/vsce unpublish prixio.maestro              # removes the extension
+  npx @vscode/vsce unpublish norequest.maestro              # removes the extension
   # (or manage individual versions from the web portal)
   ```
 
@@ -346,7 +346,7 @@ there too widens reach. The CLI is `ovsx`.
 ```bash
 # one-time: sign in at https://open-vsx.org with GitHub, create an access token,
 # then create the namespace matching package.json "publisher":
-npx ovsx create-namespace prixio -p "<OPEN_VSX_TOKEN>"
+npx ovsx create-namespace norequest -p "<OPEN_VSX_TOKEN>"
 
 # publish (from packages/extension, same bundled-deps caveat):
 cd packages/extension
@@ -357,7 +357,7 @@ npx ovsx publish maestro-0.1.10.vsix -p "<OPEN_VSX_TOKEN>"
 ```
 
 You can also set the token via the `OVSX_PAT` env var instead of `-p`. Creating
-the namespace does not auto-verify ownership; claim the `prixio` namespace on
+the namespace does not auto-verify ownership; claim the `norequest` namespace on
 the site if you want the verified badge.
 
 ### 6b. GitHub Actions release workflow (sketch)

@@ -4,7 +4,7 @@
   "description": "Conduct a team of AI coding agents in isolated git worktrees.",
   "version": "0.1.10",
   "license": "MIT",
-  "publisher": "prixio",
+  "publisher": "norequest",
   "repository": {
     "type": "git",
     "url": "https://github.com/norequest/maestro-vscode.git",

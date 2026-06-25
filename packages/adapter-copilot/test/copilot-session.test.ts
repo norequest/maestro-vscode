@@ -200,12 +200,12 @@ describe("CopilotSession", () => {
     // separator, so the emitted texts must carry their own line terminators or
     // the block flattens into one run-on line and the delegation parser (which
     // requires newlines) never matches.
-    const block = "```delegate\nrole: tornike\ntask: say hello world\n```";
+    const block = "```delegate\nrole: writer\ntask: say hello world\n```";
     // Deliver the bytes the way a real stream does: split across multiple
     // chunks at arbitrary, mid-line boundaries.
     child.out("```dele");
-    child.out("gate\nrole: tor");
-    child.out("nike\ntask: say hel");
+    child.out("gate\nrole: wri");
+    child.out("ter\ntask: say hel");
     child.out("lo world\n``");
     child.out("`");
     child.close(0);

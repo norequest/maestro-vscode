@@ -162,10 +162,10 @@ describe("Orchestrator delegation flow", () => {
     // event per complete line, each retaining its trailing "\n". The lead streams
     // two delegate blocks line by line; both directives must surface.
     const orch = new Orchestrator({ maxParallelAgents: 3 }, new FakeWorkspaceProvider());
-    const team: Team = { name: "t", roles: [role("lead"), role("tornike"), role("tester")] };
+    const team: Team = { name: "t", roles: [role("lead"), role("writer"), role("tester")] };
     const script: AgentEvent[] = [
       { kind: "output", text: "```delegate\n" },
-      { kind: "output", text: "role: tornike\n" },
+      { kind: "output", text: "role: writer\n" },
       { kind: "output", text: "task: say hello world\n" },
       { kind: "output", text: "```\n" },
       { kind: "output", text: "```delegate\n" },
@@ -175,7 +175,7 @@ describe("Orchestrator delegation flow", () => {
       { kind: "approval", id: "ap-lead", detail: null },
     ];
     orch.registerAdapter(new FakeEngineAdapter({ id: "lead", script }));
-    orch.registerAdapter(pendingAdapter("tornike"));
+    orch.registerAdapter(pendingAdapter("writer"));
     orch.registerAdapter(pendingAdapter("tester"));
 
     const proposals: DelegationProposal[] = [];
@@ -185,7 +185,7 @@ describe("Orchestrator delegation flow", () => {
     orch.launchTeam(team, "ship it");
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(proposals.map((p) => p.roleName)).toEqual(["tornike", "tester"]);
+    expect(proposals.map((p) => p.roleName)).toEqual(["writer", "tester"]);
     expect(proposals.map((p) => p.task)).toEqual(["say hello world", "write the tests"]);
   });
 
@@ -197,16 +197,16 @@ describe("Orchestrator delegation flow", () => {
     // any post-fence output scan. Before the fix this directive was missed; the
     // teammate must still surface, and approving it must still spawn the teammate.
     const orch = new Orchestrator({ maxParallelAgents: 3 }, new FakeWorkspaceProvider());
-    const team: Team = { name: "t", roles: [role("lead"), role("tornike")] };
+    const team: Team = { name: "t", roles: [role("lead"), role("writer")] };
     const script: AgentEvent[] = [
       { kind: "output", text: "```delegate\n" },
-      { kind: "output", text: "role: tornike\n" },
+      { kind: "output", text: "role: writer\n" },
       { kind: "output", text: "task: say hello world\n" },
       { kind: "done", summary: "all set" },
       { kind: "output", text: "```\n" },
     ];
     orch.registerAdapter(new FakeEngineAdapter({ id: "lead", script }));
-    orch.registerAdapter(pendingAdapter("tornike"));
+    orch.registerAdapter(pendingAdapter("writer"));
 
     const proposals: DelegationProposal[] = [];
     orch.on((e) => {
@@ -216,11 +216,11 @@ describe("Orchestrator delegation flow", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(proposals).toHaveLength(1);
-    expect(proposals[0]!.roleName).toBe("tornike");
+    expect(proposals[0]!.roleName).toBe("writer");
     expect(proposals[0]!.task).toBe("say hello world");
     // The teammate still spawns from the recovered proposal.
     const child = orch.approveDelegation(proposals[0]!.id);
-    expect(child.role.name).toBe("tornike");
+    expect(child.role.name).toBe("writer");
     expect(child.parentId).toBe(lead!.id);
     expect(orch.getAgents()).toHaveLength(2);
   });

@@ -1,9 +1,9 @@
 # Maestro design tokens (extracted from the approved Claude Design prototype)
 
-Source of truth: `docs/design-reference/Maestro-prototype.html` (the founder's approved
-"Maestro AI agents extension" prototype, pulled from claude.ai/design). Every value below
-is taken from that file. The first polish pass used a different, warmer graphite and
-saturated accents; this file is the correction. Match these exactly.
+Source of truth: the founder's approved "Maestro AI agents extension" prototype, pulled
+from claude.ai/design. Every value below is taken from that prototype. The first polish
+pass used a different, warmer graphite and saturated accents; this file is the correction.
+Match these exactly.
 
 ## Palette (cool graphite, desaturated pastel accents)
 
