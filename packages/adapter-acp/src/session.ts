@@ -7,8 +7,8 @@ import type {
   SoulDoc,
   Task,
   ToolGrant,
-} from "@maestro/core";
-import { EventQueue, composePreamble, renderToolsForPreamble } from "@maestro/core";
+} from "@hallucinate/core";
+import { EventQueue, composePreamble, renderToolsForPreamble } from "@hallucinate/core";
 import { buildInitialize, buildPermissionResponse, buildUserTurn } from "./messages.js";
 import type { AcpApprovalDetail, AcpMessage, AcpTransport } from "./types.js";
 import { autonomyToPermissionMode } from "./types.js";

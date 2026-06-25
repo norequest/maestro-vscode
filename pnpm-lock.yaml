@@ -10,11 +10,11 @@ importers:
 
   packages/adapter-acp:
     dependencies:
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@maestro/conformance':
+      '@hallucinate/conformance':
         specifier: workspace:*
         version: link:../conformance
       '@types/node':
@@ -29,11 +29,11 @@ importers:
 
   packages/adapter-copilot:
     dependencies:
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
-      '@maestro/conformance':
+      '@hallucinate/conformance':
         specifier: workspace:*
         version: link:../conformance
       '@types/node':
@@ -48,7 +48,7 @@ importers:
 
   packages/cockpit:
     dependencies:
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -64,7 +64,7 @@ importers:
 
   packages/config:
     dependencies:
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
       yaml:
@@ -83,7 +83,7 @@ importers:
 
   packages/conformance:
     dependencies:
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -111,22 +111,22 @@ importers:
 
   packages/extension:
     dependencies:
-      '@maestro/adapter-acp':
+      '@hallucinate/adapter-acp':
         specifier: workspace:*
         version: link:../adapter-acp
-      '@maestro/adapter-copilot':
+      '@hallucinate/adapter-copilot':
         specifier: workspace:*
         version: link:../adapter-copilot
-      '@maestro/cockpit':
+      '@hallucinate/cockpit':
         specifier: workspace:*
         version: link:../cockpit
-      '@maestro/config':
+      '@hallucinate/config':
         specifier: workspace:*
         version: link:../config
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
-      '@maestro/workspace':
+      '@hallucinate/workspace':
         specifier: workspace:*
         version: link:../workspace
     devDependencies:
@@ -160,7 +160,7 @@ importers:
 
   packages/workspace:
     dependencies:
-      '@maestro/core':
+      '@hallucinate/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

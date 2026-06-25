@@ -25,7 +25,7 @@ export class FsPersistenceBackend implements PersistenceBackend {
     const filePath = join(this.dir, safeAgentFileName(agentId));
     const root = resolve(this.dir) + sep;
     if (!resolve(filePath).startsWith(root)) {
-      throw new Error(`[Maestro persistence] path escapes runtime dir: ${agentId}`);
+      throw new Error(`[Hallucinate persistence] path escapes runtime dir: ${agentId}`);
     }
     return filePath;
   }

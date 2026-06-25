@@ -1,4 +1,4 @@
-import type { AgentState } from "@maestro/core";
+import type { AgentState } from "@hallucinate/core";
 export type { Lane } from "./protocol.js";
 import type { Lane } from "./protocol.js";
 

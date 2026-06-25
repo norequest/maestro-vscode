@@ -22,7 +22,7 @@ import {
   isWebviewMessage,
   type HostToWebview,
   type WebviewToHost,
-} from "@maestro/cockpit";
+} from "@hallucinate/cockpit";
 import {
   isLibraryMessage,
   type HostToLibrary,

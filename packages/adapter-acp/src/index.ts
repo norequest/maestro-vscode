@@ -1,4 +1,4 @@
-export const MAESTRO_ADAPTER_ACP_VERSION = "0.0.0";
+export const HALLUCINATE_ADAPTER_ACP_VERSION = "0.0.0";
 
 export { AcpAdapter } from "./adapter.js";
 export type { AcpAdapterOptions } from "./adapter.js";

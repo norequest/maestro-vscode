@@ -14,7 +14,7 @@ import { makeNodeFsReader } from "../src/loader.js";
 const tmpRoots: string[] = [];
 
 async function makeTmpRepo(): Promise<{ repoRoot: string; rolesDir: string; outsideDir: string }> {
-  const repoRoot = await fsp.mkdtemp(nodePath.join(os.tmpdir(), "maestro-config-"));
+  const repoRoot = await fsp.mkdtemp(nodePath.join(os.tmpdir(), "hallucinate-config-"));
   tmpRoots.push(repoRoot);
   const rolesDir = nodePath.join(repoRoot, ".conductor", "roles");
   await fsp.mkdir(rolesDir, { recursive: true });

@@ -1,7 +1,7 @@
 /**
  * Library controller: holds the current snapshot, handles inbound LibraryToHost
  * messages, routes every WRITE through an injected ConfigGateway (the seam over
- * @maestro/config + node fs), so it unit-tests against a FAKE gateway with zero
+ * @hallucinate/config + node fs), so it unit-tests against a FAKE gateway with zero
  * disk I/O. After every write it reloads, rebuilds the reverse index (used-by
  * counts), and pushes a fresh snapshot.
  *
@@ -23,7 +23,7 @@ export interface NewRoleSeed {
 // ─── ConfigGateway seam ───────────────────────────────────────────────────────
 
 /**
- * Injectable gateway interface over @maestro/config + node fs.
+ * Injectable gateway interface over @hallucinate/config + node fs.
  * The REAL implementation is Task 13; here it is a pure interface with no node
  * imports so the controller unit-tests against a fake with zero disk I/O.
  */

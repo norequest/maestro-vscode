@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { EventQueue } from "@maestro/core";
+import { EventQueue } from "@hallucinate/core";
 import type {
   AgentEvent,
   AgentSession,
@@ -9,7 +9,7 @@ import type {
   Role,
   Task,
   Workspace,
-} from "@maestro/core";
+} from "@hallucinate/core";
 import type { AdapterFactory } from "../src/index.js";
 import { runConformanceSuite } from "../src/index.js";
 

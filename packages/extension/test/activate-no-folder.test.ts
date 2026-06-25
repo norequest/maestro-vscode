@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
  *
  * The bug: activate() returned early (after a warning) when no workspace folder
  * was open, registering ZERO commands. The view-title `+` button and the command
- * palette then reported `command 'maestro.spawnAgent' not found`. With eager
+ * palette then reported `command 'hallucinate.spawnAgent' not found`. With eager
  * activation (`onStartupFinished`) this fires on every startup into an empty
  * window.
  *
@@ -27,9 +27,9 @@ const distPath = path.join(packageRoot, "dist", "extension.js");
 const requireCjs = createRequire(import.meta.url);
 
 const EXPECTED_COMMANDS = [
-  "maestro.spawnAgent",
-  "maestro.launchTeam",
-  "maestro.openStage",
+  "hallucinate.spawnAgent",
+  "hallucinate.launchTeam",
+  "hallucinate.openStage",
 ] as const;
 
 class EventEmitter {
@@ -160,7 +160,7 @@ describe("activate() with no workspace folder", () => {
 
   it("registers the core commands when a folder IS open", async () => {
     const registered = await activateWith([
-      { uri: uriOf(packageRoot), name: "maestro", index: 0 },
+      { uri: uriOf(packageRoot), name: "hallucinate", index: 0 },
     ]);
     for (const cmd of EXPECTED_COMMANDS) {
       expect(registered.has(cmd), `expected ${cmd} to be registered`).toBe(true);

@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes to the Maestro extension are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to the Hallucinate extension are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.1.10] - 2026-06-26
 
-Initial public pre-release (beta). The first build of Maestro published to the VS Code Marketplace.
+Initial public pre-release (beta). The first build of Hallucinate published to the VS Code Marketplace.
 
 ### Added
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Agent, OrchestratorEvent } from "@maestro/core";
+import type { Agent, OrchestratorEvent } from "@hallucinate/core";
 import { initialModel, reduce } from "../src/reducer.js";
 import { selectState } from "../src/select.js";
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { FsReader } from "@maestro/config";
+import type { FsReader } from "@hallucinate/config";
 import { loadComposerData, isKnownEngineId } from "../src/composer-data.js";
 
-// Mirrors the makeFakeFs pattern used in @maestro/config/test/loader.test.ts.
+// Mirrors the makeFakeFs pattern used in @hallucinate/config/test/loader.test.ts.
 function makeFakeFs(files: Record<string, string>): FsReader {
   return {
     async readFile(p: string): Promise<string> {

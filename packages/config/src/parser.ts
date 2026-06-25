@@ -1,7 +1,7 @@
 import { parse as parseYaml } from "yaml";
 import { validateRole, validateTeam, validateOrchestratorConfig } from "./validator.js";
-import type { ValidationResult, MaestroConfig } from "./types.js";
-import type { Role, Team } from "@maestro/core";
+import type { ValidationResult, HallucinateConfig } from "./types.js";
+import type { Role, Team } from "@hallucinate/core";
 
 export interface ParseRoleResult {
   role: ValidationResult<Role>;
@@ -14,7 +14,7 @@ export interface ParseTeamResult {
 }
 
 export interface ParseConfigResult {
-  config: ValidationResult<MaestroConfig>;
+  config: ValidationResult<HallucinateConfig>;
   source: string;
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { initialModel, reduce } from "../src/reducer.js";
-import type { Agent } from "@maestro/core";
+import type { Agent } from "@hallucinate/core";
 
 describe("reducer M9: merge-cleanup-failed attention", () => {
   it("flags merge-cleanup-failed as attention", () => {

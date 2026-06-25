@@ -1,4 +1,4 @@
-import type { DiscoveredItem, McpInventory } from "@maestro/config";
+import type { DiscoveredItem, McpInventory } from "@hallucinate/config";
 
 /** Which tab is active in the Library panel. */
 export type LibraryTab = "agents" | "teams" | "skills" | "discover";

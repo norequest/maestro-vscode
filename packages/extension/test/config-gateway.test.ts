@@ -12,7 +12,7 @@ import { makeConfigGateway } from "../src/config-gateway.js";
  * reject without touching disk.
  */
 describe("config-gateway · path-segment containment (R6)", () => {
-  const gw = makeConfigGateway("/tmp/maestro-test-repo");
+  const gw = makeConfigGateway("/tmp/hallucinate-test-repo");
 
   it("refuses a traversal skill name on save", async () => {
     await expect(gw.saveSkill({ name: "../../etc", description: "x" }, "body")).rejects.toThrow(
@@ -69,7 +69,7 @@ describe("config-gateway · path-segment containment (R6)", () => {
  */
 describe("config-gateway · role + team file writes (real fs)", () => {
   it("seedRole writes a role yaml; deleteRole removes it", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-gw-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-gw-"));
     try {
       const gw = makeConfigGateway(root);
       await gw.seedRole({ name: "Reviewer" });
@@ -86,7 +86,7 @@ describe("config-gateway · role + team file writes (real fs)", () => {
   });
 
   it("writeTeam stores roles as NAME strings; deleteTeam removes the file", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-gw-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-gw-"));
     try {
       const gw = makeConfigGateway(root);
       await gw.writeTeam({ name: "Checkout Squad", roleNames: ["Tester", "Reviewer"] });
@@ -105,7 +105,7 @@ describe("config-gateway · role + team file writes (real fs)", () => {
   });
 
   it("deleteRole on a missing file is a no-op (does not throw)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-gw-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-gw-"));
     try {
       // Create the .conductor dir so the containment guard is satisfied but the
       // file is absent.
@@ -125,7 +125,7 @@ describe("config-gateway · role + team file writes (real fs)", () => {
  */
 describe("config-gateway · skill file writes land under .github/skills (real fs)", () => {
   it("saveSkill writes .github/skills/<name>/SKILL.md; deleteSkill removes it", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-gw-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-gw-"));
     try {
       const gw = makeConfigGateway(root);
       await gw.saveSkill(

@@ -1,11 +1,11 @@
 import type { SkillManifest } from "./skill-types.js";
 
 /**
- * Three on-demand SKILL.md files adapted for Maestro from
+ * Three on-demand SKILL.md files adapted for Hallucinate from
  * github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md at the repo root
  * for the upstream copyright and full license text.
  *
- * Maestro reality these rewrites target: agents are isolated git-worktree
+ * Hallucinate reality these rewrites target: agents are isolated git-worktree
  * subprocesses. They cannot message each other, broadcast, or request
  * shutdown; there is no team config file or message bus. ALL coordination
  * flows through the conductor (the lead agent) and the human in the UI. The
@@ -14,7 +14,7 @@ import type { SkillManifest } from "./skill-types.js";
  * delegated teammate runs once in its own worktree and returns a diff the
  * conductor reviews and merges.
  *
- * Every upstream primitive Maestro lacks has been stripped or rewritten:
+ * Every upstream primitive Hallucinate lacks has been stripped or rewritten:
  * SendMessage/broadcast/shutdown_request, ~/.claude/teams/<name>/config.json,
  * tmux/iterm2 display modes, TaskCreate/TaskUpdate addBlockedBy task graphs,
  * and subagent_type selection. No em dash appears in any name, description, or
@@ -25,7 +25,7 @@ import type { SkillManifest } from "./skill-types.js";
 type VendoredSkill = { manifest: SkillManifest; body: string };
 
 /**
- * Reframes upstream task-coordination-strategies for Maestro. The conductor
+ * Reframes upstream task-coordination-strategies for Hallucinate. The conductor
  * has no TaskCreate/blockedBy graph: it does prerequisite and glue work
  * itself, then delegates the independent parts as fenced delegate blocks.
  */
@@ -40,7 +40,7 @@ export const TASK_COORDINATION_STRATEGIES_SKILL: VendoredSkill = {
 Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
 How to decompose a task into units you can hand to teammates that run in
-isolation and compose cleanly. In Maestro there is no task graph and no
+isolation and compose cleanly. In Hallucinate there is no task graph and no
 dependency-edge API. You, the conductor, do the prerequisite and glue work yourself,
 then delegate the independent parts. Each independent unit becomes one fenced
 \`\`\`delegate\`\`\` block with a \`role:\` and a \`task:\`. A teammate runs once in
@@ -180,7 +180,7 @@ coupled part yourself first and fan out what remains.
 };
 
 /**
- * Reframes upstream team-composition-patterns for Maestro. "Which specialists
+ * Reframes upstream team-composition-patterns for Hallucinate. "Which specialists
  * to load" means which roles from the invoked team's roster to delegate to.
  * Drops subagent_type, display modes, and Claude-Code agent-type names.
  */
@@ -194,7 +194,7 @@ export const TEAM_COMPOSITION_PATTERNS_SKILL: VendoredSkill = {
 
 Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
-How to size a team and pick which roles to delegate to. In Maestro a team is a
+How to size a team and pick which roles to delegate to. In Hallucinate a team is a
 roster of roles defined in \`.conductor/roles\` and grouped in
 \`.conductor/teams\`. The conductor is ALWAYS the coordinator: there is no
 separate lead to spawn, and teammates cannot coordinate with each other. Choosing
@@ -307,7 +307,7 @@ There is no prior conversation for it to read.
 /**
  * The big rewrite. Upstream team-communication-protocols assumed a message bus
  * (message/broadcast/shutdown_request), a team config file, and runtime
- * hand-offs. Maestro has none of that: the protocol becomes complete-context
+ * hand-offs. Hallucinate has none of that: the protocol becomes complete-context
  * delegate blocks, no mid-flight hand-offs, pinned shared interfaces, blockers
  * surfaced to the human, and integration owned by the conductor.
  */
@@ -321,7 +321,7 @@ export const TEAM_COMMUNICATION_PROTOCOLS_SKILL: VendoredSkill = {
 
 Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
-How teammates coordinate in Maestro, given that they cannot. Each teammate is an
+How teammates coordinate in Hallucinate, given that they cannot. Each teammate is an
 isolated git-worktree subprocess. There is no message bus, no send-to-all, no
 remote shutdown, and no team config file. A teammate cannot message a peer,
 cannot message you, and cannot see another teammate's work. It runs once on the
@@ -369,7 +369,7 @@ publish an interface for the other to discover; it cannot.
 
 A teammate that hits a blocker cannot ask a peer or you for help mid-run. It
 returns what it has, and the blocker surfaces to the human in the UI. The fix is
-to re-delegate with the missing context added. Maestro re-launches a sent-back
+to re-delegate with the missing context added. Hallucinate re-launches a sent-back
 teammate in the SAME worktree, so its earlier work is preserved: you add the
 context it lacked and send it back, rather than starting over.
 
@@ -390,7 +390,7 @@ context.
 
 ## Anti-patterns
 
-| Anti-pattern                              | Why it fails in Maestro                                  | Do instead                                                       |
+| Anti-pattern                              | Why it fails in Hallucinate                                  | Do instead                                                       |
 | ----------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
 | Assuming a teammate can see another's work | Worktrees are isolated; it sees only its own block       | Paste any shared context or interface into every block          |
 | Designing a relay or mid-flight hand-off   | A teammate runs once; there is no pause or pick-up        | Split into independent units; do prerequisites yourself first   |
@@ -404,7 +404,7 @@ context.
 A teammate came back without finishing.
 It likely lacked context or hit a blocker, and it cannot ask. Read its diff and
 notes, identify the missing piece, add it to the task, and send the teammate
-back. Maestro re-launches it in the same worktree, so its progress is kept.
+back. Hallucinate re-launches it in the same worktree, so its progress is kept.
 
 Two returned diffs conflict on the same lines.
 The split was not clean. Re-cut the work so each teammate owns disjoint files,

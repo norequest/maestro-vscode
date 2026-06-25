@@ -6,8 +6,8 @@ import type {
   Role,
   Task,
   Workspace,
-} from "@maestro/core";
-import { COPILOT_ENGINE_ID } from "@maestro/core";
+} from "@hallucinate/core";
+import { COPILOT_ENGINE_ID } from "@hallucinate/core";
 import { buildAgentArgs, buildArgs, buildFleetArgs, type OutputFormat } from "./args.js";
 import { type AgentProfileWriter, ensureCopilotAgent } from "./agent-profile.js";
 import { resolveAuth } from "./auth.js";

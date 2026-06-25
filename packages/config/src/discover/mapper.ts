@@ -1,4 +1,4 @@
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import { validateRole } from "../validator.js";
 import { KNOWN_ENGINE_IDS } from "../types.js";
 import type { DiscoveredItem } from "./types.js";

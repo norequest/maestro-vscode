@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Agent, DispatchSpec, OrchestratorEvent } from "@maestro/core";
-import type { CockpitState } from "@maestro/cockpit";
+import type { Agent, DispatchSpec, OrchestratorEvent } from "@hallucinate/core";
+import type { CockpitState } from "@hallucinate/cockpit";
 import { createCockpit, type OrchestratorLike } from "../src/controller.js";
 
 function fakeOrch() {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { OrchestratorEvent, Agent } from "@maestro/core";
+import type { OrchestratorEvent, Agent } from "@hallucinate/core";
 import {
   serializeEvent,
   deserializeEvent,

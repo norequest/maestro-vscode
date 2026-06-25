@@ -3,7 +3,7 @@ import {
   createDiscoverController,
   type DiscoverDeps,
 } from "../src/discover-controller.js";
-import type { DiscoveredItem, McpInventory, AdoptDraft, Provenance, DiscoverResult } from "@maestro/config";
+import type { DiscoveredItem, McpInventory, AdoptDraft, Provenance, DiscoverResult } from "@hallucinate/config";
 import type { HostToLibrary } from "../src/library-protocol.js";
 
 // ─── Fake item factory ────────────────────────────────────────────────────────

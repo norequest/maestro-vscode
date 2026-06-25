@@ -18,7 +18,7 @@ function readManifest(): Manifest {
   return JSON.parse(readFileSync(pkgPath, "utf8")) as Manifest;
 }
 
-suite("Maestro extension activation", () => {
+suite("Hallucinate extension activation", () => {
   const manifest = readManifest();
   const extensionId = `${manifest.publisher}.${manifest.name}`;
 

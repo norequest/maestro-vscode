@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildArgs, cleanOutput } from "../src/args.js";
-import type { Role, Task, Workspace } from "@maestro/core";
+import type { Role, Task, Workspace } from "@hallucinate/core";
 
 const task: Task = { id: "t1", description: "add caching", roleName: "Implementer" };
 const workspace: Workspace = { agentId: "a1", path: "/tmp/wt/a1", branch: "agent/a1" };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent } from "@maestro/core";
+import type { AgentEvent } from "@hallucinate/core";
 import { AcpSession } from "../src/session.js";
 import {
   FakeAcpTransport,

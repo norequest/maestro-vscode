@@ -1,5 +1,5 @@
 {
-  "name": "@maestro/core",
+  "name": "@hallucinate/core",
   "version": "0.0.0",
   "type": "module",
   "main": "dist/index.js",

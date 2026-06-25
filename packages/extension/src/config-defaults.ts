@@ -1,4 +1,4 @@
-import type { AgentDefaults } from "@maestro/core";
+import type { AgentDefaults } from "@hallucinate/core";
 
 /**
  * The skills the lead (the agent holding a team roster) is given when a

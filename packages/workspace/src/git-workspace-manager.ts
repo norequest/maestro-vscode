@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { AgentProfile, Diff, MergeResult, SkillRef, Workspace } from "@maestro/core";
-import type { WorkspaceManager } from "@maestro/core";
+import type { AgentProfile, Diff, MergeResult, SkillRef, Workspace } from "@hallucinate/core";
+import type { WorkspaceManager } from "@hallucinate/core";
 import { nodeGitRunner, nodeShellRunner } from "./git-runner.js";
 import type { GitRunner } from "./git-runner.js";
 
@@ -173,7 +173,7 @@ export class GitWorkspaceManager implements WorkspaceManager {
     const status = await this.git(["status", "--porcelain"], rec.path);
     if (status.trim().length > 0) {
       await this.git(["add", "-A"], rec.path);
-      await this.git(["commit", "-m", "maestro: agent work snapshot"], rec.path);
+      await this.git(["commit", "-m", "hallucinate: agent work snapshot"], rec.path);
     }
     // `-z` makes git emit NUL-delimited, unquoted paths so filenames with
     // spaces or non-ASCII bytes (e.g. Georgian) survive intact. Splitting on
@@ -328,7 +328,7 @@ export class GitWorkspaceManager implements WorkspaceManager {
       await this.bestEffortAbort(["merge", "--abort"]);
       return { status: "conflict", files: conflicted };
     }
-    await this.git(["commit", "--no-edit", "-m", `Merge ${rec.branch} via Maestro`]);
+    await this.git(["commit", "--no-edit", "-m", `Merge ${rec.branch} via Hallucinate`]);
     return { status: "clean" };
   }
 
@@ -407,13 +407,13 @@ export class GitWorkspaceManager implements WorkspaceManager {
       return { status: "conflict", files: remaining };
     }
     await this.git(["add", "-A"]);
-    await this.git(["commit", "--no-edit", "-m", "Merge resolved via Maestro"]);
+    await this.git(["commit", "--no-edit", "-m", "Merge resolved via Hallucinate"]);
     return { status: "clean" };
   }
 
   /**
    * PR mode: push the agent branch to the remote and open a pull request via
-   * `gh pr create`. This replaces the local merge when `maestro.prMode` is
+   * `gh pr create`. This replaces the local merge when `hallucinate.prMode` is
    * enabled in settings. The shellRunner is used for `gh` so the entire
    * flow stays offline-testable with a fake runner.
    *

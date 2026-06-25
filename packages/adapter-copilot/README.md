@@ -1,6 +1,6 @@
-# @maestro/adapter-copilot
+# @hallucinate/adapter-copilot
 
-The GitHub Copilot engine adapter for Maestro. Spawns the agentic Copilot CLI
+The GitHub Copilot engine adapter for Hallucinate. Spawns the agentic Copilot CLI
 (`copilot -p`) as a subprocess in an isolated git worktree, streams its output,
 and reports completion on process exit.
 
@@ -42,7 +42,7 @@ Capabilities reported: `{ streaming: true, structuredEvents: false, approvals: f
 
 ## Testing
 
-`pnpm --filter @maestro/adapter-copilot test` runs the full suite with a fake spawn:
+`pnpm --filter @hallucinate/adapter-copilot test` runs the full suite with a fake spawn:
 no `copilot` process, no network, no token. The optional live smoke test
-(`pnpm --filter @maestro/adapter-copilot build && MAESTRO_LIVE=1 COPILOT_GITHUB_TOKEN=... pnpm --filter @maestro/adapter-copilot smoke`)
+(`pnpm --filter @hallucinate/adapter-copilot build && HALLUCINATE_LIVE=1 COPILOT_GITHUB_TOKEN=... pnpm --filter @hallucinate/adapter-copilot smoke`)
 exercises the real `copilot`.

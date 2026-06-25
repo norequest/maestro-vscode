@@ -1,7 +1,7 @@
 import * as nodePath from "node:path";
 import { parseRoleYaml, parseTeamYaml, parseConfigYaml } from "./parser.js";
-import type { Role, Team } from "@maestro/core";
-import type { ValidationWarning, MaestroConfig } from "./types.js";
+import type { Role, Team } from "@hallucinate/core";
+import type { ValidationWarning, HallucinateConfig } from "./types.js";
 import { loadSoul } from "./souls.js";
 import { loadSkills } from "./skill-loader.js";
 
@@ -20,12 +20,12 @@ export interface FsReader {
 export interface LoadResult {
   roles: Role[];
   teams: Team[];
-  config: MaestroConfig;
+  config: HallucinateConfig;
   warnings: Array<{ source: string; warnings: ValidationWarning[] }>;
   errors: Array<{ source: string; errors: string[] }>;
 }
 
-export const DEFAULT_CONFIG: MaestroConfig = { maxParallelAgents: 3 };
+export const DEFAULT_CONFIG: HallucinateConfig = { maxParallelAgents: 3 };
 
 export async function loadConductorDir(
   workspaceRoot: string,

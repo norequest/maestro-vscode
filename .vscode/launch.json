@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Maestro (dogfood on this repo)",
+      "name": "Run Hallucinate (dogfood on this repo)",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -10,7 +10,7 @@
         "--extensionDevelopmentPath=${workspaceFolder}/packages/extension"
       ],
       "outFiles": ["${workspaceFolder}/packages/extension/dist/**/*.js"],
-      "preLaunchTask": "build maestro"
+      "preLaunchTask": "build hallucinate"
     }
   ]
 }

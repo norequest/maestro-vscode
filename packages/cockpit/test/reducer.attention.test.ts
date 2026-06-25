@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stateNeedsAttention, type Agent } from "@maestro/core";
+import { stateNeedsAttention, type Agent } from "@hallucinate/core";
 import { initialModel, reduce } from "../src/reducer.js";
 
 function agent(state: Agent["state"]): Agent {

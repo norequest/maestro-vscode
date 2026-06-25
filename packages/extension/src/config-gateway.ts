@@ -1,5 +1,5 @@
 /**
- * Real ConfigGateway implementation over @maestro/config + node fs.
+ * Real ConfigGateway implementation over @hallucinate/config + node fs.
  * Implements the ConfigGateway interface from library-controller.ts.
  * Node imports are isolated here; library-controller.ts stays node-free.
  */
@@ -16,8 +16,8 @@ import {
   makeNodeFsWriter,
   KNOWN_ENGINE_IDS,
   SKILLS_DIR_SEGMENTS,
-} from "@maestro/config";
-import type { Role } from "@maestro/core";
+} from "@hallucinate/config";
+import type { Role } from "@hallucinate/core";
 import type { ConfigGateway } from "./library-controller.js";
 import type { AnatomyGateway } from "./anatomy-controller.js";
 
@@ -97,7 +97,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       assertSafeSegment(manifest.name, "skill");
       const fsWriter = await makeNodeFsWriter();
       // Skills live under .github/skills/ (shared with VS Code + Copilot). The
-      // location is defined once in @maestro/config as SKILLS_DIR_SEGMENTS so the
+      // location is defined once in @hallucinate/config as SKILLS_DIR_SEGMENTS so the
       // write target stays in lock-step with what the loader reads.
       const skillDir = nodePath.join(repoRoot, ...SKILLS_DIR_SEGMENTS, manifest.name);
       await fsWriter.mkdir(skillDir);

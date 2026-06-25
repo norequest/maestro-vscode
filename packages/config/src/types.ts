@@ -1,5 +1,5 @@
-import type { OrchestratorConfig, AgentDefaults } from "@maestro/core";
-import { COPILOT_ENGINE_ID, ACP_ENGINE_ID } from "@maestro/core";
+import type { OrchestratorConfig, AgentDefaults } from "@hallucinate/core";
+import { COPILOT_ENGINE_ID, ACP_ENGINE_ID } from "@hallucinate/core";
 
 export interface ValidationOk<T> {
   ok: true;
@@ -21,7 +21,7 @@ export interface ValidationWarning {
 }
 
 /**
- * Engine ids known at build time. These are the only adapters Maestro will ever
+ * Engine ids known at build time. These are the only adapters Hallucinate will ever
  * spawn. A role naming any other engine.id is REJECTED at validation time
  * (Issue 28 / S9): an adapter command/binary must never be sourced from
  * .conductor/ config, so an unknown id cannot be honored.
@@ -40,6 +40,6 @@ export const KNOWN_ENGINE_IDS = new Set<string>([COPILOT_ENGINE_ID, ACP_ENGINE_I
  * shape it parses/serializes. It is optional, so an absent `defaults` block is
  * identical to today (back-compat).
  */
-export interface MaestroConfig extends OrchestratorConfig {
+export interface HallucinateConfig extends OrchestratorConfig {
   defaults?: AgentDefaults;
 }

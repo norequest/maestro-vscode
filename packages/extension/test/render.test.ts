@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderCardHTML, renderBoard, renderDrawer } from "../src/render.js";
-import type { CardVM, CockpitState, DelegationVM } from "@maestro/cockpit";
+import type { CardVM, CockpitState, DelegationVM } from "@hallucinate/cockpit";
 
 function card(over: Partial<CardVM> = {}): CardVM {
   return {
@@ -172,7 +172,7 @@ describe("renderBoard", () => {
   });
   it("renders the board header and status bar, and NO redundant editor-tab strip", () => {
     const html = renderBoard({ cards: [card({ id: "w1", lane: "working" })], delegations: [] });
-    // The top tab strip (Maestro/Library/Skills/Discover) was redundant with the
+    // The top tab strip (Hallucinate/Library/Skills/Discover) was redundant with the
     // header Library button and is gone; the header is the single control surface.
     expect(html).not.toContain('class="tabstrip"');
     expect(html).toContain('class="board-header"');

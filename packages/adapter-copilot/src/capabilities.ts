@@ -1,4 +1,4 @@
-import type { Capabilities } from "@maestro/core";
+import type { Capabilities } from "@hallucinate/core";
 import type { OutputFormat } from "./args.js";
 
 /**

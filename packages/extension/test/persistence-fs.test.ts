@@ -16,7 +16,7 @@ describe("FsPersistenceBackend (real fs)", () => {
   const runtimeDir = (root: string): string => join(root, ".conductor", ".runtime");
 
   beforeEach(async () => {
-    repoRoot = await mkdtemp(join(tmpdir(), "maestro-fs-persist-"));
+    repoRoot = await mkdtemp(join(tmpdir(), "hallucinate-fs-persist-"));
     backend = new FsPersistenceBackend(repoRoot);
   });
 

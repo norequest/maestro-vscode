@@ -1,7 +1,7 @@
 /**
  * Full-width review screen renderer. Pure HTML, no DOM, no vscode.
  * DOM structure mirrors the approved Claude Design prototype
- * (docs/design-reference/Maestro-prototype.html, lines 1002-1118):
+ * (docs/design-reference/Hallucinate-prototype.html, lines 1002-1118):
  * a header band, a two-region body (264px changed-files rail + a right column
  * holding a "what changed" band, an optional conflict bar, a file-path header,
  * and the scrolling unified diff), and a sticky decision footer.
@@ -9,7 +9,7 @@
  * never var(--vscode-*).
  */
 
-import type { CardVM } from "@maestro/cockpit";
+import type { CardVM } from "@hallucinate/cockpit";
 import { escapeHtml } from "./html.js";
 import type { ParsedDiff, DiffFileChange, DiffLine } from "./diff-parse.js";
 
@@ -203,7 +203,7 @@ function filesRail(files: DiffFileChange[], conflictFiles?: string[]): string {
 
 // ─── what-changed band ────────────────────────────────────────────────────────
 
-// Brand eq-bar mark (prototype `review.eq`, Maestro-prototype.html line 1046):
+// Brand eq-bar mark (prototype `review.eq`, Hallucinate-prototype.html line 1046):
 // the four-bar equalizer that precedes the "WHAT CHANGED" eyebrow. Rendered in
 // the muted eyebrow tone so it reads as a brand mark, not the green action.
 const EQ_MARK =

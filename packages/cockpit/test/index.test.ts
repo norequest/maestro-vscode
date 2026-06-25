@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import * as cockpit from "../src/index.js";
 
-describe("@maestro/cockpit", () => {
+describe("@hallucinate/cockpit", () => {
   it("exposes a version", () => {
-    expect(cockpit.MAESTRO_COCKPIT_VERSION).toBe("0.0.0");
+    expect(cockpit.HALLUCINATE_COCKPIT_VERSION).toBe("0.0.0");
   });
   it("exports the reducer + selector surface", () => {
     expect(typeof cockpit.initialModel).toBe("function");

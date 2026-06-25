@@ -1,4 +1,4 @@
-import type { Role, Team } from "@maestro/core";
+import type { Role, Team } from "@hallucinate/core";
 
 /**
  * Assemble a conductor-led team: the single conductor persona leading a roster

@@ -1,7 +1,7 @@
 import { stringify as stringifyYaml } from "yaml";
-import type { Role, Team } from "@maestro/core";
+import type { Role, Team } from "@hallucinate/core";
 import type { SkillManifest } from "./skill-types.js";
-import type { MaestroConfig } from "./types.js";
+import type { HallucinateConfig } from "./types.js";
 
 /**
  * Serialize a Role to a YAML string suitable for writing to .conductor/roles/<name>.yaml.
@@ -64,12 +64,12 @@ export function serializeSkill(manifest: SkillManifest, body: string): string {
 }
 
 /**
- * Serialize a MaestroConfig to a YAML string for .conductor/config.yaml.
+ * Serialize a HallucinateConfig to a YAML string for .conductor/config.yaml.
  * Always writes `maxParallelAgents`. The optional `defaults` block is written
  * only when present, in the same field-by-field style the other serializers use
  * (each sub-field included only when defined), so parse(serialize(x)) round-trips.
  */
-export function serializeConfig(config: MaestroConfig): string {
+export function serializeConfig(config: HallucinateConfig): string {
   const defaults = config.defaults;
   let defaultsDoc: Record<string, unknown> | undefined;
   if (defaults !== undefined) {

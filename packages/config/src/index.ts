@@ -1,4 +1,4 @@
-export const MAESTRO_CONFIG_VERSION = "0.0.0";
+export const HALLUCINATE_CONFIG_VERSION = "0.0.0";
 export * from "./paths.js";
 export * from "./types.js";
 export * from "./validator.js";

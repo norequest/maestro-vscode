@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
-import type { AgentProfile, Role, SpawnOptions, Team } from "@maestro/core";
-import { slugForRole } from "@maestro/adapter-copilot";
+import type { AgentProfile, Role, SpawnOptions, Team } from "@hallucinate/core";
+import { slugForRole } from "@hallucinate/adapter-copilot";
 import {
   COPILOT_ENGINE_ID,
   FLEET_ENGINE_ID,

@@ -338,7 +338,7 @@ describe("VENDORED_SKILLS", () => {
     }
   });
 
-  it("each body begins with an H1 title and carries the Maestro provenance line", () => {
+  it("each body begins with an H1 title and carries the Hallucinate provenance line", () => {
     for (const { body } of VENDORED_SKILLS) {
       expect(body.startsWith("# ")).toBe(true);
       expect(body).toContain(
@@ -347,7 +347,7 @@ describe("VENDORED_SKILLS", () => {
     }
   });
 
-  it("strips every Claude-Code-only primitive Maestro does not have", () => {
+  it("strips every Claude-Code-only primitive Hallucinate does not have", () => {
     const forbidden = [
       "SendMessage",
       "broadcast",
@@ -404,7 +404,7 @@ describe("VENDORED_SKILLS", () => {
 
 describe("makeNodeFsWriter().removeFile", () => {
   it("removes a single file inside .conductor", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const dir = join(root, ".conductor", "roles");
       await mkdir(dir, { recursive: true });
@@ -420,7 +420,7 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("is a no-op when the file is already absent", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       await mkdir(join(root, ".conductor"), { recursive: true });
       const writer = await makeNodeFsWriter();
@@ -433,7 +433,7 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("refuses to remove a file outside the allowed homes (containment guard)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const file = join(root, "outside.txt");
       await writeFile(file, "keep me", "utf8");
@@ -449,7 +449,7 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("removes a skill file inside .github/skills", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const dir = join(root, ".github", "skills", "run-tests");
       await mkdir(dir, { recursive: true });
@@ -465,7 +465,7 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("refuses to remove a file under .github/workflows (only .github/skills is allowed)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const dir = join(root, ".github", "workflows");
       await mkdir(dir, { recursive: true });
@@ -486,7 +486,7 @@ describe("makeNodeFsWriter().removeFile", () => {
 
 describe("makeNodeFsWriter().removeDir", () => {
   it("removes a directory inside .conductor", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, ".conductor", "roles");
       await mkdir(dir, { recursive: true });
@@ -503,7 +503,7 @@ describe("makeNodeFsWriter().removeDir", () => {
   });
 
   it("removes a skill directory inside .github/skills", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, ".github", "skills", "run-tests");
       await mkdir(dir, { recursive: true });
@@ -520,7 +520,7 @@ describe("makeNodeFsWriter().removeDir", () => {
   });
 
   it("refuses to remove a directory under .github/workflows (only .github/skills is allowed)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, ".github", "workflows");
       await mkdir(dir, { recursive: true });
@@ -538,7 +538,7 @@ describe("makeNodeFsWriter().removeDir", () => {
   });
 
   it("refuses to remove an unrelated directory (containment guard)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, "some-other-dir");
       await mkdir(dir, { recursive: true });

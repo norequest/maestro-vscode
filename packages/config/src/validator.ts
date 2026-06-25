@@ -1,6 +1,6 @@
-import type { Role, Team, ToolGrant, AgentDefaults } from "@maestro/core";
-import { AUTONOMY_VALUES } from "@maestro/core";
-import type { ValidationResult, ValidationWarning, MaestroConfig } from "./types.js";
+import type { Role, Team, ToolGrant, AgentDefaults } from "@hallucinate/core";
+import { AUTONOMY_VALUES } from "@hallucinate/core";
+import type { ValidationResult, ValidationWarning, HallucinateConfig } from "./types.js";
 import { KNOWN_ENGINE_IDS } from "./types.js";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -442,7 +442,7 @@ function parseDefaults(
 export function validateOrchestratorConfig(
   raw: unknown,
   knownSkills?: ReadonlySet<string>,
-): ValidationResult<MaestroConfig> {
+): ValidationResult<HallucinateConfig> {
   const errors: string[] = [];
   const warnings: ValidationWarning[] = [];
 

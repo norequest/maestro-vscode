@@ -1,6 +1,6 @@
-import type { Role, SkillRef, SoulDoc } from "@maestro/core";
-import { buildAgentProfile, slugForRole, writeRepoAgentFile } from "@maestro/adapter-copilot";
-import { loadConductorDir, loadSkills, loadSoul, makeNodeFsReader } from "@maestro/config";
+import type { Role, SkillRef, SoulDoc } from "@hallucinate/core";
+import { buildAgentProfile, slugForRole, writeRepoAgentFile } from "@hallucinate/adapter-copilot";
+import { loadConductorDir, loadSkills, loadSoul, makeNodeFsReader } from "@hallucinate/config";
 
 /** A reader as produced by makeNodeFsReader(); kept loose to avoid coupling. */
 type FsReader = Awaited<ReturnType<typeof makeNodeFsReader>>;
@@ -39,7 +39,7 @@ export async function resolveRolePreamble(
 }
 
 /**
- * Materialize a saved Maestro role as a repo-level Copilot custom agent at
+ * Materialize a saved Hallucinate role as a repo-level Copilot custom agent at
  * `.github/agents/<slug>.agent.md`, so it appears in the VS Code Copilot Chat
  * picker (after a window reload) and the CLI WITHOUT having to dispatch it.
  *

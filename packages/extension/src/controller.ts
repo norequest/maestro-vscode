@@ -1,6 +1,6 @@
-import type { Agent, ApprovalDecision, DispatchSpec, MergeResult, OrchestratorEvent, SpawnOptions } from "@maestro/core";
-import type { CockpitState, WebviewToHost } from "@maestro/cockpit";
-import { initialModel, reduce, selectState, setFocus } from "@maestro/cockpit";
+import type { Agent, ApprovalDecision, DispatchSpec, MergeResult, OrchestratorEvent, SpawnOptions } from "@hallucinate/core";
+import type { CockpitState, WebviewToHost } from "@hallucinate/cockpit";
+import { initialModel, reduce, selectState, setFocus } from "@hallucinate/cockpit";
 
 /** The slice of Orchestrator the cockpit drives. Keeps the controller unit-testable. */
 export interface OrchestratorLike {

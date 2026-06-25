@@ -2,11 +2,11 @@
  * Pure presenter for the Discover tab.
  * No vscode imports, no node imports: pure data transformation.
  *
- * Consumes DiscoveredItem[] from @maestro/config and emits a DiscoverVM
+ * Consumes DiscoveredItem[] from @hallucinate/config and emits a DiscoverVM
  * ready for the webview renderer.
  */
 
-import type { DiscoveredItem, Confidence } from "@maestro/config";
+import type { DiscoveredItem, Confidence } from "@hallucinate/config";
 
 // ─── View-model types ─────────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent } from "@maestro/core";
+import type { AgentEvent } from "@hallucinate/core";
 import { CopilotSession } from "../src/copilot-session.js";
 import { FakeChild } from "./fake-spawn.js";
 

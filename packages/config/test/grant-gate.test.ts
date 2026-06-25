@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { skillNeedsGrant } from "../src/grant-gate.js";
-import type { ToolGrant } from "@maestro/core";
+import type { ToolGrant } from "@hallucinate/core";
 
 describe("skillNeedsGrant", () => {
   it("returns null when allowedTools is empty (no needs = fully covered)", () => {

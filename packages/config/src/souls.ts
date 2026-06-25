@@ -1,4 +1,4 @@
-import type { SoulDoc } from "@maestro/core";
+import type { SoulDoc } from "@hallucinate/core";
 import type { FsReader } from "./loader.js";
 import * as nodePath from "node:path";
 

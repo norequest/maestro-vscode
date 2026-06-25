@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { countGrants } from "@maestro/core";
-import type { ToolGrant } from "@maestro/core";
+import { countGrants } from "@hallucinate/core";
+import type { ToolGrant } from "@hallucinate/core";
 import { renderAnatomyCanvas } from "../src/anatomy-render.js";
 import type { AnatomyVM } from "../src/anatomy-protocol.js";
 

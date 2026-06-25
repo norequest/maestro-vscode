@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { type CockpitState, type ComposerOptions } from "@maestro/cockpit";
-import type { CardVM } from "@maestro/cockpit";
+import { type CockpitState, type ComposerOptions } from "@hallucinate/cockpit";
+import type { CardVM } from "@hallucinate/cockpit";
 import { getAppHtml, makeNonce } from "./app-html.js";
 import { isAppMessage, type AppToHost, type AppView, type TaskComposerTeam } from "./app-protocol.js";
 import type { LibrarySnapshot, HostToLibrary } from "./library-protocol.js";
@@ -37,7 +37,7 @@ export class StageWebviewPanel {
       this.panel.reveal(vscode.ViewColumn.Active);
       return;
     }
-    const panel = vscode.window.createWebviewPanel("maestro.stage", "Conducting Board", vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel("hallucinate.stage", "Conducting Board", vscode.ViewColumn.Active, {
       enableScripts: true,
       retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, "dist")],

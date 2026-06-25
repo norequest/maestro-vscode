@@ -11,8 +11,8 @@
  * NO vscode imports. NO node imports. Pure TS with injected deps.
  */
 
-import type { DiscoverResult, DiscoveredItem, AdoptDraft, McpInventory, Provenance } from "@maestro/config";
-import { mapToRole } from "@maestro/config";
+import type { DiscoverResult, DiscoveredItem, AdoptDraft, McpInventory, Provenance } from "@hallucinate/config";
+import { mapToRole } from "@hallucinate/config";
 import type { HostToLibrary, LibraryToHost } from "./library-protocol.js";
 
 // ─── DiscoverDeps ─────────────────────────────────────────────────────────────

@@ -1,9 +1,9 @@
 # Third-Party Notices
 
-Maestro includes software from third parties. The notices below are reproduced
+Hallucinate includes software from third parties. The notices below are reproduced
 to satisfy the attribution and license-notice requirements of the upstream
 projects. Each notice travels with the copies of the corresponding material that
-Maestro ships.
+Hallucinate ships.
 
 ## wshobson/agents
 
@@ -12,8 +12,8 @@ Maestro ships.
 - Upstream path: `plugins/agent-teams/skills/`
 - License: MIT
 
-Maestro vendors and adapts a small set of agent-coordination skills from
-wshobson/agents. The adapted copies are rewritten to fit Maestro's engine model
+Hallucinate vendors and adapts a small set of agent-coordination skills from
+wshobson/agents. The adapted copies are rewritten to fit Hallucinate's engine model
 (worktree-isolated CLI workers coordinated through a conductor), so they are
 derivative works rather than verbatim copies. Because they derive from the
 upstream MIT-licensed material, the upstream copyright notice and the full MIT

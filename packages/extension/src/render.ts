@@ -1,4 +1,4 @@
-import type { CardVM, CockpitState, DelegationVM, Lane } from "@maestro/cockpit";
+import type { CardVM, CockpitState, DelegationVM, Lane } from "@hallucinate/cockpit";
 import { escapeHtml } from "./html.js";
 
 // ─── Lane / column layout ─────────────────────────────────────────────────────
@@ -297,7 +297,7 @@ function boardHeader(state: CockpitState): string {
   return `<header class="board-header">
     <div class="bh-left">
       <span class="bh-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-      <span class="bh-title">Maestro</span>
+      <span class="bh-title">Hallucinate</span>
       <span class="bh-sep"></span>
       <span class="bh-meta">${total} ${agentWord}&ensp;·&ensp;branch <span class="bh-branch">main</span></span>
       <button class="bh-newagent" data-action="new-task" type="button"><span class="plus">+</span>New task</button>
@@ -338,7 +338,7 @@ function statusBar(state: CockpitState): string {
     <span class="sb-branch"><svg class="sb-branch-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6.5" cy="6" r="2.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="7" r="2.5"/><path d="M6.5 8.5v7M9 7h4.5a3 3 0 013 3"/></svg>main</span>
     <span class="sb-running">${counts.working} running</span>
     <span class="sb-awaiting">${awaiting} awaiting review</span>
-    <span class="sb-version">Maestro</span>
+    <span class="sb-version">Hallucinate</span>
   </div>`;
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { initialModel, reduce } from "../src/reducer.js";
-import type { Agent, OrchestratorEvent } from "@maestro/core";
+import type { Agent, OrchestratorEvent } from "@hallucinate/core";
 
 function agent(overrides: Partial<Agent> = {}): Agent {
   return {

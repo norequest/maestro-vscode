@@ -31,7 +31,7 @@ export const nodeGitRunner: GitRunner = (args, opts) =>
  * Binaries the shell runner is permitted to spawn. The first element of an
  * args array is treated as the command (see nodeShellRunner), so without this
  * guard a caller-derived first token could spawn an arbitrary binary. Today the
- * only non-git binary Maestro invokes is `gh`.
+ * only non-git binary Hallucinate invokes is `gh`.
  */
 export const SHELL_RUNNER_ALLOWLIST: readonly string[] = ["gh"];
 

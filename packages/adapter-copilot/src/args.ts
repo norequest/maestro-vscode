@@ -1,5 +1,5 @@
-import type { Role, Task, Workspace } from "@maestro/core";
-import { composePreamble, renderToolsForPreamble } from "@maestro/core";
+import type { Role, Task, Workspace } from "@hallucinate/core";
+import { composePreamble, renderToolsForPreamble } from "@hallucinate/core";
 
 /**
  * The wire format Copilot is asked to stream on stdout.

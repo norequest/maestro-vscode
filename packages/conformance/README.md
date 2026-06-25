@@ -1,4 +1,4 @@
-# @maestro/conformance
+# @hallucinate/conformance
 
 Shared, source-only conformance harness for engine adapters. Adapter packages import this harness directly from its TypeScript source in their test files, so it is intentionally not built and not published.
 

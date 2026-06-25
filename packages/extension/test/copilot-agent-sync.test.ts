@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import { resolveRolePreamble } from "../src/copilot-agent-sync.js";
 
 /**

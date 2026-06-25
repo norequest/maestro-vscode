@@ -1,5 +1,5 @@
-import { loadConductorDir, KNOWN_ENGINE_IDS, type FsReader } from "@maestro/config";
-import type { Role, Team } from "@maestro/core";
+import { loadConductorDir, KNOWN_ENGINE_IDS, type FsReader } from "@hallucinate/config";
+import type { Role, Team } from "@hallucinate/core";
 
 export interface ComposerData {
   roles: Role[];

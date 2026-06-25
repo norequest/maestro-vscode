@@ -24,7 +24,7 @@ export class FakeWorkspaceProvider implements WorkspaceProvider {
     this.created.push(agentId);
     return Promise.resolve({
       agentId,
-      path: `/tmp/maestro/${agentId}`,
+      path: `/tmp/hallucinate/${agentId}`,
       branch: `agent/${agentId}`,
     });
   }
@@ -111,7 +111,7 @@ export class FakeWorkspaceManager implements WorkspaceManager {
 
   create(agentId: string): Promise<Workspace> {
     this.created.push(agentId);
-    return Promise.resolve({ agentId, path: `/tmp/maestro/${agentId}`, branch: `agent/${agentId}` });
+    return Promise.resolve({ agentId, path: `/tmp/hallucinate/${agentId}`, branch: `agent/${agentId}` });
   }
   cleanup(agentId: string): Promise<void> {
     this.cleaned.push(agentId);

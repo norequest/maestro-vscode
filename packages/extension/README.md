@@ -1,19 +1,19 @@
-# Maestro
+# Hallucinate
 
 Conduct a team of AI coding agents in isolated git worktrees, without leaving VS Code.
 
 > Beta (pre-release). Extension v0.1.10. Built and tested: 8 packages, 1609 tests.
 
-<p align="center"><img src="https://raw.githubusercontent.com/norequest/maestro-vscode/main/media/demo.gif" width="340" alt="Maestro: conduct a team of AI coding agents in VS Code" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/demo.gif" width="340" alt="Hallucinate: conduct a team of AI coding agents in VS Code" /></p>
 
 ## What it is
 
-Maestro is model-agnostic orchestration for AI coding agents, living entirely in your editor. It drives your own engine CLIs (GitHub Copilot, Gemini, or any ACP engine) as subprocesses, so it reuses each tool's existing login and never touches your API keys. Every agent works in its own git worktree, and a finished agent is a diff you review before anything merges.
+Hallucinate is model-agnostic orchestration for AI coding agents, living entirely in your editor. It drives your own engine CLIs (GitHub Copilot, Gemini, or any ACP engine) as subprocesses, so it reuses each tool's existing login and never touches your API keys. Every agent works in its own git worktree, and a finished agent is a diff you review before anything merges.
 
 ## Features
 
 - Model-agnostic. The orchestration brain is engine-neutral; engines plug in behind one small adapter.
-- Reuses your existing login. Each engine runs as its own CLI subprocess, so Maestro never touches your API keys.
+- Reuses your existing login. Each engine runs as its own CLI subprocess, so Hallucinate never touches your API keys.
 - Two engine families: GitHub Copilot CLI and any ACP engine (drives `gemini --acp --stdio`).
 - Real isolation. By default every agent works in its own `git worktree` on its own branch, so parallel agents never collide.
 - Review before merge. A finished agent is a diff to review, not a surprise commit. Merge, discard, send back with feedback, or open a PR.
@@ -22,7 +22,7 @@ Maestro is model-agnostic orchestration for AI coding agents, living entirely in
 
 ## Requirements
 
-The engines are separate tools you must already have installed. Maestro drives them; it does not bundle them.
+The engines are separate tools you must already have installed. Hallucinate drives them; it does not bundle them.
 
 - VS Code `^1.90.0`.
 - A git repository open as your workspace folder.
@@ -35,13 +35,13 @@ The engines are separate tools you must already have installed. Maestro drives t
 ## Getting started
 
 1. Open a folder that is a git repository.
-2. Click the Maestro icon in the activity bar to open the Conducting Board.
+2. Click the Hallucinate icon in the activity bar to open the Conducting Board.
 3. Dispatch an agent: pick a role, write the task, and send it. The agent gets a fresh worktree and streams live on the board.
 4. When it finishes, open the diff and Merge, Discard, or Send back with feedback. With PR mode on, open a pull request instead.
 
-Roles, teams, and skills live in a `.conductor/` directory in your workspace, which Maestro scaffolds on first run.
+Roles, teams, and skills live in a `.conductor/` directory in your workspace, which Hallucinate scaffolds on first run.
 
 ## Links
 
-- Full documentation and source: [github.com/norequest/maestro-vscode](https://github.com/norequest/maestro-vscode)
-- Feedback, bug reports, and ideas: [open an issue](https://github.com/norequest/maestro-vscode/issues). Maestro is pre-release and open to contributions, and an issue is the best place to start a conversation.
+- Full documentation and source: [github.com/norequest/hallucinate](https://github.com/norequest/hallucinate)
+- Feedback, bug reports, and ideas: [open an issue](https://github.com/norequest/hallucinate/issues). Hallucinate is pre-release and open to contributions, and an issue is the best place to start a conversation.

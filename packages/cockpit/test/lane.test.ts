@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentState } from "@maestro/core";
+import type { AgentState } from "@hallucinate/core";
 import { laneFor, type Lane } from "../src/lane.js";
 
 const EXPECTED: Record<AgentState, Lane> = {

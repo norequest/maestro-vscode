@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderReview } from "../src/review-render.js";
-import type { CardVM } from "@maestro/cockpit";
+import type { CardVM } from "@hallucinate/cockpit";
 import type { ParsedDiff } from "../src/diff-parse.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

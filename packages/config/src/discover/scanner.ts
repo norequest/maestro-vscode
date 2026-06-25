@@ -115,7 +115,7 @@ export async function discoverWorkspace(root: string, fs: FsScanner): Promise<Di
 
   // Dedup agents as the LAST step before returning. The same logical agent can
   // exist as both a canonical .conductor/roles/*.yaml role and a
-  // .github/agents/*.agent.md Copilot mirror that Maestro itself writes, so
+  // .github/agents/*.agent.md Copilot mirror that Hallucinate itself writes, so
   // without this collapse the same agent would appear twice in the Discover view.
   // Only items are deduped; mcp and skipped are returned untouched.
   return { items: dedupeDiscoveredAgents(items), mcp, skipped };

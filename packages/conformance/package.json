@@ -1,5 +1,5 @@
 {
-  "name": "@maestro/conformance",
+  "name": "@hallucinate/conformance",
   "version": "0.0.0",
   "private": true,
   "description": "Test-only, source-resolved package. It is intentionally NOT built: adapter conformance tests import it via source, so main/types deliberately point at src/index.ts (not dist). Do not add a build step or switch to dist; that would break how the adapter tests resolve this harness.",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@maestro/core": "workspace:*"
+    "@hallucinate/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

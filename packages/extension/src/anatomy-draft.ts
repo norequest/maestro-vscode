@@ -3,12 +3,12 @@
  * AnatomyWebviewPanel.openDraft so the single-page host can show a discovered
  * agent's anatomy pre-filled WITHOUT writing it to disk.
  *
- * No vscode, no node imports: just the VM shape over @maestro/core + @maestro/config.
+ * No vscode, no node imports: just the VM shape over @hallucinate/core + @hallucinate/config.
  */
 
-import { countGrants } from "@maestro/core";
-import { skillNeedsGrant } from "@maestro/config";
-import type { AdoptDraft } from "@maestro/config";
+import { countGrants } from "@hallucinate/core";
+import { skillNeedsGrant } from "@hallucinate/config";
+import type { AdoptDraft } from "@hallucinate/config";
 import type { AnatomyVM } from "./anatomy-protocol.js";
 
 /**

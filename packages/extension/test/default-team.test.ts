@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role, Team } from "@maestro/core";
+import type { Role, Team } from "@hallucinate/core";
 import { buildConductorTeam, launchConductorTeam } from "../src/default-team.js";
 
 const role = (name: string): Role => ({

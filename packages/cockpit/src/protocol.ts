@@ -1,4 +1,4 @@
-import type { AgentState, ApprovalDetail, Diff, EngineCapabilitiesLite } from "@maestro/core";
+import type { AgentState, ApprovalDetail, Diff, EngineCapabilitiesLite } from "@hallucinate/core";
 import type { ComposerOptions } from "./composer.js";
 
 /** Which column on the Conducting Board this card belongs to. */

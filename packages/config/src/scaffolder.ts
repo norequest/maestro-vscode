@@ -2,7 +2,7 @@ import * as nodePath from "node:path";
 import { serializeRole, serializeSkill } from "./serializer.js";
 import { SKILLS_DIR_SEGMENTS } from "./paths.js";
 import { VENDORED_SKILLS } from "./vendored-skills.js";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import type { SkillManifest } from "./skill-types.js";
 
 /** Minimal async fs interface for writing; injectable for offline testing. */
@@ -40,7 +40,7 @@ const STARTER_SKILL: { manifest: SkillManifest; body: string } = {
     "Do not modify test files; only fix the source code under test.",
 };
 
-const STARTER_CONFIG_YAML = `# Maestro orchestrator configuration
+const STARTER_CONFIG_YAML = `# Hallucinate orchestrator configuration
 # See .conductor/roles/ to define roles and .conductor/teams/ to group them.
 maxParallelAgents: 3
 

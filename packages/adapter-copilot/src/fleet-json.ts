@@ -1,7 +1,7 @@
 /**
  * Parser for Copilot's `/fleet ... --output-format json` stream.
  *
- * In fleet mode Maestro spawns ONE `copilot` session for the conductor and
+ * In fleet mode Hallucinate spawns ONE `copilot` session for the conductor and
  * drives it with a `/fleet ...` prompt. Copilot's built-in orchestrator runs the
  * named custom agents (e.g. scribe-alpha, scribe-beta) as IN-SESSION sub-agents
  * and reports their lifecycle on the JSONL stream (one JSON object per line,
@@ -32,7 +32,7 @@
  *   - result -> data: { sessionId, exitCode, usage: { ..., codeChanges: { filesModified } } }
  */
 
-import type { AgentEvent } from "@maestro/core";
+import type { AgentEvent } from "@hallucinate/core";
 
 /** Prefix marking a rendered tool/action line, matching {@link renderJsonLine}. */
 const TOOL_PREFIX = "▸";

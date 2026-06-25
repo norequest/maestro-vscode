@@ -1,7 +1,7 @@
 /**
  * Anatomy controller: holds the current role anatomy in memory, handles
  * inbound AnatomyToHost messages, routes every write through an injected
- * AnatomyGateway (the seam over @maestro/config + node fs), so it unit-tests
+ * AnatomyGateway (the seam over @hallucinate/config + node fs), so it unit-tests
  * against a FAKE gateway with zero disk I/O.
  *
  * After every write it reloads, rebuilds the AnatomyVM, and calls onSnapshot.
@@ -9,15 +9,15 @@
  * NO node imports in this file.
  */
 
-import type { Role, ToolGrant } from "@maestro/core";
-import { countGrants } from "@maestro/core";
-import { skillNeedsGrant } from "@maestro/config";
+import type { Role, ToolGrant } from "@hallucinate/core";
+import { countGrants } from "@hallucinate/core";
+import { skillNeedsGrant } from "@hallucinate/config";
 import type { AnatomyVM, AnatomyToHost } from "./anatomy-protocol.js";
 
 // ─── AnatomyGateway seam ─────────────────────────────────────────────────────
 
 /**
- * Injectable gateway interface over @maestro/config + node fs.
+ * Injectable gateway interface over @hallucinate/config + node fs.
  * The REAL implementation wires to disk; tests use a fake with no I/O.
  */
 export interface AnatomyGateway {

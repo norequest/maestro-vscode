@@ -1,4 +1,4 @@
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 
 /**
  * MINIMAL P3 append. P4 replaces this with the full Soul/Instructions/Tools/Skills/Task

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 import { applyDefaults } from "../src/config-defaults.js";
-import type { AgentDefaults } from "@maestro/core";
+import type { AgentDefaults } from "@hallucinate/core";
 
 /**
  * extension.ts imports `vscode` at the module top level, so it cannot be imported
@@ -40,11 +40,11 @@ describe("defaults wiring in extension.ts (source)", () => {
     expect(launchBody).toMatch(/scaffoldIfMissing\(repoRoot,\s*fsWriter\)/);
   });
 
-  it("imports ensureVendoredSkills from @maestro/config", () => {
+  it("imports ensureVendoredSkills from @hallucinate/config", () => {
     expect(extensionSrc).toMatch(/ensureVendoredSkills/);
     // It must come from the config package import line, alongside scaffoldIfMissing.
     expect(extensionSrc).toMatch(
-      /import\s*\{[^}]*ensureVendoredSkills[^}]*\}\s*from\s*"@maestro\/config"/s,
+      /import\s*\{[^}]*ensureVendoredSkills[^}]*\}\s*from\s*"@hallucinate\/config"/s,
     );
   });
 

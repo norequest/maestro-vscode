@@ -1,17 +1,17 @@
-// Run: MAESTRO_LIVE=1 COPILOT_GITHUB_TOKEN=... pnpm --filter @maestro/adapter-copilot smoke
+// Run: HALLUCINATE_LIVE=1 COPILOT_GITHUB_TOKEN=... pnpm --filter @hallucinate/adapter-copilot smoke
 import { execSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CopilotAdapter } from "../dist/index.js";
 
-if (process.env.MAESTRO_LIVE !== "1") {
-  console.log("Skipping live smoke test (set MAESTRO_LIVE=1 to run).");
+if (process.env.HALLUCINATE_LIVE !== "1") {
+  console.log("Skipping live smoke test (set HALLUCINATE_LIVE=1 to run).");
   process.exit(0);
 }
 
 // Throwaway git repo so the agent has a worktree to act on.
-const dir = mkdtempSync(join(tmpdir(), "maestro-copilot-smoke-"));
+const dir = mkdtempSync(join(tmpdir(), "hallucinate-copilot-smoke-"));
 execSync("git init -q && git commit -q --allow-empty -m init", { cwd: dir });
 
 const adapter = new CopilotAdapter();
@@ -20,7 +20,7 @@ console.log("health:", health);
 if (!health.ok) process.exit(1);
 
 const session = adapter.start(
-  { id: "t", description: "Create a file HELLO.md containing 'Hello from Maestro'.", roleName: "R" },
+  { id: "t", description: "Create a file HELLO.md containing 'Hello from Hallucinate'.", roleName: "R" },
   { agentId: "a", path: dir, branch: "smoke" },
   {
     name: "R",

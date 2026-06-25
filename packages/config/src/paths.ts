@@ -1,5 +1,5 @@
 /**
- * Shared path segments for where Maestro reads and writes skills.
+ * Shared path segments for where Hallucinate reads and writes skills.
  *
  * The skills home moved from `.conductor/skills/` to `.github/skills/` (the
  * folder VS Code and Copilot read natively). Roles, teams, and config.yaml

@@ -1,5 +1,5 @@
-import type { AgentEvent, AgentSession, ApprovalDecision } from "@maestro/core";
-import { EventQueue } from "@maestro/core";
+import type { AgentEvent, AgentSession, ApprovalDecision } from "@hallucinate/core";
+import { EventQueue } from "@hallucinate/core";
 import { cleanOutput, type OutputFormat } from "./args.js";
 import { FleetLineParser } from "./fleet-json.js";
 import { renderJsonLine } from "./json-output.js";

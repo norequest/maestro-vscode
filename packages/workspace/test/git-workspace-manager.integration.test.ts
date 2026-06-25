@@ -11,7 +11,7 @@ function git(cwd: string, ...args: string[]): string {
 
 let repo: string;
 beforeEach(() => {
-  repo = mkdtempSync(join(tmpdir(), "maestro-ws-"));
+  repo = mkdtempSync(join(tmpdir(), "hallucinate-ws-"));
   // Pin the initial branch name so the test is hermetic regardless of
   // the user's global init.defaultBranch setting (or lack thereof).
   git(repo, "init", "-q", "-b", "main");

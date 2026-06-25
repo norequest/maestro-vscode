@@ -1,6 +1,6 @@
 /** Pure helpers for M9 merge UX. No vscode import, so unit-testable under Vitest. */
 
-import type { Agent } from "@maestro/core";
+import type { Agent } from "@hallucinate/core";
 
 /**
  * The directory the agent's conflict files live in. Conflict markers are
@@ -15,17 +15,17 @@ export function conflictFileBase(agent: Pick<Agent, "workspace">): string | unde
 
 export function buildConflictResolveMessage(files: readonly string[]): string {
   const list = files.map((f) => `  - ${f}`).join("\n");
-  return `Maestro: resolve the conflicts in:\n${list}\nThen click "Finish Merge" on the card.`;
+  return `Hallucinate: resolve the conflicts in:\n${list}\nThen click "Finish Merge" on the card.`;
 }
 
 export function buildPrTitle(roleName: string, taskDescription: string): string {
   const truncated = taskDescription.length > 60 ? `${taskDescription.slice(0, 60)}...` : taskDescription;
-  return `[Maestro/${roleName}] ${truncated}`;
+  return `[Hallucinate/${roleName}] ${truncated}`;
 }
 
 export function buildPrBody(summary: string | undefined, diffFiles: readonly string[]): string {
   const fileList = diffFiles.length > 0 ? `\n\n**Changed files:**\n${diffFiles.map((f) => `- ${f}`).join("\n")}` : "";
-  return `${summary ?? "No summary provided."}${fileList}\n\n_Created by Maestro._`;
+  return `${summary ?? "No summary provided."}${fileList}\n\n_Created by Hallucinate._`;
 }
 
 /** The minimal orchestrator slice the PR-created transition needs (pure, testable). */

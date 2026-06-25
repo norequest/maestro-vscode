@@ -1,4 +1,4 @@
-import type { HealthStatus } from "@maestro/core";
+import type { HealthStatus } from "@hallucinate/core";
 
 const TOKEN_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"] as const;
 

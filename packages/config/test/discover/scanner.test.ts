@@ -396,7 +396,7 @@ describe("discoverWorkspace", () => {
   it("collapses a conductor role and its Copilot agent mirror to one item", async () => {
     // The same logical agent ("implementer") exists BOTH as a canonical
     // .conductor/roles/implementer.yaml role AND as a .github/agents/implementer.agent.md
-    // Copilot mirror that Maestro itself writes. Without dedup, Discover would show it twice.
+    // Copilot mirror that Hallucinate itself writes. Without dedup, Discover would show it twice.
     const dupFiles: Record<string, string> = {
       [`${ROOT}/.conductor/roles/implementer.yaml`]: `name: Implementer
 instructions: Implement the requested feature in this worktree. Write tests, make them green, then commit.
@@ -406,7 +406,7 @@ autonomy: auto-approve-safe
 `,
       [`${ROOT}/.github/agents/implementer.agent.md`]: `---
 name: Implementer
-description: Copilot mirror of the implementer role written by Maestro.
+description: Copilot mirror of the implementer role written by Hallucinate.
 tools:
   - Read
   - Edit

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { composeSkillPreamble, composeSpawnDescription } from "../src/compose.js";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 
 function makeRole(name: string, skills?: string[]): Role {
   return {

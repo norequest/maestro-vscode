@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { selectDiscover } from "../src/discover-view.js";
 import type { DiscoverGroup } from "../src/discover-view.js";
-import type { DiscoveredItem } from "@maestro/config";
+import type { DiscoveredItem } from "@hallucinate/config";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 

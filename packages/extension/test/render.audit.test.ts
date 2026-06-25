@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderCardHTML, renderDrawer } from "../src/render.js";
-import type { CardVM } from "@maestro/cockpit";
+import type { CardVM } from "@hallucinate/cockpit";
 
 function card(overrides: Partial<CardVM> = {}): CardVM {
   return { id: "a1", roleName: "Implementer", engineId: "copilot", state: "working", output: "", attention: false, lane: "working", taskDescription: "do it", ...overrides };

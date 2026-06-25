@@ -1,4 +1,4 @@
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 
 /** The subset of a dispatch message this helper reads. */
 export interface DispatchLike {
@@ -20,7 +20,7 @@ export interface DispatchPrepDeps {
  *
  * This loads the named role's full anatomy (soul + instructions + skills +
  * tools) from .conductor/ and registers it before the dispatch is forwarded,
- * mirroring what the maestro.spawnAgent command already does. Best-effort: an
+ * mirroring what the hallucinate.spawnAgent command already does. Best-effort: an
  * ad-hoc dispatch (no roleName), an unknown name, or a load failure are all
  * no-ops, leaving the existing dispatch behavior intact.
  */

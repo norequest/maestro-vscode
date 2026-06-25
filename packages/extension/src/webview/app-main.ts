@@ -16,9 +16,9 @@ import type {
   ComposerOptions,
   DispatchForm,
   CardVM,
-} from "@maestro/cockpit";
-import { buildDispatchMessage, canDispatch, ENGINE_FAMILIES } from "@maestro/cockpit";
-import type { Autonomy } from "@maestro/core";
+} from "@hallucinate/cockpit";
+import { buildDispatchMessage, canDispatch, ENGINE_FAMILIES } from "@hallucinate/cockpit";
+import type { Autonomy } from "@hallucinate/core";
 import { renderBoard, renderDrawer } from "../render.js";
 import { renderComposerHTML } from "../render-composer.js";
 import {
@@ -40,9 +40,9 @@ import { escapeHtml } from "../html.js";
 import type { LibrarySnapshot, LibraryTab } from "../library-protocol.js";
 import type { AnatomyVM } from "../anatomy-protocol.js";
 import type { ReviewOpenOpts } from "../review-render.js";
-import type { DiscoveredItem, McpInventory } from "@maestro/config";
+import type { DiscoveredItem, McpInventory } from "@hallucinate/config";
 import type { AppToHost, HostToApp, AppView } from "../app-protocol.js";
-import type { ToolGrant } from "@maestro/core";
+import type { ToolGrant } from "@hallucinate/core";
 
 type ReadTool = "Read" | "Search";
 type WriteTool = "Edit" | "Run" | "Git";
@@ -237,7 +237,7 @@ function renderLibraryView(): void {
   const tabChanged = lastRenderedLibTab !== undefined && lastRenderedLibTab !== snap.tab;
   const overlayOpen =
     snap.editing !== undefined || snap.editingTeam !== undefined || snap.picker !== undefined;
-  const bodyClass = tabChanged && !overlayOpen ? "lib-body maestro-enter" : "lib-body";
+  const bodyClass = tabChanged && !overlayOpen ? "lib-body hallucinate-enter" : "lib-body";
   root.innerHTML = `${header}<div class="${bodyClass}">${body}</div>${overlay}`;
   lastRenderedLibTab = snap.tab;
 }
@@ -325,7 +325,7 @@ function getTaskOverlay(): HTMLElement | null {
   return document.getElementById("task-overlay");
 }
 
-/** The four static equaliser bars (Maestro's launch glyph). aria-hidden decorative. */
+/** The four static equaliser bars (Hallucinate's launch glyph). aria-hidden decorative. */
 function taskGlyphBars(): string {
   return `<span class="task-glyph-bars" aria-hidden="true"><span></span><span></span><span></span><span></span></span>`;
 }

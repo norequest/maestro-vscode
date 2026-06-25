@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent } from "@maestro/core";
+import type { AgentEvent } from "@hallucinate/core";
 import { FleetLineParser, parseFleetLine } from "../src/fleet-json.js";
 
 /** Map a list of raw JSONL lines through ONE stateful parser, dropping the null

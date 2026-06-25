@@ -1,4 +1,4 @@
-export const MAESTRO_COCKPIT_VERSION = "0.0.0";
+export const HALLUCINATE_COCKPIT_VERSION = "0.0.0";
 
 export type { CardVM, CockpitState, DelegationVM, HostToWebview, WebviewToHost, Lane } from "./protocol.js";
 export { isWebviewMessage } from "./protocol.js";
