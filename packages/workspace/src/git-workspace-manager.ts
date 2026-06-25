@@ -1,5 +1,6 @@
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { Diff, MergeResult, Workspace } from "@maestro/core";
+import type { AgentProfile, Diff, MergeResult, SkillRef, Workspace } from "@maestro/core";
 import type { WorkspaceManager } from "@maestro/core";
 import { nodeGitRunner, nodeShellRunner } from "./git-runner.js";
 import type { GitRunner } from "./git-runner.js";
@@ -89,28 +90,81 @@ export class GitWorkspaceManager implements WorkspaceManager {
   }
 
   async create(agentId: string): Promise<Workspace> {
-    const slug = GitWorkspaceManager.slug(agentId);
-    if (slug.length === 0) {
+    // Derive the worktree dir and branch from the SAME slug. Using the raw
+    // agentId for the path would let a "../"-bearing id escape the worktrees
+    // root (a create-and-force-remove primitive). The raw agentId stays only as
+    // the in-memory map key.
+    const baseSlug = GitWorkspaceManager.slug(agentId);
+    if (baseSlug.length === 0) {
       throw new Error(`Agent id "${agentId}" produces an empty slug and cannot be a branch name`);
     }
-    // Derive the worktree dir from the SAME slug used for the branch. Using the
-    // raw agentId here would let a "../"-bearing id escape the worktrees root
-    // (a create-and-force-remove primitive) and risks collisions. The raw
-    // agentId stays only as the in-memory map key.
     const worktreesRoot = path.join(this.repoRoot, ".conductor", "wt");
-    const wtPath = path.join(worktreesRoot, slug);
-    // Defense in depth: even with the slug, assert the resolved path stays
-    // inside the worktrees root before handing it to `git worktree add`.
-    const resolved = path.resolve(wtPath);
-    if (!resolved.startsWith(path.resolve(worktreesRoot) + path.sep)) {
-      throw new Error(`Agent id "${agentId}" resolves to a worktree path outside ${worktreesRoot}`);
-    }
-    const branch = `agent/${slug}`;
     const baseSha = (await this.git(["rev-parse", "HEAD"])).trim();
+    // Clear worktree registrations whose directories are already gone, so a path
+    // freed by a previous session can be reused before we try to add it.
     await this.runner(["worktree", "prune"], { cwd: this.repoRoot });
-    await this.git(["worktree", "add", wtPath, "-b", branch, baseSha]);
-    this.records.set(agentId, { path: wtPath, branch, baseSha });
-    return { agentId, path: wtPath, branch };
+
+    // A leftover branch or worktree from a previous session (a crash, or an agent
+    // id reused across sessions because the orchestrator's counter restarts at 1)
+    // must NOT hard-fail `worktree add`. Try the natural slug first, then
+    // agent/<slug>-2, -3, ... on a collision. This never deletes an existing
+    // branch, so no prior work is lost. A non-collision failure (bad base sha,
+    // etc.) surfaces immediately rather than spinning.
+    const MAX_ATTEMPTS = 50;
+    let lastStderr = "";
+    for (let n = 1; n <= MAX_ATTEMPTS; n++) {
+      const slug = n === 1 ? baseSlug : `${baseSlug}-${n}`;
+      const wtPath = path.join(worktreesRoot, slug);
+      // Defense in depth: assert the resolved path stays inside the worktrees
+      // root before handing it to `git worktree add`.
+      const resolved = path.resolve(wtPath);
+      if (!resolved.startsWith(path.resolve(worktreesRoot) + path.sep)) {
+        throw new Error(`Agent id "${agentId}" resolves to a worktree path outside ${worktreesRoot}`);
+      }
+      const branch = `agent/${slug}`;
+      const res = await this.runner(["worktree", "add", wtPath, "-b", branch, baseSha], { cwd: this.repoRoot });
+      if (res.exitCode === 0) {
+        this.records.set(agentId, { path: wtPath, branch, baseSha });
+        return { agentId, path: wtPath, branch };
+      }
+      lastStderr = res.stderr.trim();
+      if (!GitWorkspaceManager.isCollisionError(lastStderr)) {
+        throw new Error(`git worktree add ${wtPath} failed (${res.exitCode}): ${lastStderr}`);
+      }
+    }
+    throw new Error(
+      `git worktree add could not find a free name for agent "${agentId}" after ${MAX_ATTEMPTS} attempts: ${lastStderr}`,
+    );
+  }
+
+  /**
+   * True when a `git worktree add` failure is a name collision (a branch or
+   * worktree path that already exists), so the caller should retry with the next
+   * slug. Bad-ref / dirty-tree style failures do NOT match, so they surface at
+   * once instead of spinning through 50 doomed attempts.
+   */
+  private static isCollisionError(stderr: string): boolean {
+    return /already exists|already used by worktree|already registered|is not an empty directory/i.test(stderr);
+  }
+
+  /**
+   * Re-register an existing worktree after a reload. The records map is in-memory
+   * and empty when a new session starts, so a hydrated agent (restored from the
+   * persisted log) has no record here and merge/diff/discard would throw
+   * "Unknown agent". Adoption rebuilds the record from the persisted path +
+   * branch. The base sha (the fork point, needed by diff/isStale) is recovered
+   * via merge-base; if that probe fails it falls back to the current HEAD.
+   * Idempotent: re-adopting an already-known agent simply refreshes its record.
+   */
+  async adopt(agentId: string, workspace: Workspace): Promise<void> {
+    let baseSha: string;
+    const probe = await this.runner(["merge-base", workspace.branch, "HEAD"], { cwd: this.repoRoot });
+    if (probe.exitCode === 0 && probe.stdout.trim().length > 0) {
+      baseSha = probe.stdout.trim();
+    } else {
+      baseSha = (await this.git(["rev-parse", "HEAD"])).trim();
+    }
+    this.records.set(agentId, { path: workspace.path, branch: workspace.branch, baseSha });
   }
 
   async diff(agentId: string): Promise<Diff> {
@@ -129,6 +183,124 @@ export class GitWorkspaceManager implements WorkspaceManager {
     );
     const patch = await this.git(["diff", rec.baseSha, "HEAD"], rec.path);
     return { files, patch };
+  }
+
+  /**
+   * Materialize the role's skills into the agent's worktree under TWO trees so
+   * every engine family can discover them:
+   *   1. `.github/skills/<name>/SKILL.md`  (PRIMARY: Copilot and VS Code read
+   *      `.github`, the folder the spawned `copilot -C <worktree>` looks in)
+   *   2. `.agents/skills/<name>/SKILL.md`  (KEPT: Gemini/ACP read `.agents/skills`)
+   * then make both materialized skill trees invisible to git so they never
+   * reach the review diff, the staging area, or the user's branch.
+   *
+   * The invisibility is achieved by adding two lines to the worktree's
+   * `info/exclude` file (the worktree-local equivalent of `.gitignore`, but NOT
+   * itself tracked or shared): `.github/skills/` and `.agents/`. We exclude
+   * `.github/skills/` specifically, NOT all of `.github/`, so any other
+   * `.github` content (e.g. `.github/agents` or tracked workflow files) still
+   * shows up in the review diff. git status/add/diff all honor info/exclude for
+   * untracked paths, so the materialized skills are present on disk for the
+   * agent to read yet absent from every git operation. diff() commits via
+   * `git add -A` (which respects info/exclude) and then diffs committed history,
+   * so the excluded skill files can never appear there either.
+   *
+   * Idempotent on repeated calls: file contents are overwritten verbatim, and
+   * each exclude line is appended only when an exact matching line is not
+   * already present.
+   */
+  async writeSkills(agentId: string, skills: SkillRef[]): Promise<void> {
+    const rec = this.require(agentId);
+    // Ensure both skill trees are excluded BEFORE writing any files, so there is
+    // no window in which a materialized tree could be picked up by a concurrent
+    // git status/add. Resolve the exclude file once, then dedupe both lines.
+    const excludeFile = await this.resolveExcludeFile(rec.path);
+    await this.ensureExcludeLine(excludeFile, ".github/skills/");
+    await this.ensureExcludeLine(excludeFile, ".agents/");
+    // Skill destinations: PRIMARY .github/skills (Copilot/VS Code), KEPT
+    // .agents/skills (Gemini/ACP). Same content materialized into both.
+    const roots = [
+      path.join(rec.path, ".github", "skills"),
+      path.join(rec.path, ".agents", "skills"),
+    ];
+    for (const skill of skills) {
+      for (const root of roots) {
+        const dir = path.join(root, skill.name);
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(path.join(dir, "SKILL.md"), skill.content);
+      }
+    }
+  }
+
+  /**
+   * Materialize the role's Copilot custom-agent profiles into the agent's
+   * worktree under `.github/agents/<name>.agent.md` (the folder the spawned
+   * `copilot -C <worktree>` reads its custom agents from), then make that tree
+   * invisible to git so the materialized profiles never reach the review diff,
+   * the staging area, or the user's branch.
+   *
+   * The invisibility is achieved by adding `.github/agents/` to the worktree's
+   * `info/exclude` file (the worktree-local equivalent of `.gitignore`, but NOT
+   * itself tracked or shared). We exclude `.github/agents/` specifically, NOT
+   * all of `.github/`, so any other `.github` content (e.g. `.github/skills` or
+   * tracked workflow files) still shows up in the review diff. git
+   * status/add/diff all honor info/exclude for untracked paths, so the
+   * materialized profiles are present on disk for the engine to read yet absent
+   * from every git operation. diff() commits via `git add -A` (which respects
+   * info/exclude) and then diffs committed history, so the excluded profile
+   * files can never appear there either.
+   *
+   * Idempotent on repeated calls: file contents are overwritten verbatim, and
+   * the exclude line is appended only when an exact matching line is not already
+   * present.
+   */
+  async writeAgentProfiles(agentId: string, profiles: AgentProfile[]): Promise<void> {
+    const rec = this.require(agentId);
+    // Ensure the agents tree is excluded BEFORE writing any files, so there is
+    // no window in which a materialized profile could be picked up by a
+    // concurrent git status/add.
+    const excludeFile = await this.resolveExcludeFile(rec.path);
+    await this.ensureExcludeLine(excludeFile, ".github/agents/");
+    // Profile destination: .github/agents/<name>.agent.md (Copilot custom agents).
+    const root = path.join(rec.path, ".github", "agents");
+    for (const profile of profiles) {
+      await fs.mkdir(root, { recursive: true });
+      await fs.writeFile(path.join(root, `${profile.name}.agent.md`), profile.content);
+    }
+  }
+
+  /**
+   * Resolve the worktree's git exclude file (`<gitdir>/info/exclude`). The path
+   * is obtained via `git rev-parse --git-path info/exclude`, which yields the
+   * per-worktree gitdir location (worktrees have their own gitdir, so this
+   * scopes the rule to this agent's checkout, not the whole repo). rev-parse may
+   * return a path relative to the worktree; it is resolved against the worktree
+   * so reads/writes target the real file.
+   */
+  private async resolveExcludeFile(worktreePath: string): Promise<string> {
+    const excludePath = (await this.git(["rev-parse", "--git-path", "info/exclude"], worktreePath)).trim();
+    return path.isAbsolute(excludePath) ? excludePath : path.join(worktreePath, excludePath);
+  }
+
+  /**
+   * Append a single exclude pattern to the worktree's info/exclude exactly once.
+   * Reads the current contents and appends the line only if no exact matching
+   * line exists yet, so repeated calls (and multiple patterns) never duplicate.
+   * Re-reads the file per call so a line added by a prior call in the same
+   * writeSkills invocation is observed before the next pattern is appended.
+   */
+  private async ensureExcludeLine(excludeFile: string, pattern: string): Promise<void> {
+    let current = "";
+    try {
+      current = await fs.readFile(excludeFile, "utf8");
+    } catch {
+      // info/exclude may not exist yet; treat as empty and create it below.
+    }
+    const alreadyExcluded = current.split(/\r?\n/).some((line) => line.trim() === pattern);
+    if (alreadyExcluded) return;
+    await fs.mkdir(path.dirname(excludeFile), { recursive: true });
+    const prefix = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
+    await fs.appendFile(excludeFile, `${prefix}${pattern}\n`);
   }
 
   /**

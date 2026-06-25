@@ -10,6 +10,8 @@ describe("protocol M6 additions", () => {
       state: "awaiting-approval",
       output: "",
       attention: true,
+      lane: "needsYou",
+      taskDescription: "test task",
       pendingApprovalId: "req-1",
       approvalDetail: { tool: "bash", description: "Run: npm test" },
       engineCapabilities: { approvals: true, steerable: true },

@@ -59,7 +59,8 @@ describe("CopilotSession (json mode)", () => {
     child.close(0);
 
     const result = await events;
-    expect(outputs(result)).toEqual(["not json, just a plain log line"]);
+    // Raw fallback: the unparseable line is emitted as-is, keeping its newline.
+    expect(outputs(result)).toEqual(["not json, just a plain log line\n"]);
     // The stream still completes cleanly.
     expect(result.at(-1)).toMatchObject({ kind: "done" });
   });
@@ -78,7 +79,8 @@ describe("CopilotSession (json mode)", () => {
     child.close(0);
 
     const result = await events;
-    expect(outputs(result)).toEqual([weird, "42"]);
+    // Raw fallback returns the cleaned line verbatim, including its newline.
+    expect(outputs(result)).toEqual([weird + "\n", "42\n"]);
     expect(result.at(-1)).toMatchObject({ kind: "done" });
   });
 
@@ -94,8 +96,10 @@ describe("CopilotSession (json mode)", () => {
     child.close(0);
 
     const lines = outputs(await events);
+    // Parsed assistant lines yield just their text; the malformed middle line
+    // degrades to its raw cleaned text, which keeps its trailing newline.
     expect(lines[0]).toBe("before");
-    expect(lines[1]).toBe('{"type":"assistant","text": broken'); // raw fallback
+    expect(lines[1]).toBe('{"type":"assistant","text": broken\n'); // raw fallback
     expect(lines[2]).toBe("after");
   });
 

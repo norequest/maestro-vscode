@@ -1,5 +1,14 @@
-import type { AgentEvent, AgentSession, ApprovalDecision, Task } from "@maestro/core";
-import { EventQueue } from "@maestro/core";
+import type {
+  AgentEvent,
+  AgentSession,
+  ApprovalDecision,
+  Autonomy,
+  SkillRef,
+  SoulDoc,
+  Task,
+  ToolGrant,
+} from "@maestro/core";
+import { EventQueue, composePreamble, renderToolsForPreamble } from "@maestro/core";
 import { buildInitialize, buildPermissionResponse, buildUserTurn } from "./messages.js";
 import type { AcpApprovalDetail, AcpMessage, AcpTransport } from "./types.js";
 import { autonomyToPermissionMode } from "./types.js";
@@ -17,7 +26,13 @@ const SAFE_TOOLS = new Set([
 export interface AcpSessionOptions {
   instructions: string;
   model?: string;
-  autonomy: "manual" | "auto-approve-safe" | "yolo";
+  autonomy: Autonomy;
+  /** Optional soul doc resolved at spawn time. */
+  soulDoc?: SoulDoc;
+  /** Optional tool grant for the role. */
+  tools?: ToolGrant;
+  /** Resolved skills, advertised by name in the preamble (bodies not inlined). */
+  skills?: SkillRef[];
 }
 
 export class AcpSession implements AgentSession {
@@ -38,8 +53,15 @@ export class AcpSession implements AgentSession {
 
   /** Call once after construction to send the ACP initialize + first user turn. */
   start(task: Task): void {
-    const initMsg = buildInitialize({
+    const systemPrompt = composePreamble({
+      soul: this.opts.soulDoc,
       instructions: this.opts.instructions,
+      tools: renderToolsForPreamble(this.opts.tools),
+      skills: this.opts.skills,
+      task: "",
+    });
+    const initMsg = buildInitialize({
+      systemPrompt,
       permissionMode: autonomyToPermissionMode(this.opts.autonomy),
       model: this.opts.model,
     });

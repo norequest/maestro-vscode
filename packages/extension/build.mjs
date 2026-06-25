@@ -15,10 +15,13 @@ const host = {
   sourcemap: true,
 };
 
-/** Webview client: browser IIFE, no externals. */
-const webview = {
-  entryPoints: ["src/webview/main.ts"],
-  outfile: "dist/webview/main.js",
+/**
+ * Single-page app webview client: the ONE router bundle that mounts
+ * board/library/anatomy/review in-place. Browser IIFE, no externals.
+ */
+const appWebview = {
+  entryPoints: ["src/webview/app-main.ts"],
+  outfile: "dist/webview/app-main.js",
   bundle: true,
   platform: "browser",
   format: "iife",
@@ -28,17 +31,18 @@ const webview = {
 
 function copyStyles() {
   mkdirSync("dist/webview", { recursive: true });
-  copyFileSync("src/webview/style.css", "dist/webview/style.css");
+  // The single merged stylesheet (board + library + anatomy + review).
+  copyFileSync("src/webview/app.css", "dist/webview/app.css");
 }
 
 if (watch) {
   const a = await context(host);
-  const b = await context(webview);
+  const b = await context(appWebview);
   await Promise.all([a.watch(), b.watch()]);
   copyStyles();
   console.log("esbuild watching...");
 } else {
-  await Promise.all([build(host), build(webview)]);
+  await Promise.all([build(host), build(appWebview)]);
   copyStyles();
   console.log("esbuild done");
 }

@@ -2,6 +2,7 @@ src/**
 test/**
 integration/**
 out/**
+.vscode/**
 .vscode-test/**
 build.mjs
 tsconfig.json

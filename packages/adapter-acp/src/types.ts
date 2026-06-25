@@ -1,3 +1,5 @@
+import type { Autonomy } from "@maestro/core";
+
 /** The minimal shape of an ACP JSON-RPC message we care about. */
 export interface AcpMessage {
   jsonrpc: "2.0";
@@ -32,9 +34,7 @@ export interface AcpApprovalDetail {
 /** Autonomy-to-ACP permission mode mapping. */
 export type AcpPermissionMode = "ask" | "auto-approve-safe" | "allow-all";
 
-export function autonomyToPermissionMode(
-  autonomy: "manual" | "auto-approve-safe" | "yolo",
-): AcpPermissionMode {
+export function autonomyToPermissionMode(autonomy: Autonomy): AcpPermissionMode {
   switch (autonomy) {
     case "manual":
       return "ask";

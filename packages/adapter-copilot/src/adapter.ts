@@ -7,7 +7,9 @@ import type {
   Task,
   Workspace,
 } from "@maestro/core";
-import { buildArgs, type OutputFormat } from "./args.js";
+import { COPILOT_ENGINE_ID } from "@maestro/core";
+import { buildAgentArgs, buildArgs, buildFleetArgs, type OutputFormat } from "./args.js";
+import { type AgentProfileWriter, ensureCopilotAgent } from "./agent-profile.js";
 import { resolveAuth } from "./auth.js";
 import { capabilitiesFor } from "./capabilities.js";
 import { CopilotSession } from "./copilot-session.js";
@@ -55,22 +57,74 @@ export interface CopilotAdapterOptions {
    * {@link renderJsonLine}.
    */
   outputFormat?: OutputFormat;
+  /**
+   * When set, the adapter runs in NATIVE custom-agent mode: it materializes the
+   * role into a Copilot `.agent.md` (via this writer) and spawns
+   * `copilot --agent <slug> -p "<task>"`, so Copilot recognizes a real named
+   * custom agent instead of receiving the persona as a raw prompt. When absent
+   * (the default), the legacy inline-preamble behavior is preserved unchanged.
+   * Production wires {@link nodeAgentProfileWriter}; tests inject a fake.
+   */
+  agentProfile?: AgentProfileWriter;
+  /**
+   * OPT-IN FLEET single-session mode. When `true`, the adapter spawns ONE
+   * conductor session (`copilot -p "<task verbatim>" --output-format json
+   * --no-color`) that runs the roster's named custom agents as in-session
+   * sub-agents, and parses their JSONL lifecycle into sub-agent events. The
+   * extension supplies the `/fleet ...` text and roster as `task.description`,
+   * which is passed VERBATIM. There is deliberately NO `--agent`: Copilot's
+   * built-in default orchestrator owns the `task` dispatch tool that `/fleet`
+   * drives, whereas a custom conductor agent teaches a dead ```delegate
+   * convention and never dispatches. Default `false` keeps the per-teammate
+   * spawn behavior byte-identical.
+   */
+  fleet?: boolean;
 }
 
 export class CopilotAdapter implements EngineAdapter {
-  readonly id = "copilot";
+  readonly id = COPILOT_ENGINE_ID;
   readonly capabilities;
   private readonly spawnFn: SpawnFn;
   private readonly env: Record<string, string | undefined>;
   private readonly command: string;
   private readonly outputFormat: OutputFormat;
+  private readonly agentProfile?: AgentProfileWriter;
+  private readonly fleet: boolean;
 
   constructor(opts: CopilotAdapterOptions = {}) {
     this.spawnFn = opts.spawn ?? defaultSpawn;
     this.env = opts.env ?? process.env;
     this.command = opts.command ?? "copilot";
-    this.outputFormat = opts.outputFormat ?? "text";
+    this.fleet = opts.fleet ?? false;
+    // Fleet mode always streams structured JSONL, so it advertises and parses as
+    // a structured-events mode regardless of any `outputFormat` passed.
+    this.outputFormat = this.fleet ? "fleet" : (opts.outputFormat ?? "text");
+    this.agentProfile = opts.agentProfile;
     this.capabilities = capabilitiesFor(this.outputFormat);
+  }
+
+  /**
+   * In native mode, materialize the agent file then build `--agent` argv. If
+   * materialization fails (fs error), fall back to the inline preamble so a
+   * dispatch never breaks just because the agent file could not be written.
+   */
+  private argvFor(task: Task, workspace: Workspace, role: Role): string[] {
+    if (this.fleet) {
+      // Fleet mode: pass the `/fleet ...` text VERBATIM via `-p` and let Copilot's
+      // built-in default orchestrator (which owns the `task` dispatch tool) run it.
+      // No preamble, and deliberately NO `--agent`: a custom conductor agent
+      // teaches the dead ```delegate convention and `/fleet` never dispatches.
+      return buildFleetArgs(task, workspace, role);
+    }
+    if (this.agentProfile) {
+      try {
+        const slug = ensureCopilotAgent(this.agentProfile, workspace.path, role, task);
+        return buildAgentArgs(task, workspace, role, slug, this.outputFormat);
+      } catch {
+        return buildArgs(task, workspace, role, this.outputFormat);
+      }
+    }
+    return buildArgs(task, workspace, role, this.outputFormat);
   }
 
   health(): Promise<HealthStatus> {
@@ -78,7 +132,7 @@ export class CopilotAdapter implements EngineAdapter {
   }
 
   start(task: Task, workspace: Workspace, role: Role): AgentSession {
-    const args = buildArgs(task, workspace, role, this.outputFormat);
+    const args = this.argvFor(task, workspace, role);
     const child = this.spawnFn(this.command, args, {
       cwd: workspace.path,
       env: definedEnv(this.env),

@@ -164,3 +164,101 @@ describe("parseConfigYaml", () => {
     }
   });
 });
+
+describe("parseConfigYaml defaults block", () => {
+  const DEFAULTS_YAML = `
+maxParallelAgents: 3
+defaults:
+  instructions: Always run the linter.
+  skills:
+    - run-tests
+  leadSkills:
+    - task-coordination-strategies
+`;
+
+  it("parses a defaults block into instructions, skills, and leadSkills", () => {
+    const result = parseConfigYaml(DEFAULTS_YAML, "config.yaml");
+    expect(result.config.ok).toBe(true);
+    if (result.config.ok) {
+      expect(result.config.value.defaults).toEqual({
+        instructions: "Always run the linter.",
+        skills: ["run-tests"],
+        leadSkills: ["task-coordination-strategies"],
+      });
+    }
+  });
+
+  it("leaves defaults undefined when the block is absent (unchanged from today)", () => {
+    const result = parseConfigYaml("maxParallelAgents: 3\n", "config.yaml");
+    expect(result.config.ok).toBe(true);
+    if (result.config.ok) {
+      expect(result.config.value.defaults).toBeUndefined();
+    }
+  });
+
+  it("degrades gracefully when defaults.skills is not an array (no throw, warning emitted)", () => {
+    const yaml = `
+maxParallelAgents: 3
+defaults:
+  skills: run-tests
+`;
+    let result: ReturnType<typeof parseConfigYaml>;
+    expect(() => {
+      result = parseConfigYaml(yaml, "config.yaml");
+    }).not.toThrow();
+    expect(result!.config.ok).toBe(true);
+    if (result!.config.ok) {
+      // The malformed skills key is dropped; nothing else parsed, so defaults is undefined.
+      expect(result!.config.value.defaults).toBeUndefined();
+      expect(result!.config.warnings.some((w) => w.field === "defaults.skills")).toBe(true);
+    }
+  });
+
+  it("skips non-string entries inside defaults.skills and warns", () => {
+    const yaml = `
+maxParallelAgents: 3
+defaults:
+  skills:
+    - run-tests
+    - 7
+`;
+    const result = parseConfigYaml(yaml, "config.yaml");
+    expect(result.config.ok).toBe(true);
+    if (result.config.ok) {
+      expect(result.config.value.defaults?.skills).toEqual(["run-tests"]);
+      expect(result.config.warnings.some((w) => w.field === "defaults.skills")).toBe(true);
+    }
+  });
+
+  it("ignores a non-string defaults.instructions and warns", () => {
+    const yaml = `
+maxParallelAgents: 3
+defaults:
+  instructions: 42
+`;
+    const result = parseConfigYaml(yaml, "config.yaml");
+    expect(result.config.ok).toBe(true);
+    if (result.config.ok) {
+      expect(result.config.value.defaults).toBeUndefined();
+      expect(result.config.warnings.some((w) => w.field === "defaults.instructions")).toBe(true);
+    }
+  });
+
+  it("warns on an unknown default skill name when a known-skill set is provided", () => {
+    const yaml = `
+maxParallelAgents: 3
+defaults:
+  skills:
+    - nonexistent-skill
+`;
+    const result = parseConfigYaml(yaml, "config.yaml", new Set<string>(["run-tests"]));
+    expect(result.config.ok).toBe(true);
+    if (result.config.ok) {
+      expect(
+        result.config.warnings.some(
+          (w) => w.field === "defaults.skills" && w.message.includes("nonexistent-skill"),
+        ),
+      ).toBe(true);
+    }
+  });
+});

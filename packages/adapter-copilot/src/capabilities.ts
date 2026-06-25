@@ -16,15 +16,15 @@ export const COPILOT_CAPABILITIES: Capabilities = {
  * Per-instance capabilities for a given output mode. Returns a fresh object so
  * the shared {@link COPILOT_CAPABILITIES} is never mutated.
  *
- * Only `structuredEvents` differs by mode: json mode parses the CLI's structured
- * stream into formatted events, so it advertises `true`. `approvals` stays
- * `false` in both modes because `copilot -p` is headless and autonomous
+ * Only `structuredEvents` differs by mode: `json` and `fleet` parse the CLI's
+ * structured stream into formatted events, so they advertise `true`. `approvals`
+ * stays `false` in every mode because `copilot -p` is headless and autonomous
  * (`--allow-all --no-ask-user`); there is no approval handshake to honor.
  */
 export function capabilitiesFor(outputFormat: OutputFormat): Capabilities {
   return {
     streaming: true,
-    structuredEvents: outputFormat === "json",
+    structuredEvents: outputFormat === "json" || outputFormat === "fleet",
     approvals: false,
     steerable: false,
   };

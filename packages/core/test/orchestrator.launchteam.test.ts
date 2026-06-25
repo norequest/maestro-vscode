@@ -12,8 +12,7 @@ function role(name: string): Role {
 
 function pendingAdapter(name: string): FakeEngineAdapter {
   // Parks the session on an approval so the agent settles in a non-terminal,
-  // slot-holding state. This keeps a started agent "running" for the duration of
-  // the test so the concurrency assertion is meaningful.
+  // slot-holding state for the duration of the test.
   return new FakeEngineAdapter({ id: name, script: [{ kind: "approval", id: `ap-${name}`, detail: null }] });
 }
 
@@ -27,67 +26,70 @@ function waitForState(orch: Orchestrator, agentId: string, target: string): Prom
   });
 }
 
-describe("Orchestrator.launchTeam", () => {
-  it("launches one agent per role, in order, each with the shared description", async () => {
+describe("Orchestrator.launchTeam (lead-orchestrated)", () => {
+  it("spawns ONLY the lead (first role by default), not the whole roster", async () => {
     const workspaces = new FakeWorkspaceProvider();
     const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);
 
     const team: Team = { name: "build-team", roles: [role("planner"), role("coder"), role("reviewer")] };
-    for (const r of team.roles) {
-      orch.registerAdapter(pendingAdapter(r.name));
-    }
+    for (const r of team.roles) orch.registerAdapter(pendingAdapter(r.name));
 
     const agents = orch.launchTeam(team, "ship the feature");
 
-    expect(agents).toHaveLength(3);
-    // Order preserved, role bound by name, shared description threaded through.
-    expect(agents.map((a) => a.role.name)).toEqual(["planner", "coder", "reviewer"]);
-    for (const a of agents) {
-      expect(a.task.description).toBe("ship the feature");
-      // Each returned agent is the live, tracked instance.
-      expect(orch.getAgent(a.id)).toBe(a);
-    }
+    // One agent only: the lead. The teammates are not spawned up front.
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.role.name).toBe("planner");
+    expect(agents[0]!.task.description).toBe("ship the feature");
+    expect(orch.getAgents()).toHaveLength(1);
   });
 
-  it("registers each role so a later spawn(role.name, ...) resolves", async () => {
+  it("prefixes the lead with a brief that names the teammates and the delegate fence", () => {
+    const workspaces = new FakeWorkspaceProvider();
+    const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);
+
+    const team: Team = { name: "build-team", roles: [role("planner"), role("coder"), role("reviewer")] };
+    for (const r of team.roles) orch.registerAdapter(pendingAdapter(r.name));
+
+    const [lead] = orch.launchTeam(team, "ship it");
+
+    expect(lead!.role.instructions).toContain("coder");
+    expect(lead!.role.instructions).toContain("reviewer");
+    expect(lead!.role.instructions).toContain("```delegate");
+    // The brief is per-agent: the lead's own original instructions are preserved.
+    expect(lead!.role.instructions).toContain("do planner");
+  });
+
+  it("honors team.lead when set", () => {
+    const workspaces = new FakeWorkspaceProvider();
+    const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);
+
+    const team: Team = {
+      name: "t",
+      roles: [role("planner"), role("coder"), role("reviewer")],
+      lead: "coder",
+    };
+    for (const r of team.roles) orch.registerAdapter(pendingAdapter(r.name));
+
+    const agents = orch.launchTeam(team, "task");
+    expect(agents).toHaveLength(1);
+    expect(agents[0]!.role.name).toBe("coder");
+  });
+
+  it("registers every role so a later spawn / delegation resolves by name", async () => {
     const workspaces = new FakeWorkspaceProvider();
     const orch = new Orchestrator({ maxParallelAgents: 4 }, workspaces);
 
     const team: Team = { name: "t", roles: [role("alpha"), role("beta")] };
-    for (const r of team.roles) {
-      orch.registerAdapter(pendingAdapter(r.name));
-    }
+    for (const r of team.roles) orch.registerAdapter(pendingAdapter(r.name));
 
     orch.launchTeam(team, "task");
 
-    // Roles are now registered: spawning by name must NOT throw "Unknown role".
-    const extra = orch.spawn("alpha", "follow-up");
-    expect(extra.role.name).toBe("alpha");
+    // Roles are registered even though only the lead was spawned: spawning the
+    // non-lead role by name must NOT throw "Unknown role".
+    const extra = orch.spawn("beta", "follow-up");
+    expect(extra.role.name).toBe("beta");
     await waitForState(orch, extra.id, "working");
     expect(extra.state).toBe("working");
-  });
-
-  it("inherits the concurrency queue: a team larger than the limit spawns N and queues the rest", async () => {
-    const workspaces = new FakeWorkspaceProvider();
-    const orch = new Orchestrator({ maxParallelAgents: 2 }, workspaces);
-
-    const team: Team = { name: "t", roles: [role("one"), role("two"), role("three")] };
-    for (const r of team.roles) {
-      orch.registerAdapter(pendingAdapter(r.name));
-    }
-
-    const agents = orch.launchTeam(team, "task");
-    expect(agents).toHaveLength(3);
-
-    // First two reach the engine; the third is queued (never created a workspace).
-    await waitForState(orch, agents[0]!.id, "awaiting-approval");
-    await waitForState(orch, agents[1]!.id, "awaiting-approval");
-
-    // Same observable the spawn/queue tests use: create() only fires at launch, so
-    // exactly the first two have workspaces and the surplus stays "preparing".
-    expect(new Set(workspaces.created)).toEqual(new Set([agents[0]!.id, agents[1]!.id]));
-    expect(workspaces.created).toHaveLength(2);
-    expect(orch.getAgent(agents[2]!.id)!.state).toBe("preparing");
   });
 
   it("returns an empty array and spawns nothing for an empty team", () => {

@@ -10,3 +10,15 @@ out/
 packages/*/out/
 .vscode-test/
 packages/*/.vscode-test/
+
+# Packaged extension build artifacts
+*.vsix
+
+# Claude Code local agent worktrees (scratch)
+.claude/
+
+# Dogfood scaffold output: running the extension with packages/extension as the
+# workspace scaffolds vendored skills/config into these dirs. They are runtime
+# byproducts, not source.
+packages/extension/.conductor/
+packages/extension/.github/

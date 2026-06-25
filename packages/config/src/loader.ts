@@ -1,7 +1,9 @@
 import * as nodePath from "node:path";
 import { parseRoleYaml, parseTeamYaml, parseConfigYaml } from "./parser.js";
-import type { Role, Team, OrchestratorConfig } from "@maestro/core";
-import type { ValidationWarning } from "./types.js";
+import type { Role, Team } from "@maestro/core";
+import type { ValidationWarning, MaestroConfig } from "./types.js";
+import { loadSoul } from "./souls.js";
+import { loadSkills } from "./skill-loader.js";
 
 /** Minimal async fs interface; injectable for offline testing. */
 export interface FsReader {
@@ -9,6 +11,8 @@ export interface FsReader {
   readFile(path: string): Promise<string>;
   /** Returns base names of files with the given extension inside a directory, or [] if the dir does not exist. */
   listFiles(dir: string, ext: string): Promise<string[]>;
+  /** Returns base names of immediate subdirectories inside a directory, or [] if the dir does not exist. Symlinked entries are skipped. */
+  listDirs(dir: string): Promise<string[]>;
   /** Returns true if the path exists (file or directory). */
   exists(path: string): Promise<boolean>;
 }
@@ -16,12 +20,12 @@ export interface FsReader {
 export interface LoadResult {
   roles: Role[];
   teams: Team[];
-  config: OrchestratorConfig;
+  config: MaestroConfig;
   warnings: Array<{ source: string; warnings: ValidationWarning[] }>;
   errors: Array<{ source: string; errors: string[] }>;
 }
 
-export const DEFAULT_CONFIG: OrchestratorConfig = { maxParallelAgents: 3 };
+export const DEFAULT_CONFIG: MaestroConfig = { maxParallelAgents: 3 };
 
 export async function loadConductorDir(
   workspaceRoot: string,
@@ -53,9 +57,24 @@ export async function loadConductorDir(
       const text = await fs.readFile(filePath);
       const parsed = parseRoleYaml(text, source);
       if (parsed.role.ok) {
-        result.roles.push(parsed.role.value);
-        if (parsed.role.warnings.length > 0) {
-          result.warnings.push({ source, warnings: parsed.role.warnings });
+        const roleWarnings: ValidationWarning[] = [...parsed.role.warnings];
+        const role = parsed.role.value;
+
+        // Resolve soul reference if present. A missing file is a warning, not an error.
+        if (role.soul !== undefined) {
+          const soulResult = await loadSoul(workspaceRoot, role.soul, fs);
+          if ("error" in soulResult) {
+            roleWarnings.push({
+              field: "soul",
+              message: `soul "${role.soul}" referenced in role "${role.name}" was not found: ${soulResult.error}`,
+            });
+          }
+          // The role.soul name stays as-is regardless; extension resolves at spawn.
+        }
+
+        result.roles.push(role);
+        if (roleWarnings.length > 0) {
+          result.warnings.push({ source, warnings: roleWarnings });
         }
       } else {
         result.errors.push({ source, errors: parsed.role.errors });
@@ -89,11 +108,19 @@ export async function loadConductorDir(
     }
   }
 
+  // Resolve the loaded skill name set so the config validator can warn on
+  // default skill names (defaults.skills / defaults.leadSkills) that do not
+  // resolve, mirroring the role/team reference-by-name warning style. Skill
+  // load errors here are non-fatal for config: an empty set just means every
+  // referenced default skill warns, which is the safe, best-effort behavior.
+  const skillLoad = await loadSkills(workspaceRoot, fs);
+  const knownSkills = new Set<string>(skillLoad.skills.map((s) => s.name));
+
   // Load orchestrator config.
   if (await fs.exists(configPath)) {
     try {
       const text = await fs.readFile(configPath);
-      const parsed = parseConfigYaml(text, ".conductor/config.yaml");
+      const parsed = parseConfigYaml(text, ".conductor/config.yaml", knownSkills);
       if (parsed.config.ok) {
         result.config = parsed.config.value;
         if (parsed.config.warnings.length > 0) {
@@ -188,6 +215,19 @@ export async function makeNodeFsReader(): Promise<FsReader> {
         // a symlinked .yaml can never be listed and then read). Issue 27 / S8.
         return entries
           .filter((e) => !e.isSymbolicLink() && e.isFile() && e.name.endsWith(ext))
+          .map((e) => e.name)
+          .sort();
+      } catch {
+        return [];
+      }
+    },
+    async listDirs(dir: string): Promise<string[]> {
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        // Skip symlinks: a symlinked subdir could escape the .conductor boundary
+        // (Issue 27 / S8). isDirectory() is already false for them, but be explicit.
+        return entries
+          .filter((e) => !e.isSymbolicLink() && e.isDirectory())
           .map((e) => e.name)
           .sort();
       } catch {

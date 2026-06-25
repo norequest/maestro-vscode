@@ -11,5 +11,8 @@ function compareCards(a: CardVM, b: CardVM): number {
 /** Pure: derive the ordered, renderable CockpitState from the model. */
 export function selectState(model: CockpitModel): CockpitState {
   const cards = [...model.cards.values()].sort(compareCards);
-  return model.focusedId === undefined ? { cards } : { cards, focusedId: model.focusedId };
+  const delegations = [...model.delegations.values()];
+  return model.focusedId === undefined
+    ? { cards, delegations }
+    : { cards, delegations, focusedId: model.focusedId };
 }

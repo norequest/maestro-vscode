@@ -1,6 +1,7 @@
 import type { AgentEvent, AgentSession, ApprovalDecision } from "@maestro/core";
 import { EventQueue } from "@maestro/core";
 import { cleanOutput, type OutputFormat } from "./args.js";
+import { FleetLineParser } from "./fleet-json.js";
 import { renderJsonLine } from "./json-output.js";
 import type { ChildHandle } from "./types.js";
 
@@ -26,6 +27,13 @@ export class CopilotSession implements AgentSession {
   /** Bounded tail of stderr for diagnostics on a non-zero exit. */
   private stderrTail = "";
   private settled = false;
+  /** In fleet mode, set once the parser emits a terminal event (done/error) from
+   *  a `result` line, so the `close` handler ends the queue without doubling it. */
+  private terminalEmitted = false;
+  /** In fleet mode, ONE stateful parser for the whole session: it tracks which
+   *  toolCallIds belong to sub-agents so later output is attributed correctly
+   *  (the conductor's own narration stays top-level). */
+  private readonly fleetParser = new FleetLineParser();
 
   constructor(
     private readonly child: ChildHandle,
@@ -54,6 +62,12 @@ export class CopilotSession implements AgentSession {
       if (this.settled) return;
       this.settled = true;
       this.flushStdoutTail();
+      // In fleet mode the parser may already have emitted the terminal event from
+      // a `result` line; if so, just end the queue (no doubled done/error).
+      if (this.terminalEmitted) {
+        this.queue.end();
+        return;
+      }
       if (code === 0) {
         this.queue.push({ kind: "done", summary: this.summary() });
       } else {
@@ -73,12 +87,16 @@ export class CopilotSession implements AgentSession {
   }
 
   /** Split accumulated stdout on newlines, emitting one output event per
-   *  complete line and retaining the partial remainder. */
+   *  complete line and retaining the partial remainder. The trailing "\n" is
+   *  kept on each emitted line so that concatenating the output-event texts
+   *  faithfully reconstructs the original stream, including its line breaks.
+   *  Downstream consumers (the orchestrator's run-on buffer, the delegate-block
+   *  parser) depend on those newlines surviving. */
   private consumeStdout(text: string): void {
     this.stdoutTail += text;
     let nl = this.stdoutTail.indexOf("\n");
     while (nl !== -1) {
-      const rawLine = this.stdoutTail.slice(0, nl);
+      const rawLine = this.stdoutTail.slice(0, nl + 1); // include the "\n"
       this.stdoutTail = this.stdoutTail.slice(nl + 1);
       this.emitLine(rawLine);
       nl = this.stdoutTail.indexOf("\n");
@@ -97,12 +115,35 @@ export class CopilotSession implements AgentSession {
   private emitLine(rawLine: string): void {
     const cleaned = cleanOutput(rawLine);
     if (cleaned.trim().length === 0) return; // skip spinner-only / blank lines
+    // Fleet mode: route the line through the fleet JSON parser, which maps it to
+    // zero-or-one event (sub-agent lifecycle, output, or a terminal done/error
+    // from a `result` line). An unparseable / unmodeled line degrades to a raw
+    // output event, so the stream is never dropped and this never throws.
+    if (this.outputFormat === "fleet") {
+      this.emitFleetLine(cleaned);
+      return;
+    }
     // In json mode, parse the line into a structured event; an invalid or
     // unrecognized line degrades to the raw cleaned text (never throws, never
     // drops the stream). In text mode this is exactly the v1 behavior.
     const text = this.outputFormat === "json" ? renderJsonLine(cleaned) : cleaned;
     this.lastText = text;
     this.queue.push({ kind: "output", text });
+  }
+
+  /** Map one cleaned fleet line to an event and enqueue it. A `result` line
+   *  produces the terminal done/error here; the `close` handler then only ends
+   *  the queue (see {@link terminalEmitted}). */
+  private emitFleetLine(cleaned: string): void {
+    const event = this.fleetParser.parse(cleaned);
+    if (!event) return; // ignored frame (background-task churn, tool lifecycle)
+    if (event.kind === "output" || event.kind === "subagent-output") {
+      this.lastText = event.text;
+    }
+    if (event.kind === "done" || event.kind === "error") {
+      this.terminalEmitted = true;
+    }
+    this.queue.push(event);
   }
 
   private appendStderr(text: string): void {

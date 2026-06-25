@@ -206,6 +206,77 @@ describe("AcpSession", () => {
     expect((init!.params as any).permissionMode).toBe("ask");
   });
 
+  it("initialize systemPrompt contains composed preamble (soul red lines present, no task text)", () => {
+    const transport = new FakeAcpTransport();
+    const session = new AcpSession(transport, {
+      instructions: "be helpful",
+      model: undefined,
+      autonomy: "yolo",
+      soulDoc: { redLines: "never lie", raw: "## Red lines\nnever lie" },
+    });
+
+    session.start({ id: "t1", description: "add caching", roleName: "R" });
+
+    const initFrame = transport.sent[0]!;
+    const systemPrompt = (initFrame.params as Record<string, unknown>)?.["systemPrompt"] as string;
+
+    // Soul red lines and instructions both appear in systemPrompt
+    expect(systemPrompt).toContain("never lie");
+    expect(systemPrompt).toContain("be helpful");
+    // Task text goes in the user_turn, not in systemPrompt
+    expect(systemPrompt).not.toContain("add caching");
+    // Soul red lines appear before instructions (soul preamble ordering)
+    const redLineIdx = systemPrompt.indexOf("never lie");
+    const instrIdx = systemPrompt.indexOf("be helpful");
+    expect(redLineIdx).toBeLessThan(instrIdx);
+  });
+
+  it("systemPrompt advertises skills as a pointer block, not inlining the body", () => {
+    const transport = new FakeAcpTransport();
+    const session = new AcpSession(transport, {
+      instructions: "be helpful",
+      model: undefined,
+      autonomy: "yolo",
+      skills: [
+        {
+          name: "task-coordination",
+          description: "coordinate parallel tasks",
+          content: "# task-coordination\nINLINE_SKILL_BODY do the secret handshake",
+        },
+      ],
+    });
+
+    session.start({ id: "t1", description: "add caching", roleName: "R" });
+
+    const initFrame = transport.sent[0]!;
+    const systemPrompt = (initFrame.params as Record<string, unknown>)?.["systemPrompt"] as string;
+
+    // The new pointer header advertises the skill by name + description.
+    expect(systemPrompt).toContain("# Skills (available, load when relevant)");
+    expect(systemPrompt).toContain("- task-coordination: coordinate parallel tasks");
+    // The old inlined header must NOT appear.
+    expect(systemPrompt).not.toContain("# Skills (standing procedures)");
+    // The skill BODY must NOT be inlined into the systemPrompt.
+    expect(systemPrompt).not.toContain("INLINE_SKILL_BODY");
+  });
+
+  it("first user_turn carries the task description", () => {
+    const transport = new FakeAcpTransport();
+    const session = new AcpSession(transport, {
+      instructions: "be helpful",
+      model: undefined,
+      autonomy: "yolo",
+    });
+
+    session.start({ id: "t1", description: "add caching", roleName: "R" });
+
+    // Second sent message is the first user_turn (after initialize)
+    const userTurnFrame = transport.sent[1]!;
+    expect(userTurnFrame.method).toBe("user_turn");
+    const content = (userTurnFrame.params as Record<string, unknown>)?.["content"] as string;
+    expect(content).toBe("add caching");
+  });
+
   // Issue 2 (A5/ACP5): slash-namespaced permission method and missing id.
   it("handles a session/request_permission frame as an approval with the correct id", async () => {
     const { transport, session } = makeSession("manual");

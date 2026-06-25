@@ -1,4 +1,4 @@
-import type { Diff, MergeResult, Workspace } from "./types.js";
+import type { AgentProfile, Diff, MergeResult, SkillRef, Workspace } from "./types.js";
 
 /** Abstracts worktree creation so the orchestrator stays pure and testable. */
 export interface WorkspaceProvider {
@@ -53,6 +53,27 @@ export interface WorkspaceManager extends WorkspaceProvider {
    * via the guarded optional call in the orchestrator.
    */
   releaseWorktree?(agentId: string): Promise<void>;
+  /**
+   * Re-register an existing worktree (its path + branch) for an agent restored
+   * after a reload. A manager's record map is in-memory, so it starts each
+   * session empty: without re-adoption, merge/diff/discard on a hydrated agent
+   * throw "Unknown agent". Optional: implementations predating this are tolerated.
+   */
+  adopt?(agentId: string, workspace: Workspace): Promise<void>;
+  /**
+   * Materialize the agent's resolved skills into its worktree (e.g. one
+   * .conductor/skills/<name>/SKILL.md per ref) so the running engine can
+   * discover and load them on demand. Optional: implementations predating this
+   * are tolerated via the guarded optional call in the orchestrator.
+   */
+  writeSkills?(agentId: string, skills: SkillRef[]): Promise<void>;
+  /**
+   * Materialize agent profiles into the agent's worktree at
+   * .github/agents/<name>.agent.md, git-excluded like skills so they never reach
+   * the review diff. Optional; predating implementations are tolerated via the
+   * guarded optional call in the orchestrator.
+   */
+  writeAgentProfiles?(agentId: string, profiles: AgentProfile[]): Promise<void>;
 }
 
 /** Runtime feature-detection guard. */
@@ -73,6 +94,11 @@ export class FakeWorkspaceManager implements WorkspaceManager {
   readonly merged: string[] = [];
   readonly discarded: string[] = [];
   readonly released: string[] = [];
+  readonly adopted: string[] = [];
+  /** Records each writeSkills call so tests can assert materialization. */
+  readonly wroteSkills: Array<{ agentId: string; skills: SkillRef[] }> = [];
+  /** Records each writeAgentProfiles call so tests can assert materialization. */
+  readonly wroteAgentProfiles: Array<{ agentId: string; profiles: AgentProfile[] }> = [];
   private diffs = new Map<string, Diff>();
   private mergeResults = new Map<string, MergeResult>();
 
@@ -105,6 +131,18 @@ export class FakeWorkspaceManager implements WorkspaceManager {
   }
   releaseWorktree(agentId: string): Promise<void> {
     this.released.push(agentId);
+    return Promise.resolve();
+  }
+  adopt(agentId: string): Promise<void> {
+    this.adopted.push(agentId);
+    return Promise.resolve();
+  }
+  writeSkills(agentId: string, skills: SkillRef[]): Promise<void> {
+    this.wroteSkills.push({ agentId, skills });
+    return Promise.resolve();
+  }
+  writeAgentProfiles(agentId: string, profiles: AgentProfile[]): Promise<void> {
+    this.wroteAgentProfiles.push({ agentId, profiles });
     return Promise.resolve();
   }
 }

@@ -1,0 +1,17 @@
+{
+  "name": "Security Toolkit",
+  "description": "Security analysis tools for code review",
+  "agents": [
+    { "file": "agents/sec-agent.agent.md", "name": "Security Agent" }
+  ],
+  "skills": [
+    { "file": "skills/vuln-scan/SKILL.md", "name": "Vulnerability Scanner" }
+  ],
+  "mcpServers": {
+    "sec-mcp": {
+      "command": "npx",
+      "args": ["-y", "mcp-security-tools"],
+      "description": "Security MCP server"
+    }
+  }
+}

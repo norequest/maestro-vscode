@@ -1,7 +1,7 @@
 import { parse as parseYaml } from "yaml";
 import { validateRole, validateTeam, validateOrchestratorConfig } from "./validator.js";
-import type { ValidationResult } from "./types.js";
-import type { Role, Team, OrchestratorConfig } from "@maestro/core";
+import type { ValidationResult, MaestroConfig } from "./types.js";
+import type { Role, Team } from "@maestro/core";
 
 export interface ParseRoleResult {
   role: ValidationResult<Role>;
@@ -14,14 +14,13 @@ export interface ParseTeamResult {
 }
 
 export interface ParseConfigResult {
-  config: ValidationResult<OrchestratorConfig>;
+  config: ValidationResult<MaestroConfig>;
   source: string;
 }
 
 export function parseRoleYaml(
   yamlText: string,
   source: string,
-  knownRoles?: Map<string, Role>,
 ): ParseRoleResult {
   let raw: unknown;
   try {
@@ -60,7 +59,11 @@ export function parseTeamYaml(
   return { source, team: validateTeam(raw, knownRoles) };
 }
 
-export function parseConfigYaml(yamlText: string, source: string): ParseConfigResult {
+export function parseConfigYaml(
+  yamlText: string,
+  source: string,
+  knownSkills?: ReadonlySet<string>,
+): ParseConfigResult {
   let raw: unknown;
   try {
     raw = parseYaml(yamlText);
@@ -74,5 +77,5 @@ export function parseConfigYaml(yamlText: string, source: string): ParseConfigRe
       },
     };
   }
-  return { source, config: validateOrchestratorConfig(raw) };
+  return { source, config: validateOrchestratorConfig(raw, knownSkills) };
 }

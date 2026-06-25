@@ -186,5 +186,10 @@ function agentIdOf(event: OrchestratorEvent): string | null {
       return event.agent.id;
     case "agent-event":
       return event.agentId;
+    // Delegation proposals are ephemeral conductor prompts, not agent lifecycle,
+    // so they are not written to any per-agent log. Returning null skips persist.
+    case "delegation-proposed":
+    case "delegation-resolved":
+      return null;
   }
 }

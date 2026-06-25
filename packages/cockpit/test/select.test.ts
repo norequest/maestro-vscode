@@ -26,4 +26,33 @@ describe("selectState", () => {
     const m = reduce(initialModel(), add(agent("a1", "working")));
     expect(selectState({ ...m, focusedId: "a1" }).focusedId).toBe("a1");
   });
+
+  it("includes an empty delegations array when none are pending (both branches)", () => {
+    const m = reduce(initialModel(), add(agent("a1", "working")));
+    expect(selectState(m).delegations).toEqual([]);
+    expect(selectState({ ...m, focusedId: "a1" }).delegations).toEqual([]);
+  });
+
+  it("keeps id-stable order inside the done lane", () => {
+    // Resolved states (merged/discarded/pr-created) auto-leave the model, so the
+    // only residents of the done lane are ready-to-review `done` cards. They all
+    // carry attention=true, so ordering inside the lane is purely id-stable.
+    let m = initialModel();
+    m = reduce(m, add(agent("a3", "done")));
+    m = reduce(m, add(agent("a1", "done")));
+    m = reduce(m, add(agent("a2", "done")));
+    const doneLane = selectState(m).cards.filter((c) => c.lane === "done").map((c) => c.id);
+    expect(doneLane).toEqual(["a1", "a2", "a3"]);
+  });
+
+  it("puts every card in a lane derived from its state", () => {
+    let m = initialModel();
+    m = reduce(m, add(agent("w", "working")));
+    m = reduce(m, add(agent("n", "awaiting-approval")));
+    m = reduce(m, add(agent("c", "conflict")));
+    const byId = new Map(selectState(m).cards.map((c) => [c.id, c.lane]));
+    expect(byId.get("w")).toBe("working");
+    expect(byId.get("n")).toBe("needsYou");
+    expect(byId.get("c")).toBe("conflict");
+  });
 });

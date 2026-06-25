@@ -181,6 +181,153 @@ describe("GitWorkspaceManager isStale + rebase (real git)", () => {
   });
 });
 
+// ---- writeSkills: materialize skills, invisible to the review diff (real git) ----
+
+describe("GitWorkspaceManager.writeSkills (real git)", () => {
+  it("materializes each skill into BOTH .github/skills and .agents/skills with the exact content", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    const content = "---\nname: coordinator\n---\n# Coordinator\nDo the thing.\n";
+    await m.writeSkills("a1", [{ name: "coordinator", description: "coordinate", content }]);
+    // PRIMARY: Copilot and VS Code read .github/skills.
+    const githubPath = join(ws.path, ".github", "skills", "coordinator", "SKILL.md");
+    expect(existsSync(githubPath)).toBe(true);
+    expect(readFileSync(githubPath, "utf8")).toBe(content);
+    // KEPT: Gemini/ACP read .agents/skills.
+    const agentsPath = join(ws.path, ".agents", "skills", "coordinator", "SKILL.md");
+    expect(existsSync(agentsPath)).toBe(true);
+    expect(readFileSync(agentsPath, "utf8")).toBe(content);
+  });
+
+  it("materialized skills (.github/skills AND .agents/) do NOT appear in the diff, but tracked edits still do", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    await m.writeSkills("a1", [{ name: "skA", content: "skill body A\n" }]);
+    // A normal edit the agent makes that SHOULD show up in the review diff.
+    writeFileSync(join(ws.path, "real.txt"), "real work\n");
+
+    const diff = await m.diff("a1");
+    // Neither materialized skill tree is visible to review.
+    expect(diff.files.some((f) => f.startsWith(".github/skills/"))).toBe(false);
+    expect(diff.files.some((f) => f.startsWith(".agents/"))).toBe(false);
+    expect(diff.patch.includes(".github/skills/")).toBe(false);
+    expect(diff.patch.includes(".agents/")).toBe(false);
+    expect(diff.patch.includes("skill body A")).toBe(false);
+    // The exclusion is scoped to the skill trees only: the normal edit still shows.
+    expect(diff.files).toContain("real.txt");
+    expect(diff.patch).toContain("real work");
+  });
+
+  it("excluding .github/skills/ does NOT hide a separate tracked file elsewhere under .github", async () => {
+    // Commit a tracked file under .github that is NOT a skill, so we can prove the
+    // exclusion is scoped to .github/skills/ specifically, not all of .github.
+    execFileSync("mkdir", ["-p", join(repo, ".github")]);
+    writeFileSync(join(repo, ".github", "keep.txt"), "keep base\n");
+    git(repo, "add", ".github/keep.txt");
+    git(repo, "commit", "-q", "-m", "add tracked .github/keep.txt");
+
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    await m.writeSkills("a1", [{ name: "skA", content: "skill body A\n" }]);
+    // Edit the tracked, non-skills file under .github in the worktree.
+    writeFileSync(join(ws.path, ".github", "keep.txt"), "keep edited\n");
+
+    const diff = await m.diff("a1");
+    // The skill tree under .github/skills is still hidden ...
+    expect(diff.files.some((f) => f.startsWith(".github/skills/"))).toBe(false);
+    // ... but the tracked, non-skills .github file edit DOES appear.
+    expect(diff.files).toContain(".github/keep.txt");
+    expect(diff.patch).toContain("keep edited");
+  });
+
+  it("calling writeSkills twice does not duplicate the .agents/ or .github/skills/ lines in info/exclude", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    await m.writeSkills("a1", [{ name: "s1", content: "one\n" }]);
+    await m.writeSkills("a1", [{ name: "s2", content: "two\n" }]);
+    const excludePath = git(ws.path, "rev-parse", "--git-path", "info/exclude").trim();
+    const resolved = excludePath.startsWith("/") ? excludePath : join(ws.path, excludePath);
+    const allLines = readFileSync(resolved, "utf8").split(/\r?\n/);
+    expect(allLines.filter((l) => l.trim() === ".agents/").length).toBe(1);
+    expect(allLines.filter((l) => l.trim() === ".github/skills/").length).toBe(1);
+  });
+
+  it("throws for an unknown agentId", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    await expect(m.writeSkills("nope", [{ name: "s", content: "x\n" }])).rejects.toThrow(/unknown agent/i);
+  });
+});
+
+// ---- writeAgentProfiles: materialize profiles, invisible to the review diff (real git) ----
+
+describe("GitWorkspaceManager.writeAgentProfiles (real git)", () => {
+  it("materializes each profile into .github/agents/<name>.agent.md with the exact content", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    const content = "---\nname: scribe\n---\n# Scribe\nWrite the notes.\n";
+    await m.writeAgentProfiles("a1", [{ name: "scribe", content }]);
+    const profilePath = join(ws.path, ".github", "agents", "scribe.agent.md");
+    expect(existsSync(profilePath)).toBe(true);
+    expect(readFileSync(profilePath, "utf8")).toBe(content);
+  });
+
+  it("materialized agent profiles (.github/agents/) do NOT appear in the diff, but tracked edits still do", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    await m.writeAgentProfiles("a1", [{ name: "scribe", content: "scribe body\n" }]);
+    // A normal edit the agent makes that SHOULD show up in the review diff.
+    writeFileSync(join(ws.path, "real.txt"), "real work\n");
+
+    const diff = await m.diff("a1");
+    // The materialized profile tree is invisible to review.
+    expect(diff.files.some((f) => f.startsWith(".github/agents/"))).toBe(false);
+    expect(diff.patch.includes(".github/agents/")).toBe(false);
+    expect(diff.patch.includes("scribe body")).toBe(false);
+    // The exclusion is scoped to the agents tree only: the normal edit still shows.
+    expect(diff.files).toContain("real.txt");
+    expect(diff.patch).toContain("real work");
+  });
+
+  it("excluding .github/agents/ does NOT hide a separate tracked file elsewhere under .github", async () => {
+    // Commit a tracked file under .github that is NOT an agent profile, so we can
+    // prove the exclusion is scoped to .github/agents/ specifically, not all of
+    // .github.
+    execFileSync("mkdir", ["-p", join(repo, ".github")]);
+    writeFileSync(join(repo, ".github", "keep.txt"), "keep base\n");
+    git(repo, "add", ".github/keep.txt");
+    git(repo, "commit", "-q", "-m", "add tracked .github/keep.txt");
+
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    await m.writeAgentProfiles("a1", [{ name: "scribe", content: "scribe body\n" }]);
+    // Edit the tracked, non-agents file under .github in the worktree.
+    writeFileSync(join(ws.path, ".github", "keep.txt"), "keep edited\n");
+
+    const diff = await m.diff("a1");
+    // The agents tree under .github/agents is still hidden ...
+    expect(diff.files.some((f) => f.startsWith(".github/agents/"))).toBe(false);
+    // ... but the tracked, non-agents .github file edit DOES appear.
+    expect(diff.files).toContain(".github/keep.txt");
+    expect(diff.patch).toContain("keep edited");
+  });
+
+  it("calling writeAgentProfiles twice does not duplicate the .github/agents/ line in info/exclude", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    const ws = await m.create("a1");
+    await m.writeAgentProfiles("a1", [{ name: "p1", content: "one\n" }]);
+    await m.writeAgentProfiles("a1", [{ name: "p2", content: "two\n" }]);
+    const excludePath = git(ws.path, "rev-parse", "--git-path", "info/exclude").trim();
+    const resolved = excludePath.startsWith("/") ? excludePath : join(ws.path, excludePath);
+    const allLines = readFileSync(resolved, "utf8").split(/\r?\n/);
+    expect(allLines.filter((l) => l.trim() === ".github/agents/").length).toBe(1);
+  });
+
+  it("throws for an unknown agentId", async () => {
+    const m = new GitWorkspaceManager({ repoRoot: repo });
+    await expect(m.writeAgentProfiles("nope", [{ name: "p", content: "x\n" }])).rejects.toThrow(/unknown agent/i);
+  });
+});
+
 // ---- Task C3: resolveMerge (real git) ----
 
 describe("GitWorkspaceManager.resolveMerge (real git)", () => {

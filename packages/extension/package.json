@@ -1,39 +1,110 @@
 {
-  "name": "@maestro/extension",
+  "name": "maestro",
   "displayName": "Maestro",
   "description": "Conduct a team of AI coding agents in isolated git worktrees.",
-  "version": "0.0.0",
+  "version": "0.1.10",
+  "license": "MIT",
   "publisher": "prixio",
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Other"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/norequest/maestro-vscode.git",
+    "directory": "packages/extension"
+  },
+  "homepage": "https://github.com/norequest/maestro-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/norequest/maestro-vscode/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "github-copilot",
+    "coding-agent",
+    "orchestration",
+    "git-worktree",
+    "acp",
+    "multi-agent"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "AI",
+    "Machine Learning"
+  ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
-        { "id": "maestro", "title": "Maestro", "icon": "resources/maestro.svg" }
+        {
+          "id": "maestro",
+          "title": "Maestro",
+          "icon": "media/maestro.svg"
+        }
       ]
     },
     "views": {
       "maestro": [
-        { "id": "maestro.roster", "name": "Roster" }
+        {
+          "id": "maestro.home",
+          "name": "Maestro",
+          "type": "webview"
+        }
       ]
     },
     "commands": [
-      { "command": "maestro.spawnAgent", "title": "Maestro: Spawn Agent", "icon": "$(add)" },
-      { "command": "maestro.launchTeam", "title": "Maestro: Launch Team", "icon": "$(organization)" },
-      { "command": "maestro.openStage", "title": "Maestro: Open Stage" }
+      {
+        "command": "maestro.newAgent",
+        "title": "Maestro: New Agent",
+        "icon": "$(add)"
+      },
+      {
+        "command": "maestro.spawnAgent",
+        "title": "Maestro: Spawn Agent (quick)",
+        "icon": "$(add)"
+      },
+      {
+        "command": "maestro.launchTeam",
+        "title": "Maestro: Launch Team",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "maestro.openStage",
+        "title": "Maestro: Open Conducting Board",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "maestro.openLibrary",
+        "title": "Maestro: Open Library",
+        "icon": "$(library)"
+      },
+      {
+        "command": "maestro.openAnatomy",
+        "title": "Maestro: Edit Agent Anatomy",
+        "icon": "$(settings-gear)"
+      }
     ],
-    "menus": {
-      "view/title": [
-        { "command": "maestro.spawnAgent", "when": "view == maestro.roster", "group": "navigation" },
-        { "command": "maestro.launchTeam", "when": "view == maestro.roster", "group": "navigation" }
-      ]
-    },
     "configuration": {
       "title": "Maestro",
       "properties": {
-        "maestro.prMode": { "type": "boolean", "default": false, "description": "Create a pull request (push branch + gh pr create) instead of a local merge." },
-        "maestro.prDraft": { "type": "boolean", "default": false, "description": "Open pull requests as drafts when PR mode is on." }
+        "maestro.prMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create a pull request (push branch + gh pr create) instead of a local merge."
+        },
+        "maestro.prDraft": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open pull requests as drafts when PR mode is on."
+        },
+        "maestro.discoverPlugins": {
+          "type": "boolean",
+          "default": false,
+          "description": "Scan installed Copilot plugins during discovery."
+        }
       }
     }
   },

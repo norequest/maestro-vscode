@@ -104,7 +104,7 @@ describe("Orchestrator.markPrCreated", () => {
     await waitFor(orch, agent.id, "done");
     await orch.markPrCreated(agent.id);
 
-    expect(() => orch.sendBack(agent.id, "more please")).toThrow(/cannot send back/i);
+    expect(() => orch.sendBack(agent.id, "more please")).toThrow(/cannot resume/i);
   });
 });
 

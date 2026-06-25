@@ -1,0 +1,12 @@
+export type { Confidence, SourceKind, DiscoveredItem } from "./types.js";
+export { splitFrontmatter, parseDiscoveredFile } from "./sources.js";
+export { classify } from "./classifier.js";
+export type { Provenance, AdoptDraft } from "./mapper.js";
+export { mapToRole } from "./mapper.js";
+export type { McpServerInfo, McpInventory } from "./mcp.js";
+export { readMcpInventory } from "./mcp.js";
+export type { PluginDiscoverResult } from "./plugins.js";
+export { discoverPlugins } from "./plugins.js";
+export type { FsScanner, DiscoverResult } from "./scanner.js";
+export { discoverWorkspace } from "./scanner.js";
+export { dedupeDiscoveredAgents } from "./dedupe.js";

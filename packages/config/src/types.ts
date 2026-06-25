@@ -1,3 +1,6 @@
+import type { OrchestratorConfig, AgentDefaults } from "@maestro/core";
+import { COPILOT_ENGINE_ID, ACP_ENGINE_ID } from "@maestro/core";
+
 export interface ValidationOk<T> {
   ok: true;
   value: T;
@@ -22,5 +25,21 @@ export interface ValidationWarning {
  * spawn. A role naming any other engine.id is REJECTED at validation time
  * (Issue 28 / S9): an adapter command/binary must never be sourced from
  * .conductor/ config, so an unknown id cannot be honored.
+ *
+ * Derived from the core constants (the single source of truth). FLEET_ENGINE_ID
+ * is deliberately omitted: it is launch-injected and internal, never authored in
+ * .conductor/, so a role naming it must still be rejected here.
  */
-export const KNOWN_ENGINE_IDS = new Set<string>(["copilot", "acp"]);
+export const KNOWN_ENGINE_IDS = new Set<string>([COPILOT_ENGINE_ID, ACP_ENGINE_ID]);
+
+/**
+ * The config object the loader returns: the core `OrchestratorConfig` plus the
+ * optional config-driven `defaults` layer parsed from `.conductor/config.yaml`.
+ *
+ * `defaults` is kept here (not on the core type) so the config package owns the
+ * shape it parses/serializes. It is optional, so an absent `defaults` block is
+ * identical to today (back-compat).
+ */
+export interface MaestroConfig extends OrchestratorConfig {
+  defaults?: AgentDefaults;
+}

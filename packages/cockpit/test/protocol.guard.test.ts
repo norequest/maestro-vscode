@@ -6,6 +6,14 @@ describe("isWebviewMessage runtime guard", () => {
     expect(isWebviewMessage({ type: "ready" })).toBe(true);
   });
 
+  it("accepts the bare new-task message (the board funnel trigger)", () => {
+    expect(isWebviewMessage({ type: "new-task" })).toBe(true);
+  });
+
+  it("accepts the bare clear-done-lane message (no agentId)", () => {
+    expect(isWebviewMessage({ type: "clear-done-lane" })).toBe(true);
+  });
+
   it("accepts a valid spawn message", () => {
     expect(isWebviewMessage({ type: "spawn", roleName: "Implementer", description: "fix it" })).toBe(true);
   });
@@ -59,7 +67,44 @@ describe("isWebviewMessage runtime guard", () => {
     expect(isWebviewMessage({ type: "spawn", roleName: "Implementer" })).toBe(false);
   });
 
+  it("accepts a spawn with an optional goal string", () => {
+    expect(isWebviewMessage({ type: "spawn", roleName: "r", description: "d", goal: "g" })).toBe(true);
+  });
+
+  it("rejects a spawn where goal is present but not a string", () => {
+    expect(isWebviewMessage({ type: "spawn", roleName: "r", description: "d", goal: 123 })).toBe(false);
+  });
+
   it("rejects an approve with a bad decision", () => {
     expect(isWebviewMessage({ type: "approve", agentId: "a1", approvalId: "r1", decision: "maybe" })).toBe(false);
+  });
+});
+
+describe("isWebviewMessage · dispatch", () => {
+  it("accepts a preset dispatch (roleName + description)", () => {
+    expect(isWebviewMessage({ type: "dispatch", roleName: "Test Author", description: "write tests" })).toBe(true);
+  });
+  it("accepts an ad-hoc dispatch (newRoleName + description) with engine + goal", () => {
+    expect(isWebviewMessage({ type: "dispatch", newRoleName: "Doc Writer", engineId: "copilot", model: "gpt-5", goal: "so the API is documented", description: "document the public API" })).toBe(true);
+  });
+  it("requires a string description and rejects wrong-typed fields", () => {
+    expect(isWebviewMessage({ type: "dispatch", roleName: "X" })).toBe(false);
+    expect(isWebviewMessage({ type: "dispatch", description: 7 })).toBe(false);
+    expect(isWebviewMessage({ type: "dispatch", description: "ok", engineId: 9 })).toBe(false);
+  });
+  it("dispatch carries no agentId (validates without one)", () => {
+    expect(isWebviewMessage({ type: "dispatch", roleName: "X", description: "y" })).toBe(true);
+  });
+});
+
+describe("isWebviewMessage · open-review", () => {
+  it("accepts a valid open-review with agentId", () => {
+    expect(isWebviewMessage({ type: "open-review", agentId: "a1" })).toBe(true);
+  });
+  it("rejects open-review missing agentId", () => {
+    expect(isWebviewMessage({ type: "open-review" })).toBe(false);
+  });
+  it("rejects open-review with non-string agentId", () => {
+    expect(isWebviewMessage({ type: "open-review", agentId: 42 })).toBe(false);
   });
 });

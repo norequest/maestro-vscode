@@ -1,0 +1,1910 @@
+/* ===========================================================================
+   Maestro single-page webview stylesheet (app.css)
+
+   Concatenation of the three per-view stylesheets, reconciled into ONE file
+   for the consolidated single-page webview:
+     - style.css   -> BOARD (default view) + drawer + dispatch modal
+     - library.css -> LIBRARY (Agents / Teams / Skills / Discover)
+     - anatomy.css -> ANATOMY (agent editor)
+
+   The single-page router sets `root.dataset.view` ("board" | "library" |
+   "anatomy"); per-view #root / body layout rules are scoped with
+   [data-view="..."] so they no longer collide.
+
+   Review (rv-*) styles are deliberately NOT here: the review screen keeps its
+   own inline <style> block injected by renderReview.
+
+   Graphite tokens only (no var(--vscode-*)). All hex values are TOKENS-correct.
+   =========================================================================== */
+
+/* === GLOBAL :root TOKENS (merged from all three files) ======================
+   Reconciled variables (same name, different values across files):
+     --bg-inset:     style.css #19191c | library.css #18181a | anatomy.css #161618
+                     -> CHOSE #19191c (style.css). The board is the default
+                        surface; TOKENS has no exact #19191c entry that
+                        disagrees, so the board default wins.
+     --border-subtle: style.css #232328 | library.css #2a2a30
+                     -> CHOSE #232328 (style.css). Board is the default surface.
+                        (TOKENS lists #2a2a30/#2e2e36 as "subtle", but the
+                        board-driven value is canonical here per the merge rule;
+                        library's surfaces that referenced #2a2a30 are already
+                        also expressed via literal hex where needed.)
+     --border-faint:  library.css #232328 | anatomy.css #232329
+                     -> CHOSE #232328. The two differ by one digit; unified to
+                        the board-aligned #232328.
+   All other shared variables (--bg-card, --bg-raised, --bg-code,
+   --border-default, --border-hover, --text-primary, --text-secondary,
+   --text-tertiary, --text-ghost, --text-faint, --amber, --blue, --green,
+   --green-deep, --red, --on-accent, etc.) had identical values across files.
+   ========================================================================== */
+:root {
+  /* Backgrounds */
+  --bg-stage:#161618; --bg-page:#161618;
+  --bg-panel:#1c1c20; --bg-deep:#1c1c20;
+  --bg-inset:#19191c;            /* reconciled: board default (style.css) */
+  --bg-card:#26262c; --bg-raised:#2e2e36; --bg-code:#1a1a1e;
+  --bg-surface-low:#222228; --bg-card-hover:#2a2a30;
+  --bg-rail:#18181a; --bg-grid:#18181a;
+  /* Borders */
+  --border-default:#33333c; --border-hover:#41414a;
+  --border-subtle:#232328;      /* reconciled: board default (style.css) */
+  --border-faint:#232328;       /* reconciled: unified board-aligned value */
+  --border-hair:#1f1f24;
+  /* Text */
+  --text-primary:#ededf1; --text-secondary:#cdcdd3; --text-body:#dcdce0;
+  --text-tertiary:#83838b; --text-ghost:#6c6c74; --text-faint:#5e5e66;
+  --text-quiet:#74747c; --text-soft:#9a9aa2; --text-editor:#c4c4ca;
+  /* Status (board) */
+  --status-working:#8ab8ff; --status-attention:#e2b35a; --status-done:#7fd9a8; --status-conflict:#f0848c;
+  --eq-blue:#6f9fd8;
+  /* Accents (desaturated pastels). On-accent text is dark. */
+  --amber:#e2b35a; --amber-deep:#e2a93c; --blue:#8ab8ff; --green:#7fd9a8; --green-deep:#46c98a; --red:#f0848c;
+  --on-accent:#161618;
+  /* Fonts */
+  --font-body:"Inter",system-ui,sans-serif;
+  --font-display:"Manrope",sans-serif;
+  --font-mono:"JetBrains Mono",monospace;
+  /* Transition shorthand for interactive elements. ease-out reads snappier on
+     release, and transform is included so the :active press feedback animates. */
+  --t-interactive: color 120ms ease-out, background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out, transform 120ms ease-out;
+}
+
+/* === GLOBAL: scrollbars, keyframes, base resets ============================
+   Single canonical copy. (style.css and anatomy.css declared identical
+   scrollbar/keyframe blocks; only one is kept.)
+   ========================================================================== */
+
+/* ─── Scrollbars ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width:10px; height:10px; }
+::-webkit-scrollbar-thumb { background:#34343a; border-radius:6px; border:2px solid transparent; background-clip:content-box; }
+::-webkit-scrollbar-thumb:hover { background:#46464e; background-clip:content-box; }
+::-webkit-scrollbar-track { background:transparent; }
+
+/* ─── Keyframes (eqbar + blink for live/working indicators) ──────────────── */
+@keyframes eqbar { 0% { transform:scaleY(0.3) } 100% { transform:scaleY(1) } }
+@keyframes blink { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
+/* Subtle fade + tiny rise applied to freshly rendered content ONLY on a real
+   tab/view change (the client adds .maestro-enter after the innerHTML swap).
+   opacity + transform only, so it stays on the compositor and never reflows. */
+@keyframes maestro-enter { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.maestro-enter { animation:maestro-enter 160ms ease-out both; will-change:opacity, transform; }
+@media (prefers-reduced-motion: reduce) { .maestro-enter { animation:none; } }
+/* Looping decorative animations (equalisers, pulsing dots, scanning banner) are
+   silenced under reduced-motion: they convey liveness, not state, so stopping
+   them costs no information. */
+@media (prefers-reduced-motion: reduce) {
+  .eq i, .tab-eq i, .bh-eq i, .drawer-eq i, .composer-eq i,
+  .lane-working .dot, .discover-scanning::before { animation: none !important; }
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+* { box-sizing:border-box; }
+html, body { height:100%; }
+body { background:var(--bg-stage); color:var(--text-primary); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; margin:0; padding:0; }
+
+/* #root base: the BOARD fills the panel. Per-view layouts are re-scoped below
+   with [data-view="..."] so they do not collide. */
+#root { height:100%; }
+
+/* ANATOMY view: the agent editor needs a full-viewport flex column with a
+   flex-row #root. Re-scoped from anatomy.css's bare `body` + `#root` rules. */
+body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+#root[data-view="anatomy"] { display:flex; flex-direction:row; flex:1; min-height:0; height:100%; overflow:hidden; }
+
+/* ===========================================================================
+   === BOARD === (from style.css)
+   Board shell, lanes, agent cards, drawer, composer / dispatch modal.
+   =========================================================================== */
+
+/* ─── Equaliser mark (prototype eqbar) ──────────────────────────────────────── */
+
+.eq, .tab-eq, .bh-eq, .drawer-eq {
+  display:inline-flex; align-items:flex-end; gap:2px; height:13px;
+}
+.eq i, .tab-eq i, .bh-eq i, .drawer-eq i {
+  width:2px; border-radius:1px; background:var(--eq-blue);
+  transform-origin:bottom;
+}
+.eq i:nth-child(1), .tab-eq i:nth-child(1), .bh-eq i:nth-child(1), .drawer-eq i:nth-child(1) { height:7px;  animation:eqbar .5s ease-in-out infinite alternate; }
+.eq i:nth-child(2), .tab-eq i:nth-child(2), .bh-eq i:nth-child(2), .drawer-eq i:nth-child(2) { height:13px; animation:eqbar .7s ease-in-out infinite alternate; }
+.eq i:nth-child(3), .tab-eq i:nth-child(3), .bh-eq i:nth-child(3), .drawer-eq i:nth-child(3) { height:5px;  animation:eqbar .6s ease-in-out infinite alternate; }
+.eq i:nth-child(4), .tab-eq i:nth-child(4), .bh-eq i:nth-child(4), .drawer-eq i:nth-child(4) { height:9px;  animation:eqbar .55s ease-in-out infinite alternate; }
+
+.bh-eq, .drawer-eq { height:15px; }
+.bh-eq i, .drawer-eq i { background:#c9c9d0; }
+
+/* ─── Board shell: tab strip + board column ─────────────────────────────────── */
+
+.board-shell { display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg-stage); }
+
+/* TAB STRIP (prototype lines 70-79) */
+.tabstrip {
+  height:37px; flex:0 0 37px;
+  background:var(--bg-stage);
+  border-bottom:1px solid var(--border-subtle);
+  display:flex; align-items:stretch;
+}
+.tab-chip {
+  display:flex; align-items:center; gap:8px;
+  padding:0 14px; font-size:12.5px;
+  background:none; border:none; font-family:inherit; cursor:pointer;
+}
+.tab-chip.active {
+  background:#1c1c20;
+  border-right:1px solid var(--border-subtle);
+  border-top:1px solid #6f6f7a;
+  color:#e3e3e6;
+}
+.tab-chip.ghost {
+  color:#7c7c84;
+  border-right:1px solid #1f1f24;
+  transition:color 120ms ease, background 120ms ease;
+}
+.tab-chip.ghost:hover { color:var(--text-secondary); background:#1a1a1e; }
+.tab-chip.ghost:focus, .tab-chip.ghost:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working) inset; }
+.tab-chip .tab-name { font-family:'Manrope',sans-serif; font-weight:600; }
+
+/* BOARD column wrapper (prototype line 82) */
+.board { flex:1; min-height:0; display:flex; flex-direction:column; background:var(--bg-panel); }
+
+/* ─── Board header (prototype lines 84-102) ─────────────────────────────────── */
+
+.board-header {
+  flex:0 0 auto;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:17px 22px;
+  border-bottom:1px solid var(--border-subtle);
+}
+.bh-left, .bh-right { display:flex; align-items:center; }
+.bh-left { gap:13px; }
+.bh-right { gap:16px; }
+.bh-title { font-family:'Manrope',sans-serif; font-weight:800; font-size:18px; letter-spacing:-0.01em; color:var(--text-primary); }
+.bh-sep { width:1px; height:18px; background:#2e2e34; display:inline-block; }
+.bh-meta { font-size:12.5px; color:#74747c; }
+.bh-branch { color:#9a9aa2; font-family:'JetBrains Mono',monospace; font-size:11.5px; }
+
+.bh-newagent {
+  display:flex; align-items:center; gap:6px;
+  background:#222228; border:1px solid var(--border-default); color:var(--text-secondary);
+  padding:6px 11px; border-radius:7px; font-size:12px; font-weight:600;
+  font-family:inherit; cursor:pointer; margin-left:6px;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.bh-newagent:hover { background:#2c2c34; border-color:var(--border-hover); }
+.bh-newagent:focus, .bh-newagent:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+.bh-newagent .plus { font-size:14px; line-height:1; margin-top:-1px; color:var(--text-tertiary); }
+
+.bh-counts { display:flex; align-items:center; gap:14px; font-size:11.5px; color:var(--text-tertiary); font-family:'JetBrains Mono',monospace; }
+.bh-count { display:flex; align-items:center; gap:6px; }
+.bh-count .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.bh-count.working .dot { background:var(--status-working); }
+.bh-count.needs .dot { background:var(--status-attention); }
+.bh-count.done .dot { background:var(--status-done); }
+
+.bh-library {
+  display:flex; align-items:center; gap:7px;
+  background:#222228; border:1px solid var(--border-default); color:var(--text-secondary);
+  padding:6px 11px; border-radius:7px; font-size:12px; font-weight:600;
+  font-family:inherit; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.bh-library:hover { background:#2c2c34; border-color:var(--border-hover); }
+.bh-library:focus, .bh-library:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* ─── Lanes: three columns (prototype lines 104-195) ────────────────────────── */
+
+.lanes { flex:1; min-height:0; display:flex; gap:16px; padding:18px 22px; overflow:hidden; }
+
+.lane {
+  flex:1; min-width:0;
+  display:flex; flex-direction:column;
+  background:var(--bg-inset);
+  border:1px solid var(--border-subtle);
+  border-radius:12px; overflow:hidden;
+}
+.lane-col-needsYou { background:#1b1a18; border-color:#2c2820; }
+
+.lane-header {
+  flex:0 0 auto;
+  display:flex; align-items:center; gap:9px;
+  margin:0; padding:13px 15px;
+  border-bottom:1px solid #222227;
+  font:600 12px/1 'Manrope',sans-serif;
+  text-transform:uppercase; letter-spacing:0.06em; color:#b7b7be;
+}
+.lane-col-needsYou .lane-header { border-bottom-color:#2a261d; color:#d8c79e; }
+.lane-header .lane-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.lane-col-working  .lane-dot { background:var(--status-working); }
+.lane-col-needsYou .lane-dot { background:var(--status-attention); box-shadow:0 0 0 3px rgba(226,169,60,0.18); }
+.lane-col-done     .lane-dot { background:var(--status-done); }
+.lane-header .lane-title { flex:1; }
+.lane-header .count {
+  font-family:'JetBrains Mono',monospace; font-size:11px; color:#7a7a82;
+  background:#232329; padding:2px 8px; border-radius:6px; text-transform:none; letter-spacing:0;
+}
+.lane-col-needsYou .lane-header .count { color:#caa869; background:rgba(226,169,60,0.12); }
+
+/* Lane-header "Clear all" (Done lane): a small, quiet header control. It bulk
+   discards the ready-to-review runs, so the hover reads as destructive (red). */
+.lane-clear {
+  background:transparent; border:none; color:var(--text-tertiary);
+  font:600 11px/1 'Manrope',sans-serif;
+  text-transform:none; letter-spacing:0;
+  padding:2px 6px; border-radius:6px; cursor:pointer;
+  transition:color 120ms ease;
+}
+.lane-clear:hover { color:var(--red); }
+.lane-clear:focus, .lane-clear:focus-visible { outline:none; box-shadow:0 0 0 1px var(--red); }
+
+.lane-cards {
+  flex:1; min-height:0; overflow-y:auto;
+  padding:12px; display:flex; flex-direction:column; gap:11px;
+}
+
+/* Empty column: quiet per-lane copy, not a stray hard border (prototype 130/163/191) */
+.lane-empty {
+  text-align:center; color:#52525a; font-size:12px; padding:24px 8px; line-height:1.5;
+}
+
+/* ─── Agent card (prototype lines 116-128) ──────────────────────────────────── */
+
+.card {
+  background:var(--bg-card);
+  border:1px solid var(--border-default);
+  border-left-width:3px;
+  border-radius:9px;
+  padding:12px 14px;
+  cursor:pointer;
+  display:flex; flex-direction:column; gap:6px;
+  transition:border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.card:hover { border-color:#3c3c44; box-shadow:0 8px 26px rgba(0,0,0,.4); transform:translateY(-1px); }
+.card:focus, .card:focus-visible { outline:none; border-color:var(--status-working); box-shadow:0 0 0 1px var(--status-working); }
+
+/* TITLE ROW: dot + status pill + role, with the live eq pushed to the far right.
+   Single line, never wraps; the role takes the slack and ellipsises if long. */
+.card header { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; min-width:0; }
+.card header .state-pill { flex:0 0 auto; }
+.card .role {
+  color:#e3e3e6; font-weight:600; font-size:13.5px; font-family:'Manrope',sans-serif; letter-spacing:0.1px;
+  margin-left:2px; min-width:0; flex:0 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+/* The eq is the live-working mark; it trails the title and stays put on the right. */
+.card header .eq { margin-left:auto; height:11px; flex:0 0 auto; }
+
+/* META ROW: engine chip + faint "via <lead>" provenance + elapsed timer, all on
+   ONE tidy line. The engine chip and the timer keep their full width (flex:0 0
+   auto); only the provenance gives way, shrinking and ellipsising when the lane
+   column is tight, so the row never wraps onto a second, ragged line. */
+.card-meta {
+  display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
+  min-width:0; min-height:18px;
+}
+.card .engine {
+  background:var(--bg-raised); color:var(--text-secondary);
+  border-radius:4px; padding:1px 6px; font-size:10px; font-weight:500;
+  font-family:'JetBrains Mono',monospace; line-height:1.6; letter-spacing:.02em;
+  flex:0 0 auto; white-space:nowrap;
+}
+.card .goal { color:#74747c; font-style:italic; font-size:11.5px; line-height:1.45; }
+/* The task clamps to two lines with a clean trailing ellipsis. overflow-wrap lets
+   a long, unbreakable token wrap inside the clamp box instead of overflowing it
+   horizontally and getting hard-cut mid-word (the "allel. Use…" / "ree bull…" bug). */
+.card .task {
+  color:#b9b9c0; font-size:12.5px; line-height:1.5;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; overflow-wrap:anywhere;
+}
+.card .dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+.card .diffstat { display:flex; gap:8px; font-size:10.5px; font-family:'JetBrains Mono',monospace; }
+.card .diffstat .adds { color:var(--status-done); }
+.card .diffstat .dels { color:var(--status-conflict); }
+.card .diffstat .nochange { color:var(--text-tertiary); }
+.card .elapsed { color:#5e5e66; margin-left:auto; font-size:10.5px; font-family:'JetBrains Mono',monospace; flex:0 0 auto; white-space:nowrap; }
+.card .anatomy { color:var(--text-tertiary); font-size:11px; line-height:1.4; }
+
+/* Inline "needs you" question block (prototype line 153) */
+.card-question {
+  background:rgba(226,179,90,.1); border:1px solid rgba(226,179,90,.28); border-radius:7px;
+  color:#e2c389; font-size:11.5px; line-height:1.45; padding:8px 10px;
+}
+
+/* Inline conflict-file block (prototype line 154) */
+.card-conflict {
+  background:rgba(240,132,140,.1); border:1px solid rgba(240,132,140,.28); border-radius:7px;
+  color:#f0a8ad; font-size:11px; line-height:1.45; padding:8px 10px;
+  font-family:'JetBrains Mono',monospace; word-break:break-word;
+}
+
+/* Card footer: on-card Review button (prototype lines 155-159 / 183-187) */
+.card-footer { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.card-review {
+  margin-left:auto;
+  background:#26262c; border:1px solid #3a3a44; color:#dcdce0;
+  font-size:11px; font-weight:600; font-family:inherit;
+  padding:5px 11px; border-radius:6px; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.card-review:hover { background:#30303a; border-color:#46464f; }
+.card-review:focus, .card-review:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+/* Done cards: the Review button is a quieter ghost variant (prototype line 186) */
+.card-review.ghost { background:transparent; border-color:#2e2e34; color:#9a9aa2; }
+.card-review.ghost:hover { background:#222226; color:var(--text-secondary); }
+
+/* Per-card "Remove" (done cards only): a quiet, borderless link that reads as a
+   destructive action only on hover. Reuses the discard verb under the hood. */
+.card-remove {
+  margin-right:auto;
+  background:transparent; border:none; color:var(--text-tertiary);
+  font-size:11px; font-weight:600; font-family:inherit;
+  padding:5px 4px; border-radius:6px; cursor:pointer;
+  transition:color 120ms ease;
+}
+.card-remove:hover { color:var(--red); }
+.card-remove:focus, .card-remove:focus-visible { outline:none; box-shadow:0 0 0 1px var(--red); }
+
+/* Done cards de-emphasised (prototype lines 176-189): dimmer role, calmer card */
+.card.done { opacity:.82; }
+.card.done:hover { opacity:1; border-color:#33333a; box-shadow:none; transform:none; }
+.card.done .role { color:#c4c4ca; font-size:13px; }
+.card.done .task { color:#86868e; font-size:12px; }
+
+/* ─── Lane accent colors ───────────────────────────────────────────────────── */
+
+.lane-working  { border-left-color:var(--status-working);  }
+.lane-needsYou { border-left-color:var(--status-attention); }
+.lane-conflict  { border-left-color:var(--status-conflict); }
+.lane-done      { border-left-color:var(--status-done);     }
+
+/* Per-state left-border accents that override the lane accent so error and
+   stopped/detached cards do not masquerade as the generic amber "needs you". */
+.card.state-error, .card.state-merge-cleanup-failed { border-left-color:var(--status-conflict); }
+.card.state-stopped, .card.state-detached { border-left-color:var(--text-tertiary); }
+
+.lane-working  .dot { background:var(--status-working);  }
+.lane-needsYou .dot { background:var(--status-attention); }
+.lane-conflict  .dot { background:var(--status-conflict); }
+.lane-done      .dot { background:var(--status-done);     }
+
+/* Working dot: gentle pulse */
+@keyframes dot-pulse {
+  0%   { opacity:1;    box-shadow:0 0 0 0 rgba(138,184,255,.5); }
+  50%  { opacity:.35;  box-shadow:0 0 0 4px rgba(138,184,255,0); }
+  100% { opacity:1;    box-shadow:0 0 0 0 rgba(138,184,255,0); }
+}
+.lane-working .dot { animation:dot-pulse 1.6s ease-in-out infinite; }
+
+/* Attention state */
+.card.attention { border-color:var(--status-attention); }
+
+/* Delegated child card marker: a faint "via <lead>" provenance in the meta row.
+   It is the one flexible item on that line, so it shrinks and ellipsises first,
+   protecting the engine chip and the timer from being squeezed or wrapped. */
+.card .via {
+  font-size:10.5px; color:var(--text-ghost);
+  font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;
+  flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* Conductor affordance: a faint mono count of sub-agents in the meta row,
+   styled like the "via" provenance marker so the hierarchy reads quietly. */
+.card .subagents {
+  font-size:10.5px; color:var(--text-ghost);
+  font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;
+  flex:0 0 auto; white-space:nowrap;
+}
+
+/* ─── Nested sub-agent cards ─────────────────────────────────────────────────
+   A delegated child renders indented under its conductor (which sits directly
+   above it in the same lane), with a subtle elbow connector tying the two
+   together and a faint accent border so the team reads as one conductor with
+   its sub-agents, not scattered flat cards. No fragile fixed heights: the
+   connector is anchored to the card top and uses a short fixed run. */
+.card.is-child {
+  margin-left:18px;
+  border-left-color:var(--status-working);
+}
+.card.is-child .role { font-size:12.5px; }
+.card.is-child::before {
+  content:"";
+  position:absolute;
+  left:-12px; top:-6px;
+  width:11px; height:24px;
+  border-left:1px solid var(--border-default);
+  border-bottom:1px solid var(--border-default);
+  border-bottom-left-radius:6px;
+  pointer-events:none;
+}
+/* The elbow connector is positioned relative to the card, so the card must be a
+   positioning context. (The base .card sets no `position`, so this is additive
+   and does not change a plain card's box.) */
+.card.is-child { position:relative; }
+
+/* ─── Pending delegations (lead asks to bring a teammate in) ────────────────────
+   A prominent "needs your decision" strip above the lanes. Uses the attention
+   (amber) accent of the Needs-you column so it reads as something only you can
+   resolve. Graphite tokens / amber rgba only, consistent with .card-question. */
+
+.delegations {
+  flex:0 0 auto;
+  margin:14px 22px 0; padding:13px 15px;
+  background:#1b1a18; border:1px solid #2c2820; border-left:3px solid var(--status-attention);
+  border-radius:10px;
+  display:flex; flex-direction:column; gap:11px;
+}
+.delegations-eyebrow {
+  display:flex; align-items:center; gap:8px;
+  font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em;
+  text-transform:uppercase; color:#d8c79e;
+}
+.delegations-dot {
+  width:7px; height:7px; border-radius:50%;
+  background:var(--status-attention); box-shadow:0 0 0 3px rgba(226,169,60,0.18);
+}
+.delegations-count {
+  margin-left:auto; font-size:10px; color:#caa869;
+  background:rgba(226,169,60,0.12); padding:2px 8px; border-radius:6px;
+  letter-spacing:0;
+}
+.delegations-list { display:flex; flex-direction:column; gap:9px; }
+
+.delegation {
+  background:rgba(226,179,90,.07); border:1px solid rgba(226,179,90,.24);
+  border-radius:8px; padding:11px 12px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.delegation-head {
+  display:flex; align-items:baseline; flex-wrap:wrap; gap:6px;
+  font-size:12px; color:var(--text-secondary);
+}
+.delegation-lead, .delegation-role {
+  font-weight:700; color:var(--text-primary);
+  font-family:'Manrope',sans-serif;
+}
+.delegation-asks { color:var(--text-tertiary); font-size:11.5px; }
+.delegation-task {
+  font-size:11.5px; line-height:1.5; color:#e2c389;
+  font-family:'JetBrains Mono',monospace; word-break:break-word;
+}
+.delegation-actions { display:flex; gap:8px; }
+.delegation-approve, .delegation-deny {
+  font-size:11.5px; font-weight:600; font-family:inherit;
+  padding:6px 14px; border-radius:7px; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.delegation-approve {
+  background:rgba(127,217,168,.14); border:1px solid rgba(127,217,168,.34); color:var(--status-done);
+}
+.delegation-approve:hover { background:rgba(127,217,168,.22); border-color:rgba(127,217,168,.5); }
+.delegation-deny {
+  background:#26262c; border:1px solid var(--border-default); color:var(--text-secondary);
+}
+.delegation-deny:hover { background:#2c2c34; border-color:var(--border-hover); }
+.delegation-approve:focus, .delegation-approve:focus-visible,
+.delegation-deny:focus, .delegation-deny:focus-visible {
+  outline:none; box-shadow:0 0 0 1px var(--status-attention);
+}
+
+/* ─── Status bar (prototype lines 198-204) ──────────────────────────────────── */
+
+.status-bar {
+  height:24px; flex:0 0 24px;
+  background:#202024; border-top:1px solid var(--border-subtle);
+  display:flex; align-items:center; padding:0 12px; gap:16px;
+  font-size:11px; color:var(--text-tertiary); font-family:'JetBrains Mono',monospace;
+}
+.status-bar .sb-branch { display:flex; align-items:center; gap:5px; }
+.status-bar .sb-branch-icon { flex:0 0 auto; }
+.status-bar .sb-awaiting { color:#caa869; }
+.status-bar .sb-version { margin-left:auto; }
+
+/* ─── Drawer (prototype lines 206-337) ──────────────────────────────────────── */
+
+/* Scrim behind the drawer: dims the board so the half-covered lane cards read as
+   "behind", and a click closes the drawer (data-action matches the host handler).
+   z-index 50 sits under the drawer (51) but below composer (100) / task (120). */
+.drawer-scrim { position:fixed; inset:0; background:rgba(8,8,10,.5); z-index:50; }
+
+.drawer {
+  position:fixed; top:0; right:0;
+  width:42%; max-width:560px; height:100%;
+  z-index:51;
+  background:var(--bg-panel);
+  border-left:1px solid var(--border-default);
+  box-shadow:-8px 0 24px rgba(0,0,0,.5);
+  padding:0; overflow:hidden; box-sizing:border-box;
+  display:flex; flex-direction:column;
+}
+
+.drawer-head {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:17px 20px 14px;
+  border-bottom:1px solid #2a2a30;
+  flex-shrink:0;
+}
+.drawer-eq { margin-top:2px; }
+.drawer-id { flex:1; min-width:0; }
+.drawer-head .role { display:block; color:var(--text-primary); font-weight:700; font-size:16px; font-family:'Manrope',sans-serif; line-height:1.2; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.drawer-chips { display:flex; align-items:center; gap:8px; margin-top:7px; min-width:0; flex-wrap:wrap; }
+.drawer-chips .state-pill { flex:0 0 auto; }
+.drawer-head .engine {
+  flex:0 0 auto; white-space:nowrap;
+  background:var(--bg-stage); color:var(--text-secondary);
+  border-radius:4px; padding:1px 6px; font-size:10px; font-weight:500;
+  font-family:'JetBrains Mono',monospace; line-height:1.6;
+}
+
+.state-pill { border-radius:20px; padding:2px 8px; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+.state-pill.lane-working  { background:rgba(138,184,255,.15); color:var(--status-working); }
+.state-pill.lane-needsYou { background:rgba(226,179,90,.15);  color:var(--status-attention); }
+.state-pill.lane-conflict  { background:rgba(240,132,140,.15);  color:var(--status-conflict); }
+.state-pill.lane-done      { background:rgba(127,217,168,.15);  color:var(--status-done); }
+/* State-distinct pill overrides: error/cleanup-failed read as danger (red), and
+   stopped/detached/discarded read as inert (neutral grey), instead of all
+   sharing the lane colour. Placed after the lane rules so they win by order. */
+.state-pill.state-error, .state-pill.state-merge-cleanup-failed { background:rgba(240,132,140,.15); color:var(--status-conflict); }
+.state-pill.state-stopped, .state-pill.state-detached, .state-pill.state-discarded { background:rgba(131,131,139,.15); color:var(--text-tertiary); }
+
+.drawer-close {
+  background:none; border:none; color:#6c6c74;
+  font-size:18px; line-height:1; cursor:pointer; padding:2px 4px; border-radius:4px;
+  transition:color 120ms ease, background 120ms ease;
+}
+.drawer-close:hover { color:#d6d6da; }
+.drawer-close:focus, .drawer-close:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+.drawer-goal { padding:11px 20px; font-size:12px; color:#74747c; font-style:italic; line-height:1.45; border-bottom:1px solid #232329; }
+
+/* Editable TASK section (prototype lines 227-230) */
+.drawer-task { flex:0 0 auto; padding:13px 20px; border-bottom:1px solid #232329; }
+.drawer-task-label {
+  font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em;
+  color:#5e5e66; margin-bottom:11px;
+}
+.drawer-task-input {
+  width:100%; background:var(--bg-stage); border:1px solid #2a2a30; border-radius:7px;
+  color:#dcdce0; font-size:12.5px; font-family:inherit; padding:9px 11px; outline:none;
+  box-sizing:border-box; transition:border-color 120ms ease;
+}
+.drawer-task-input:focus, .drawer-task-input:focus-visible { border-color:#41414a; }
+
+.drawer .tabs { display:flex; border-bottom:1px solid #2a2a30; flex-shrink:0; padding:0 16px; }
+.drawer .tabs .tab {
+  background:none; border:none; border-bottom:2px solid transparent;
+  color:var(--text-tertiary); cursor:pointer; padding:8px 12px;
+  font-size:12px; font-weight:500; font-family:inherit;
+  transition:color 120ms ease, border-color 120ms ease; margin-bottom:-1px;
+}
+.drawer .tabs .tab:hover { color:var(--text-secondary); }
+.drawer .tabs .tab.active { color:var(--text-primary); border-bottom-color:var(--status-working); }
+.drawer .tabs .tab:focus, .drawer .tabs .tab:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working) inset; }
+
+.drawer-body { flex:1; min-height:0; overflow:auto; }
+
+.tab-body { padding:14px 20px; }
+.tab-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:0.14em; color:#5e5e66; margin-bottom:11px; }
+/* The role brief (role.md): multi-line markdown, line breaks preserved. */
+.instr-body {
+  color:var(--text-secondary); font-size:12.5px; line-height:1.55; margin:0;
+  white-space:pre-wrap; word-break:break-word;
+  font-family:'JetBrains Mono',monospace;
+}
+.instr-empty { color:var(--text-tertiary); font-size:12.5px; line-height:1.55; margin:0; }
+
+.output, .patch {
+  background:#121214; color:var(--text-primary);
+  white-space:pre-wrap; word-break:break-word;
+  border-radius:6px; border:1px solid var(--border-default);
+  padding:13px 16px; font-size:11.5px; line-height:1.55;
+  font-family:'JetBrains Mono',monospace; margin:0;
+}
+
+.detail-block { padding:0 20px 14px; }
+
+.drawer-actions {
+  display:flex; flex-wrap:wrap; gap:8px;
+  padding:13px 16px; border-top:1px solid #2a2a30; background:var(--bg-code);
+  flex-shrink:0;
+}
+
+/* Working footer: Pause/Resume toggle (prototype line 293). Neutral control.
+   flex:0 0 auto keeps it the same auto width as its siblings so the row reads as
+   one tidy cluster instead of stretching Pause full-width. */
+.drawer .drawer-pause {
+  flex:0 0 auto;
+  background:#26262c; border:1px solid #36363e; color:#cdcdd3; border-radius:7px;
+  padding:9px 14px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.drawer .drawer-pause:hover { background:#2e2e36; border-color:var(--border-hover); }
+.drawer .drawer-pause:focus, .drawer .drawer-pause:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* Blocked footer: waiting note + an "Answer to unblock…" row (prototype lines 312-319) */
+.drawer-footer-blocked { flex-direction:column; align-items:stretch; }
+.drawer-blocked-note { font-size:11.5px; color:#caa869; width:100%; }
+.drawer-blocked-row { display:flex; gap:8px; width:100%; }
+.drawer-answer-input {
+  flex:1; background:var(--bg-stage); border:1px solid #2a2a30; border-radius:7px;
+  color:#dcdce0; font-size:12px; font-family:inherit; padding:9px 11px; outline:none;
+  box-sizing:border-box; transition:border-color 120ms ease;
+}
+.drawer-answer-input:focus, .drawer-answer-input:focus-visible { border-color:#41414a; }
+.drawer .drawer-answer-send {
+  background:rgba(138,184,255,0.15); border:1px solid rgba(138,184,255,0.4); color:#8ab8ff;
+  border-radius:7px; padding:9px 16px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:background 120ms ease, box-shadow 120ms ease;
+}
+.drawer .drawer-answer-send:hover { background:rgba(138,184,255,0.24); }
+.drawer .drawer-answer-send:focus, .drawer .drawer-answer-send:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* ─── Drawer inline forms ─────────────────────────────────────────────────── */
+
+.approval-panel {
+  padding:12px 16px; border-top:1px solid var(--border-default);
+  display:flex; flex-wrap:wrap; gap:8px; align-items:center; background:var(--bg-code);
+}
+.approval-detail { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; width:100%; }
+.approval-tool   { font-size:11px; font-weight:600; color:var(--text-primary); font-family:'JetBrains Mono',monospace; }
+.approval-summary { font-size:11px; color:var(--text-secondary); }
+
+.steer-form, .sendback-form {
+  display:flex; gap:8px; align-items:flex-start;
+  padding:12px 16px; border-top:1px solid var(--border-default); background:var(--bg-code);
+}
+.steer-input, .sendback-input {
+  flex:1; background:var(--bg-stage); border:1px solid #2a2a30; border-radius:7px;
+  color:#dcdce0; font-size:12px; font-family:inherit; padding:9px 11px; outline:none;
+  transition:border-color 120ms ease;
+}
+.sendback-input { resize:vertical; }
+.steer-input:focus, .steer-input:focus-visible,
+.sendback-input:focus, .sendback-input:focus-visible { border-color:#41414a; }
+
+/* ─── Buttons (shared base) ──────────────────────────────────────────────── */
+
+.drawer button,
+button[data-action="steer"],
+button[data-action="sendBack"] {
+  background:#26262c; color:#cdcdd3; border:1px solid #36363e; border-radius:7px;
+  padding:9px 14px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.drawer button:hover,
+button[data-action="steer"]:hover,
+button[data-action="sendBack"]:hover { background:#2e2e36; border-color:var(--border-hover); }
+.drawer button:focus, .drawer button:focus-visible,
+button[data-action="steer"]:focus, button[data-action="steer"]:focus-visible,
+button[data-action="sendBack"]:focus, button[data-action="sendBack"]:focus-visible {
+  outline:none; box-shadow:0 0 0 1px var(--status-working);
+}
+
+/* Approve / merge / finish-merge: done green, translucent per prototype */
+button[data-action="approve"],
+button[data-action="merge"],
+button[data-action="finish-merge"] {
+  background:rgba(70,201,138,0.16); border:1px solid rgba(70,201,138,0.42); color:#7fd9a8;
+  font-weight:600; transition:background 120ms ease, box-shadow 120ms ease;
+}
+button[data-action="approve"]:hover,
+button[data-action="merge"]:hover,
+button[data-action="finish-merge"]:hover { background:rgba(70,201,138,0.26); }
+button[data-action="approve"]:focus, button[data-action="approve"]:focus-visible,
+button[data-action="merge"]:focus, button[data-action="merge"]:focus-visible,
+button[data-action="finish-merge"]:focus, button[data-action="finish-merge"]:focus-visible {
+  outline:none; box-shadow:0 0 0 1px var(--status-done);
+}
+
+/* Deny / discard: conflict red, translucent per prototype */
+button[data-action="deny"],
+button[data-action="discard"] {
+  background:rgba(240,96,107,0.12); border:1px solid rgba(240,96,107,0.35); color:#f08a92;
+  font-weight:600; transition:background 120ms ease, box-shadow 120ms ease;
+}
+button[data-action="deny"]:hover,
+button[data-action="discard"]:hover { background:rgba(240,96,107,0.2); }
+button[data-action="deny"]:focus, button[data-action="deny"]:focus-visible,
+button[data-action="discard"]:focus, button[data-action="discard"]:focus-visible {
+  outline:none; box-shadow:0 0 0 1px var(--status-conflict);
+}
+
+/* Stop: attention red, translucent per prototype */
+button[data-action="stop"] {
+  background:transparent; color:#f08a92; border:1px solid rgba(240,96,107,0.35);
+  font-weight:600; transition:background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+button[data-action="stop"]:hover { background:rgba(240,96,107,0.12); }
+button[data-action="stop"]:focus, button[data-action="stop"]:focus-visible {
+  outline:none; box-shadow:0 0 0 1px var(--status-conflict);
+}
+
+/* Open review button: inline, subtle */
+.open-review-btn {
+  background:#26262c; color:#dcdce0; border:1px solid #3a3a44; border-radius:7px;
+  padding:9px; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer;
+  margin-bottom:12px; display:inline-block; width:100%; box-sizing:border-box;
+  transition:background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.open-review-btn:hover { background:#30303a; border-color:#46464f; color:var(--text-primary); }
+.open-review-btn:focus, .open-review-btn:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* ─── Misc drawer content ──────────────────────────────────────────────────── */
+
+.empty { color:var(--text-tertiary); font-size:12px; padding:24px; }
+.ghost { color:var(--text-ghost); font-style:italic; font-size:12px; text-align:center; line-height:1.6; }
+.summary { color:var(--text-secondary); font-size:12px; margin-bottom:8px; }
+.conflict { color:var(--status-attention); font-size:12px; font-weight:600; margin-bottom:8px; }
+.files { margin:0 0 12px; padding-left:18px; font-size:12px; color:var(--text-secondary); line-height:1.6; font-family:'JetBrains Mono',monospace; }
+.diff-error { color:var(--status-conflict); font-size:12px; margin-top:6px; }
+.cleanup-note { color:var(--text-secondary); font-size:12px; margin-top:8px; line-height:1.5; }
+.pr-note { color:var(--status-done); font-size:12px; }
+.error {
+  background:rgba(240,132,140,.08); border:1px solid rgba(240,132,140,.25); border-radius:6px;
+  color:var(--status-conflict); padding:10px 12px; font-size:11px;
+  white-space:pre-wrap; word-break:break-word; margin:0;
+}
+.why { color:#74747c; font-size:11.5px; font-style:italic; line-height:1.45; margin:9px 0 0; }
+
+/* ─── Composer overlay / dispatch modal (prototype lines 339-388) ───────────── */
+
+.composer-overlay { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; }
+.composer-overlay[hidden] { display:none; }
+
+.composer-scrim { position:absolute; inset:0; background:rgba(8,8,10,.62); }
+
+.composer-panel {
+  position:relative; z-index:1;
+  background:#1b1b1f; border:1px solid #2e2e36; border-radius:13px;
+  width:484px; max-width:calc(100% - 48px); max-height:calc(100% - 56px);
+  overflow:hidden; display:flex; flex-direction:column;
+  box-shadow:0 26px 70px rgba(0,0,0,.6); box-sizing:border-box;
+}
+
+.composer-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding:18px 20px 15px; border-bottom:1px solid #2a2a30; flex:0 0 auto;
+}
+.composer-headline { display:flex; align-items:center; gap:12px; min-width:0; }
+.composer-heading-text { min-width:0; }
+.composer-title { margin:0; font-size:16px; font-weight:700; color:var(--text-primary); font-family:'Manrope',sans-serif; line-height:1.2; }
+.composer-subtitle { margin:3px 0 0; font-size:11.5px; color:#74747c; line-height:1.3; }
+.composer-branch { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:#9a9aa2; }
+
+/* Brand equaliser mark on the modal header + Dispatch button (prototype eqbar) */
+.composer-eq { display:inline-flex; align-items:flex-end; gap:1.5px; height:11px; flex:0 0 auto; }
+.composer-eq i { width:2px; border-radius:1px; transform-origin:bottom; }
+.composer-eq i:nth-child(1) { height:7px;  animation:eqbar .5s ease-in-out infinite alternate; }
+.composer-eq i:nth-child(2) { height:11px; animation:eqbar .7s ease-in-out infinite alternate; }
+.composer-eq i:nth-child(3) { height:5px;  animation:eqbar .6s ease-in-out infinite alternate; }
+.composer-eq i:nth-child(4) { height:9px;  animation:eqbar .55s ease-in-out infinite alternate; }
+.composer-eq--brand { height:15px; }
+.composer-eq--brand i { background:#c9c9d0; }
+.composer-eq--accent i { background:#8ab8ff; }
+.composer-close {
+  background:none; border:none; color:#6c6c74; font-size:19px; cursor:pointer;
+  padding:2px 4px; line-height:1; border-radius:4px;
+  transition:color 120ms ease, background 120ms ease;
+}
+.composer-close:hover { color:#d6d6da; }
+.composer-close:focus, .composer-close:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+.composer-body { flex:1; min-height:0; overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:18px; }
+.composer-section { margin-bottom:0; }
+
+.composer-label {
+  display:block; font-size:9.5px; font-weight:500; text-transform:uppercase; letter-spacing:.14em;
+  color:#5e5e66; font-family:'JetBrains Mono',monospace; margin-bottom:11px;
+}
+.composer-label--sub { font-size:11px; text-transform:none; letter-spacing:0; color:#5e5e66; margin-top:8px; font-family:'JetBrains Mono',monospace; }
+.composer-hint { font-style:italic; text-transform:none; letter-spacing:0; font-weight:400; color:#5e5e66; }
+.composer-required { color:var(--status-conflict); }
+
+/* Compact inline role chips (prototype lines 357-361): single-line pills. */
+.composer-presets { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:9px; }
+.composer-chip {
+  background:#26262c; border:1px solid #2a2a30; border-radius:7px; padding:7px 11px;
+  cursor:pointer; text-align:left; display:inline-flex; align-items:center; gap:7px;
+  transition:border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  color:#dcdce0; font-size:12.5px; font-weight:600; font-family:'Manrope',sans-serif;
+  white-space:nowrap;
+}
+.composer-chip:hover { border-color:#4a4a56; }
+.composer-chip:focus, .composer-chip:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); border-color:var(--status-working); }
+.composer-chip.selected { border-color:var(--status-working); box-shadow:0 0 0 1px var(--status-working); }
+.chip-role { font-size:12.5px; font-weight:600; color:#dcdce0; font-family:'Manrope',sans-serif; }
+.chip-engine { font-size:10px; background:#161618; color:#83838b; border-radius:3px; padding:0 5px; line-height:1.6; font-family:'JetBrains Mono',monospace; }
+.composer-no-presets { font-size:12px; color:#5e5e66; margin:0 0 4px; }
+
+.composer-engine-pills { display:flex; flex-wrap:wrap; gap:7px; }
+.composer-engine-pill {
+  background:#26262c; border:1px solid #2a2a30; border-radius:20px; padding:4px 12px;
+  font-size:12px; color:#cdcdd3; cursor:pointer; font-family:'JetBrains Mono',monospace;
+  transition:border-color 120ms ease, color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.composer-engine-pill:hover { border-color:#4a4a56; color:var(--text-primary); }
+.composer-engine-pill.selected { border-color:var(--status-working); color:var(--status-working); box-shadow:0 0 0 1px var(--status-working); }
+.composer-engine-pill:focus, .composer-engine-pill:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); border-color:var(--status-working); }
+.composer-engine-pill--model { opacity:.8; }
+
+.composer-input {
+  width:100%; background:#161618; border:1px solid #2a2a30; border-radius:7px;
+  color:#dcdce0; font-size:13px; padding:10px 12px; box-sizing:border-box; outline:none;
+  font-family:inherit; transition:border-color 120ms ease, box-shadow 120ms ease;
+}
+.composer-input:focus, .composer-input:focus-visible { border-color:#41414a; }
+.composer-textarea {
+  width:100%; background:#161618; border:1px solid #2a2a30; border-radius:7px;
+  color:#dcdce0; font-size:13px; padding:11px 12px; box-sizing:border-box; resize:vertical;
+  outline:none; font-family:inherit; line-height:1.55; transition:border-color 120ms ease, box-shadow 120ms ease;
+}
+.composer-textarea:focus, .composer-textarea:focus-visible { border-color:#41414a; }
+.composer-new-role-row { margin-top:6px; }
+
+.composer-footer { display:flex; gap:8px; padding:14px 20px; border-top:1px solid #2a2a30; background:var(--bg-code); flex:0 0 auto; }
+.composer-dispatch {
+  flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+  background:rgba(138,184,255,0.16); border:1px solid rgba(138,184,255,0.42); color:#8ab8ff;
+  border-radius:8px; padding:11px; font-size:13px; font-weight:600; font-family:'Manrope',sans-serif;
+  cursor:pointer; transition:background 120ms ease, box-shadow 120ms ease;
+}
+.composer-dispatch:disabled { background:#26262c; color:#5e5e66; border-color:#2a2a30; }
+.composer-dispatch:disabled .composer-eq--accent i { background:#5e5e66; }
+.composer-dispatch:not(:disabled):hover { background:rgba(138,184,255,0.26); }
+.composer-dispatch:not(:disabled):focus, .composer-dispatch:not(:disabled):focus-visible { outline:none; box-shadow:0 0 0 2px var(--status-working); }
+
+.composer-cancel {
+  background:#26262c; border:1px solid #36363e; color:#cdcdd3; border-radius:8px;
+  padding:11px 18px; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.composer-cancel:hover { background:#2e2e36; border-color:var(--border-hover); }
+.composer-cancel:focus, .composer-cancel:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* ─── Task composer (roomy, team-aware multi-line task entry) ──────────────────
+   The on-brand modal that opens for "Launch team" and "Run agent". Carries an
+   identity row (launch glyph + eyebrow + subject), optional member avatars + a
+   shared-goal line, the roomy textarea, and an accent-tinted submit. The accent
+   ("team" -> blue, "agent" -> green) is set per .task-panel--team / --agent and
+   read through the local --task-accent / --task-accent-soft custom properties.
+   Graphite tokens only; no em dashes. */
+.task-overlay { position:fixed; inset:0; z-index:120; display:flex; align-items:center; justify-content:center; }
+.task-overlay[hidden] { display:none; }
+.task-scrim { position:absolute; inset:0; background:rgba(8,8,10,.62); }
+
+.task-panel {
+  /* Per-accent tints (defaults to the team/blue accent). */
+  --task-accent:var(--blue);
+  --task-accent-soft:rgba(138,184,255,0.16);
+  --task-accent-softer:rgba(138,184,255,0.12);
+  --task-accent-border:rgba(138,184,255,0.42);
+  --task-accent-hover:rgba(138,184,255,0.26);
+  position:relative; z-index:1;
+  background:var(--bg-panel); border:1px solid var(--border-default); border-radius:14px;
+  width:540px; max-width:calc(100% - 48px); max-height:calc(100% - 56px);
+  overflow:hidden; display:flex; flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.62); box-sizing:border-box;
+}
+.task-panel--agent {
+  --task-accent:var(--green);
+  --task-accent-soft:rgba(127,217,168,0.16);
+  --task-accent-softer:rgba(127,217,168,0.12);
+  --task-accent-border:rgba(127,217,168,0.42);
+  --task-accent-hover:rgba(127,217,168,0.26);
+}
+/* Entrance: fade + small scale/rise, gated behind reduced-motion preference. */
+@keyframes task-panel-in { from { opacity:0; transform:translateY(6px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+@media (prefers-reduced-motion: no-preference) {
+  .task-panel { animation:task-panel-in 160ms ease-out both; will-change:opacity, transform; }
+}
+
+/* Identity row: launch glyph tile + eyebrow/subject + close. */
+.task-header {
+  display:flex; align-items:center; gap:13px;
+  padding:18px 20px 15px; border-bottom:1px solid var(--border-subtle); flex:0 0 auto;
+}
+.task-glyph {
+  flex:0 0 auto; width:34px; height:34px; border-radius:9px;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--task-accent-soft); border:1px solid var(--task-accent-border);
+}
+.task-glyph-bars { display:inline-flex; align-items:flex-end; gap:2px; height:14px; }
+.task-glyph-bars span { width:2.5px; border-radius:1px; background:var(--task-accent); }
+.task-glyph-bars span:nth-child(1) { height:7px; }
+.task-glyph-bars span:nth-child(2) { height:14px; }
+.task-glyph-bars span:nth-child(3) { height:5px; }
+.task-glyph-bars span:nth-child(4) { height:10px; }
+.task-identity { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+.task-eyebrow {
+  font-family:var(--font-mono); font-size:11px; font-weight:500;
+  text-transform:uppercase; letter-spacing:0.16em; color:var(--text-faint); line-height:1;
+}
+.task-subject {
+  font-family:var(--font-display); font-size:17px; font-weight:700;
+  color:var(--text-primary); line-height:1.2; letter-spacing:-0.01em;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.task-close {
+  flex:0 0 auto; align-self:flex-start; margin-top:-2px;
+  background:none; border:none; color:var(--text-ghost); font-size:19px; cursor:pointer;
+  padding:2px 4px; line-height:1; border-radius:4px; transition:color 120ms ease, background 120ms ease;
+}
+.task-close:hover { color:#d6d6da; }
+.task-close:focus, .task-close:focus-visible { outline:none; box-shadow:0 0 0 1px var(--task-accent); }
+
+.task-body { flex:1; min-height:0; overflow:auto; padding:16px 20px 18px; display:flex; flex-direction:column; gap:12px; }
+
+/* Members row: a lead label + circular initial avatars with wrapped names. */
+.task-members { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+.task-members-lead {
+  font-family:var(--font-mono); font-size:10px; font-weight:500;
+  text-transform:uppercase; letter-spacing:0.12em; color:var(--text-faint); margin-right:2px;
+}
+.task-member { display:inline-flex; align-items:center; gap:6px; background:var(--bg-surface-low); border:1px solid var(--border-subtle); border-radius:20px; padding:3px 10px 3px 3px; }
+.task-avatar {
+  width:20px; height:20px; border-radius:50%; flex:0 0 auto;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--bg-raised); font-family:var(--font-display); font-weight:700; font-size:10px;
+  color:var(--text-secondary);
+}
+.task-member-name { font-size:11.5px; color:var(--text-body); }
+
+/* Goal line: one muted, wrapping line with a subtle lead label. */
+.task-goal { margin:0; display:flex; gap:8px; align-items:baseline; font-size:12px; line-height:1.45; }
+.task-goal-label {
+  flex:0 0 auto; font-family:var(--font-mono); font-size:10px; font-weight:500;
+  text-transform:uppercase; letter-spacing:0.12em; color:var(--text-faint);
+}
+.task-goal-text { color:var(--text-tertiary); word-break:break-word; }
+
+/* Target chips (the in-page "+ New task" Default-agent-vs-team picker). Single-
+   select; selected chip gets the soft-blue accent. Reuses the composer role-chip
+   language (graphite chip, --status-working selected accent) per TOKENS.md. */
+.task-targets { display:flex; flex-direction:column; gap:8px; }
+.task-targets-lead {
+  font-family:var(--font-mono); font-size:10px; font-weight:500;
+  text-transform:uppercase; letter-spacing:0.12em; color:var(--text-faint);
+}
+.task-targets-chips { display:flex; flex-wrap:wrap; gap:7px; }
+.task-target-chip {
+  display:inline-flex; flex-direction:column; align-items:flex-start; gap:1px;
+  background:#26262c; border:1px solid #2a2a30; border-radius:9px; padding:7px 12px;
+  cursor:pointer; text-align:left;
+  transition:border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.task-target-chip:hover { border-color:#4a4a56; }
+.task-target-chip:focus, .task-target-chip:focus-visible {
+  outline:none; box-shadow:0 0 0 1px var(--status-working); border-color:var(--status-working);
+}
+.task-target-chip.selected {
+  border-color:var(--status-working); box-shadow:0 0 0 1px var(--status-working);
+}
+.task-target-label {
+  font-size:12.5px; font-weight:600; color:var(--text-body); font-family:var(--font-display);
+}
+.task-target-sub {
+  font-size:10px; color:var(--text-faint); font-family:var(--font-mono); letter-spacing:0.02em;
+}
+.task-target-chip.selected .task-target-label { color:var(--text-primary); }
+
+.task-textarea {
+  width:100%; background:var(--bg-code); border:1px solid var(--border-default); border-radius:9px;
+  color:var(--text-body); font-size:13px; padding:13px; box-sizing:border-box; resize:vertical;
+  min-height:160px; max-height:48vh; overflow:auto; outline:none; font-family:var(--font-body);
+  line-height:1.55; transition:border-color 120ms ease, box-shadow 120ms ease;
+}
+.task-textarea::placeholder { color:var(--text-faint); }
+.task-textarea:focus, .task-textarea:focus-visible { border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+
+.task-footer { display:flex; align-items:center; gap:10px; padding:14px 20px; border-top:1px solid var(--border-subtle); background:var(--bg-code); flex:0 0 auto; }
+.task-submit {
+  flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  background:var(--task-accent-soft); border:1px solid var(--task-accent-border); color:var(--task-accent);
+  border-radius:8px; padding:10px 18px; font-size:13px; font-weight:600; font-family:var(--font-display);
+  cursor:pointer; transition:background 120ms ease, box-shadow 120ms ease;
+}
+.task-submit .task-glyph-bars { height:11px; }
+.task-submit .task-glyph-bars span { background:var(--task-accent); }
+.task-submit-label { line-height:1; }
+.task-submit:disabled { background:var(--bg-card); color:var(--text-faint); border-color:var(--border-subtle); }
+.task-submit:disabled .task-glyph-bars span { background:var(--text-faint); }
+.task-submit:not(:disabled):hover { background:var(--task-accent-hover); }
+.task-submit:not(:disabled):focus, .task-submit:not(:disabled):focus-visible { outline:none; box-shadow:0 0 0 2px var(--task-accent); }
+.task-cancel {
+  flex:0 0 auto;
+  background:var(--bg-card); border:1px solid #36363e; color:var(--text-secondary); border-radius:8px;
+  padding:10px 16px; font-size:13px; font-weight:600; font-family:var(--font-display); cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.task-cancel:hover { background:var(--bg-raised); border-color:var(--border-hover); }
+.task-cancel:focus, .task-cancel:focus-visible { outline:none; box-shadow:0 0 0 1px var(--task-accent); }
+.task-hint { margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--text-faint); font-family:var(--font-mono); }
+.task-kbd {
+  display:inline-flex; align-items:center; gap:2px;
+  background:var(--bg-raised); border:1px solid var(--border-default); border-radius:5px;
+  padding:2px 6px; font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono); line-height:1;
+}
+
+/* ===========================================================================
+   === LIBRARY === (from library.css)
+   Library shell, Agents / Teams / Skills / Discover, skill editor + pickers.
+   The Library tab bar uses `.lib-tab` (NOT the board drawer's `.tab`) so the
+   two never collide on one page.
+   =========================================================================== */
+
+/* ─── Library shell header ───────────────────────────────────────────────────── */
+.lib-shell-header { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:18px 24px; border-bottom:1px solid var(--border-faint); flex-wrap:wrap; }
+.lib-shell-titlebox { display:flex; align-items:center; gap:14px; }
+.lib-shell-mark { font-size:18px; color:#aeaeb6; line-height:1; }
+.lib-shell-titles { display:flex; flex-direction:column; }
+.lib-shell-title { font-family:var(--font-display); font-weight:800; font-size:18px; color:var(--text-primary); letter-spacing:-0.01em; }
+.lib-shell-subtitle { font-size:11.5px; color:var(--text-quiet); margin-top:2px; }
+.lib-shell-nav { display:flex; align-items:center; gap:14px; }
+.lib-shell-close { display:flex; align-items:center; gap:7px; background:none; cursor:pointer; color:var(--text-tertiary); font-family:var(--font-body); font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:7px; border:1px solid #2e2e34; transition:color 130ms ease,border-color 130ms ease; }
+.lib-shell-close:hover { color:#d6d6da; border-color:#3a3a42; }
+.lib-shell-close-x { font-size:14px; line-height:1; }
+
+/* ─── Library tab bar (active-underline) ──────────────────────────────────────
+   Uses `.lib-tab` (NOT the board drawer's `.tab`) so the two never collide when
+   both stylesheets merge onto one page. */
+.tab-bar { display:flex; gap:20px; align-items:flex-end; border-bottom:1px solid var(--border-subtle); }
+.tab-bar .lib-tab { background:none; border:none; border-bottom:2px solid transparent; color:var(--text-tertiary); cursor:pointer; font-family:var(--font-display); font-weight:600; font-size:13px; padding:2px 0 9px; transition:color 130ms ease,border-color 130ms ease; }
+.tab-bar .lib-tab:hover { color:var(--text-primary); }
+.tab-bar .lib-tab.active { color:var(--text-primary); border-bottom-color:var(--blue); }
+.tab-bar .lib-tab:focus-visible { outline:none; color:var(--text-primary); border-bottom-color:var(--blue); }
+
+/* ─── Body wrapper ───────────────────────────────────────────────────────────── */
+.lib-body { color:var(--text-primary); }
+.lib-empty { color:var(--text-tertiary); padding:22px 24px; }
+
+/* ─── Agents tab ─────────────────────────────────────────────────────────────── */
+.agent-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; padding:22px 24px; }
+.agent-new-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:158px; border:1px dashed #34343c; border-radius:11px; cursor:pointer; color:var(--text-ghost); background:transparent; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease; }
+.agent-new-card:hover { border-color:#4a4a54; color:#b7b7be; }
+.agent-new-plus { font-size:26px; line-height:1; font-weight:300; }
+.agent-new-label { font-size:12.5px; font-weight:600; }
+.agent-card { display:flex; flex-direction:column; background:var(--bg-deep); border:1px solid var(--bg-card); border-radius:11px; padding:16px; cursor:pointer; min-height:158px; transition:border-color 130ms ease,box-shadow 130ms ease,transform 130ms ease; }
+.agent-card:hover { border-color:#33333a; transform:translateY(-1px); box-shadow:0 8px 24px rgba(0,0,0,.35); }
+.agent-card:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.agent-card-head { display:flex; align-items:center; gap:9px; }
+.agent-name { font-family:var(--font-display); font-weight:700; font-size:14.5px; color:var(--text-primary); }
+.agent-engine { margin-left:auto; background:var(--bg-surface-low); color:var(--text-tertiary); border:1px solid #2c2c33; font-family:var(--font-mono); border-radius:6px; padding:2px 8px; font-size:10.5px; }
+.agent-anatomy { display:flex; align-items:center; gap:11px; margin-top:10px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); }
+.agent-anatomy-soul { font-size:12px; color:#aeaeb6; line-height:1; }
+.agent-anatomy-tools { color:var(--text-tertiary); }
+.agent-anatomy-skill { display:inline-flex; align-items:center; gap:6px; background:var(--bg-surface-low); border:1px solid #2c2c33; border-radius:6px; padding:2px 7px; color:#aeaeb6; }
+.agent-anatomy-diamond { color:#aeaeb6; }
+.agent-anatomy-overflow { color:var(--text-ghost); }
+.agent-autonomy-row { display:flex; align-items:center; gap:8px; margin-top:12px; }
+.autonomy-meter { display:inline-flex; align-items:flex-end; gap:2px; height:11px; }
+.autonomy-notch { width:3px; height:5px; background:#33333c; border-radius:1px; }
+.autonomy-notch.filled { height:11px; background:var(--blue); }
+.agent-autonomy-label { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); }
+.agent-snippet { font-size:12px; color:#86868e; margin-top:12px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+/* Run action: dispatch this single agent on a task (Library Agents tab). */
+.agent-card-actions { margin-top:13px; display:flex; }
+.agent-run-btn {
+  display:inline-flex; align-items:center; gap:7px;
+  background:rgba(138,184,255,0.14); border:1px solid rgba(138,184,255,0.40); color:#8ab8ff;
+  border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:600; font-family:var(--font-body);
+  cursor:pointer; transition:background 120ms ease;
+}
+.agent-run-btn:hover { background:rgba(138,184,255,0.24); }
+.agent-run-btn:focus, .agent-run-btn:focus-visible { outline:none; box-shadow:0 0 0 2px var(--status-working); }
+.agent-run-plus { font-size:9px; line-height:1; }
+
+/* ─── Teams tab ──────────────────────────────────────────────────────────────── */
+.team-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; padding:22px 24px; }
+.team-new-card { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:172px; border:1px dashed #34343c; border-radius:11px; cursor:pointer; color:var(--text-ghost); background:transparent; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease; }
+.team-new-card:hover { border-color:#4a4a54; color:#b7b7be; }
+.team-new-plus { font-size:26px; line-height:1; font-weight:300; }
+.team-new-label { font-size:12.5px; font-weight:600; }
+.team-card { display:flex; flex-direction:column; background:var(--bg-deep); border:1px solid var(--bg-card); border-radius:11px; padding:16px; min-height:172px; }
+.team-card:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.team-card-head { display:flex; align-items:center; gap:9px; }
+.team-name { font-family:var(--font-display); font-weight:700; font-size:14.5px; color:var(--text-primary); cursor:pointer; }
+.team-name:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.team-count { margin-left:auto; font-family:var(--font-mono); font-size:10.5px; color:var(--text-ghost); background:var(--border-faint); padding:2px 8px; border-radius:6px; }
+.team-goal { font-size:12px; color:#7c7c84; font-style:italic; margin-top:7px; line-height:1.45; }
+.team-members { display:flex; flex-wrap:wrap; gap:6px; margin-top:13px; }
+.team-member-chip { display:flex; align-items:center; gap:7px; background:var(--bg-surface-low); border:1px solid #2c2c33; border-radius:20px; padding:3px 11px 3px 3px; }
+.team-member-initial { width:20px; height:20px; border-radius:50%; background:#2f2f37; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:10px; color:var(--text-secondary); }
+.team-member-name { font-size:11.5px; color:#b9b9c0; }
+.team-actions { display:flex; gap:8px; margin-top:auto; padding-top:15px; }
+.team-launch-btn { flex:1; display:flex; align-items:center; justify-content:center; gap:8px; background:rgba(138,184,255,.14); border:1px solid rgba(138,184,255,.4); color:var(--blue); padding:8px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:background-color 130ms ease; }
+.team-launch-btn:hover { background:rgba(138,184,255,.24); }
+.team-launch-bars { display:inline-flex; align-items:flex-end; gap:1.5px; height:10px; }
+.team-launch-bars span { width:2px; background:var(--blue); border-radius:1px; }
+.team-launch-bars span:nth-child(1) { height:6px; }
+.team-launch-bars span:nth-child(2) { height:10px; }
+.team-launch-bars span:nth-child(3) { height:4px; }
+.team-launch-bars span:nth-child(4) { height:8px; }
+.team-edit-btn { background:var(--bg-card); border:1px solid #36363e; color:var(--text-secondary); padding:8px 15px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:background-color 130ms ease; }
+.team-edit-btn:hover { background:var(--bg-raised); }
+
+/* ─── Agent card delete affordance ───────────────────────────────────────────── */
+.agent-delete-btn { margin-left:8px; background:transparent; border:none; cursor:pointer; color:var(--text-ghost); font-size:16px; line-height:1; padding:2px 5px; border-radius:6px; transition:color 130ms ease,background-color 130ms ease; }
+.agent-delete-btn:hover { color:var(--red); background:rgba(240,132,140,.1); }
+.agent-delete-btn:focus-visible { outline:none; box-shadow:0 0 0 1px var(--red); }
+
+/* ─── Team editor (modal) ────────────────────────────────────────────────────── */
+.team-editor-overlay { position:fixed; inset:0; z-index:37; display:flex; align-items:center; justify-content:center; background:rgba(8,8,10,.62); padding:24px; box-sizing:border-box; }
+.team-editor { position:relative; width:548px; max-width:100%; max-height:100%; background:#1b1b1f; border:1px solid var(--bg-raised); border-radius:13px; box-shadow:0 26px 70px rgba(0,0,0,.6); display:flex; flex-direction:column; overflow:hidden; }
+.team-editor-body { flex:1; min-height:0; overflow:auto; padding:18px 20px; display:flex; flex-direction:column; gap:17px; }
+.team-editor-field { display:flex; flex-direction:column; }
+.team-editor-label { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; color:var(--text-faint); margin-bottom:11px; }
+.team-editor-count { color:var(--text-secondary); }
+.team-editor-name-input, .team-editor-goal-input { width:100%; background:var(--bg-code); border:1px solid var(--border-subtle); border-radius:7px; padding:10px 12px; color:var(--text-body); font-size:13px; box-sizing:border-box; outline:none; transition:border-color 130ms ease; }
+.team-editor-name-input:focus, .team-editor-goal-input:focus { border-color:var(--border-hover); }
+.team-editor-members { display:flex; flex-direction:column; gap:8px; }
+.team-editor-member { display:flex; align-items:center; gap:10px; background:var(--bg-code); border:1px solid var(--border-subtle); border-radius:8px; padding:9px 12px; cursor:pointer; transition:border-color 130ms ease,background-color 130ms ease; }
+.team-editor-member:hover { border-color:var(--border-default); }
+.team-editor-member.selected { border-color:rgba(138,184,255,.45); background:rgba(138,184,255,.08); }
+.team-editor-check { width:14px; color:transparent; font-size:13px; line-height:1; }
+.team-editor-member.selected .team-editor-check { color:var(--blue); }
+.team-editor-avatar { width:20px; height:20px; border-radius:50%; background:#2f2f37; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:10px; color:var(--text-secondary); }
+.team-editor-member-name { font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--text-body); }
+.team-editor-member-engine { margin-left:auto; font-family:var(--font-mono); font-size:10px; color:var(--text-tertiary); }
+.team-editor-empty { color:var(--text-tertiary); font-size:12.5px; padding:10px 0; }
+
+/* ─── Skills tab ─────────────────────────────────────────────────────────────── */
+.skills-tab { padding:20px 24px 26px; }
+.skills-tab-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.skills-tab-title { display:flex; align-items:center; gap:11px; font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--text-primary); }
+.skills-tab-diamond { font-size:15px; color:#aeaeb6; line-height:1; }
+.skill-new-btn { display:flex; align-items:center; gap:7px; background:transparent; border:1px solid var(--border-default); color:var(--text-secondary); padding:7px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease; }
+.skill-new-btn:hover { border-color:var(--border-hover); color:var(--text-primary); }
+.skill-new-plus { font-size:14px; line-height:1; margin-top:-1px; }
+.skill-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:13px; }
+
+/* ─── Skill card ─────────────────────────────────────────────────────────────── */
+.skill-card { background:var(--bg-card); border:1px solid var(--border-default); border-radius:10px; padding:14px; cursor:pointer; display:flex; flex-direction:column; transition:border-color 130ms ease,box-shadow 130ms ease,transform 130ms ease; }
+.skill-card:hover { border-color:var(--border-hover); box-shadow:0 8px 24px rgba(0,0,0,.35); transform:translateY(-1px); }
+.skill-card:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.skill-card.amber { border-left:3px solid var(--amber); }
+.skill-header { display:flex; align-items:flex-start; gap:9px; }
+.skill-diamond { font-size:13px; color:#aeaeb6; line-height:1.2; }
+.skill-name { font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--text-primary); flex:1; min-width:0; }
+.plugin-badge { background:var(--bg-surface-low); color:var(--text-tertiary); font-family:var(--font-mono); font-size:10px; border:1px solid var(--border-subtle); border-radius:6px; padding:2px 7px; }
+.skill-desc { color:var(--text-soft); font-size:12px; line-height:1.5; margin:10px 0 0; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.skill-footer { display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid #333; }
+.used-by { color:var(--text-ghost); font-family:var(--font-mono); font-size:10.5px; }
+.used-by.amber { color:var(--amber); }
+.tools-hint { margin-left:auto; color:var(--text-tertiary); font-size:10.5px; font-family:var(--font-mono); }
+
+/* ─── Read-only role/team fallback list (legacy classes) ─────────────────────── */
+.role-list { display:flex; flex-direction:column; gap:10px; }
+.role-list-empty { color:var(--text-tertiary); padding:22px 24px; }
+.role-item { background:var(--bg-card); border:1px solid var(--border-default); border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:9px; }
+.role-item:hover { border-color:var(--border-hover); }
+.role-name { font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--text-primary); }
+.role-engine { background:var(--bg-surface-low); color:var(--text-tertiary); border:1px solid var(--border-subtle); font-family:var(--font-mono); border-radius:6px; padding:2px 8px; font-size:10.5px; }
+.role-skills { color:var(--text-tertiary); font-family:var(--font-mono); font-size:10.5px; margin-top:2px; }
+
+/* ─── Skill editor (modal) ───────────────────────────────────────────────────── */
+.skill-editor-overlay { position:fixed; inset:0; z-index:36; display:flex; align-items:center; justify-content:center; background:rgba(8,8,10,.62); padding:18px; box-sizing:border-box; }
+.skill-editor { position:relative; width:760px; max-width:100%; height:calc(100% - 18px); background:#1b1b1f; border:1px solid var(--bg-raised); border-radius:13px; box-shadow:0 26px 70px rgba(0,0,0,.6); display:flex; flex-direction:column; overflow:hidden; }
+.editor-head { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:17px 20px 15px; border-bottom:1px solid var(--border-subtle); }
+.editor-head-title { display:flex; align-items:center; gap:10px; }
+.editor-head-diamond { font-size:15px; color:#aeaeb6; line-height:1; }
+.editor-head-name { font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); }
+.editor-close { background:none; border:none; cursor:pointer; color:var(--text-ghost); font-size:19px; line-height:1; padding:2px 4px; transition:color 130ms ease; }
+.editor-close:hover { color:#d6d6da; }
+.editor-body-wrap { flex:1; min-height:0; display:flex; }
+.editor-rail { width:178px; flex:0 0 178px; border-right:1px solid var(--border-faint); padding:18px 14px; background:var(--bg-inset); overflow:auto; }
+.editor-rail-nav { display:flex; flex-direction:column; gap:2px; }
+.editor-rail-link { display:block; padding:7px 8px; border-radius:7px; cursor:pointer; font-size:12.5px; font-weight:500; color:var(--text-secondary); text-decoration:none; transition:background-color 130ms ease; }
+.editor-rail-link:hover { background:#202024; }
+.editor-rail-divider { height:1px; background:var(--border-subtle); margin:13px 8px; }
+.editor-rail-label { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; color:var(--text-faint); margin:0 8px 11px; }
+.editor-used-dots { display:flex; flex-direction:column; gap:7px; }
+.editor-used-dot { display:flex; align-items:center; gap:9px; padding:0 8px; }
+.editor-dot { width:6px; height:6px; border-radius:50%; background:var(--green-deep); flex:0 0 6px; }
+.editor-dot-name { font-size:11.5px; color:var(--text-soft); }
+.editor-canvas { flex:1; min-width:0; overflow:auto; padding:22px 24px; display:flex; flex-direction:column; gap:26px; }
+.editor-section-label { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; color:var(--text-faint); margin-bottom:11px; }
+.editor-name-input, .editor-desc-input { width:100%; background:var(--bg-page); border:1px solid var(--border-subtle); border-radius:8px; padding:11px 13px; color:var(--text-primary); font-size:13px; box-sizing:border-box; outline:none; transition:border-color 130ms ease; }
+.editor-name-input { font-family:var(--font-mono); margin-bottom:10px; }
+.editor-desc-input { color:var(--text-secondary); }
+.editor-name-input:focus, .editor-desc-input:focus { border-color:var(--border-hover); }
+.editor-body { width:100%; min-height:240px; background:var(--bg-code); border:1px solid var(--border-subtle); border-radius:8px; color:#c4c4ca; font-size:11.5px; font-family:var(--font-mono); line-height:1.7; padding:13px 14px; box-sizing:border-box; resize:vertical; outline:none; transition:border-color 130ms ease; }
+.editor-body:focus { border-color:var(--border-hover); }
+.editor-tools-note { font-size:11.5px; color:var(--text-quiet); margin-bottom:11px; }
+.editor-req-table { border:1px solid var(--bg-card); border-radius:10px; overflow:hidden; background:var(--bg-inset); }
+.editor-req-head { display:flex; align-items:center; padding:8px 14px; border-bottom:1px solid #1f1f24; font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; color:var(--text-faint); }
+.editor-req-head-tool { flex:1; }
+.editor-req-head-col { width:54px; text-align:center; }
+.editor-req-row { display:flex; align-items:center; padding:9px 14px; border-bottom:1px solid #1f1f24; }
+.editor-req-row:last-child { border-bottom:none; }
+.editor-req-name { flex:1; font-size:12.5px; color:var(--text-secondary); font-family:var(--font-mono); }
+.editor-req-cell { width:54px; text-align:center; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+/* Per-row toggle indicator: hidden by default, shown as a green ✓ when the host
+   marks the cell on (.on). Toggling wiring is deferred (TODO in render). */
+.editor-req-tick { width:13px; height:13px; }
+.editor-req-cell.on .editor-req-tick::before { content:"\2713"; color:var(--green-deep); font-size:12px; line-height:1; }
+.editor-req-empty { padding:9px 14px; font-size:12px; color:var(--text-ghost); font-family:var(--font-mono); }
+.blast-caution { display:flex; align-items:center; gap:9px; margin-top:16px; color:var(--amber); font-size:11.5px; }
+.blast-caution-icon { color:var(--amber); font-size:11px; line-height:1; }
+.used-by-chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+.used-by-chip { background:var(--bg-surface-low); border:1px solid #2c2c33; border-radius:7px; padding:5px 10px; font-size:11.5px; color:var(--text-secondary); }
+.engine-id { color:var(--text-ghost); font-family:var(--font-mono); font-size:10px; }
+.editor-actions { flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:13px 20px; border-top:1px solid var(--border-subtle); background:var(--bg-code); }
+.editor-actions-left { display:flex; flex-direction:column; gap:4px; }
+.delete-btn { background:transparent; color:var(--red); border:1px solid rgba(240,132,140,.35); border-radius:8px; padding:9px 16px; cursor:pointer; font-family:var(--font-body); font-weight:600; font-size:13px; transition:background-color 130ms ease; }
+.delete-btn:hover { background:rgba(240,132,140,.1); }
+.delete-warning { color:var(--text-tertiary); font-size:11px; margin:0; }
+.save-btn { background:rgba(138,184,255,.16); border:1px solid rgba(138,184,255,.45); color:var(--blue); border-radius:8px; padding:10px 24px; font-size:13px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:background-color 130ms ease; }
+.save-btn:hover { background:rgba(138,184,255,.26); }
+.save-btn:focus-visible { outline:none; box-shadow:0 0 0 1px var(--blue); }
+
+/* ─── Add-skill picker (modal) ───────────────────────────────────────────────── */
+.picker-overlay { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(8,8,10,.66); padding:24px; box-sizing:border-box; }
+.skill-picker { position:relative; width:480px; max-width:100%; max-height:100%; background:var(--bg-card); border:1px solid var(--border-default); border-radius:10px; box-shadow:0 30px 80px rgba(0,0,0,.7); display:flex; flex-direction:column; overflow:hidden; }
+.picker-head { flex:0 0 auto; padding:16px 18px 13px; border-bottom:1px solid var(--border-default); }
+.picker-head-row { display:flex; align-items:center; justify-content:space-between; }
+.picker-title { font-family:var(--font-display); font-weight:700; font-size:15px; color:var(--text-primary); }
+.picker-close { background:none; border:none; cursor:pointer; color:var(--text-ghost); font-size:18px; line-height:1; transition:color 130ms ease; }
+.picker-close:hover { color:#d6d6da; }
+.picker-search { width:100%; margin-top:12px; box-sizing:border-box; background:var(--bg-code); border:1px solid var(--border-default); border-radius:6px; padding:9px 12px; color:var(--text-secondary); font-size:12.5px; font-family:var(--font-body); outline:none; transition:border-color 130ms ease; }
+.picker-search:focus { border-color:var(--border-hover); }
+.picker-search::placeholder { color:var(--text-ghost); }
+.picker-list { flex:1; min-height:0; overflow:auto; padding:14px 18px 18px; }
+.picker-group-label { font-family:var(--font-mono); font-size:9.5px; letter-spacing:.14em; color:var(--text-faint); margin-bottom:11px; }
+.picker-rows { display:flex; flex-direction:column; gap:8px; }
+.picker-empty { color:var(--text-tertiary); font-size:12.5px; }
+.picker-row { border-radius:6px; border:1px solid var(--border-default); background:var(--bg-surface-low); overflow:hidden; transition:border-color 130ms ease; }
+.picker-row:hover { border-color:var(--border-hover); }
+.picker-row-main { display:flex; align-items:flex-start; gap:10px; padding:11px 13px; cursor:pointer; }
+.picker-diamond { font-size:13px; color:#aeaeb6; line-height:1.3; }
+.picker-row-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.picker-skill-name { font-family:var(--font-display); font-weight:600; font-size:13px; color:var(--text-primary); }
+.picker-skill-desc { font-size:11.5px; color:var(--text-soft); line-height:1.45; }
+.picker-row-meta { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex:0 0 auto; text-align:right; padding-left:12px; }
+.picker-shared { font-family:var(--font-mono); font-size:10px; color:var(--text-tertiary); }
+.picker-hint { font-family:var(--font-mono); font-size:10px; color:var(--text-faint); }
+/* Amber grant-gate row: shown when a skill needs a tool the agent lacks (R5: P4) */
+.picker-grant-gate { border-left:3px solid var(--amber); background:rgba(226,179,90,.07); padding:12px 14px; }
+.picker-grant-gate.hidden { display:none; }
+.picker-grant-warn { font-size:12px; color:var(--amber); line-height:1.5; margin-bottom:11px; }
+.picker-grant-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.picker-grant-btn { background:transparent; border:1px solid var(--amber); color:var(--amber); padding:7px 13px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:background-color 130ms ease; }
+.picker-grant-btn:hover { background:rgba(226,179,90,.12); }
+.picker-grant-attach { background:transparent; border:1px solid var(--border-default); color:var(--text-soft); padding:7px 13px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease; }
+.picker-grant-attach:hover { border-color:var(--border-hover); color:var(--text-secondary); }
+.picker-grant-cancel { background:transparent; border:none; color:var(--text-tertiary); padding:7px 8px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease; }
+.picker-grant-cancel:hover { color:var(--text-soft); }
+
+/* DISCOVERED IN REPO group (skills found in the workspace, not yet adopted) */
+.picker-group-discovered { margin-top:18px; }
+.picker-disc-row { display:flex; align-items:flex-start; gap:10px; border-radius:6px; border:1px solid var(--border-default); background:var(--bg-surface-low); padding:11px 13px; transition:border-color 130ms ease; }
+.picker-disc-row:hover { border-color:var(--border-hover); }
+.picker-disc-head { display:flex; align-items:center; gap:8px; }
+.picker-disc-tag { font-family:var(--font-mono); font-size:9px; color:var(--text-tertiary); border:1px solid var(--border-default); border-radius:10px; padding:1px 7px; }
+.picker-disc-adopt { display:inline-block; font-size:11.5px; color:var(--blue); margin-top:8px; cursor:pointer; font-weight:600; }
+.picker-disc-adopt:hover { text-decoration:underline; }
+.picker-disc-hint { font-family:var(--font-mono); font-size:10px; color:var(--text-faint); flex:0 0 auto; }
+
+/* ─── Discover tab ───────────────────────────────────────────────────────────── */
+.discover-tab { display:flex; flex-direction:column; }
+
+/* Scanning banner with an animated pulsing dot */
+.discover-scanning { display:flex; align-items:center; gap:9px; margin:18px 24px 0; background:var(--bg-card); border:1px solid var(--border-default); border-radius:8px; padding:9px 13px; color:var(--text-secondary); font-size:12px; }
+.discover-scanning::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--blue); flex:0 0 auto; animation:discover-pulse 1.2s ease-in-out infinite; }
+@keyframes discover-pulse { 0%,100% { opacity:.3; transform:scale(.8); } 50% { opacity:1; transform:scale(1.1); } }
+
+/* Error banner */
+.discover-error { margin:18px 24px 0; background:rgba(240,132,140,.12); border-left:3px solid var(--red); border-radius:6px; padding:9px 13px; color:var(--red); font-size:12px; }
+
+/* Sticky header */
+.discover-header { position:sticky; top:0; z-index:6; background:var(--bg-page); border-bottom:1px solid var(--border-faint); padding:18px 24px 13px; }
+.discover-header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.discover-titlebox { min-width:0; }
+.discover-title { font-family:var(--font-display); font-weight:700; font-size:16px; color:var(--text-primary); }
+.discover-subtitle { font-size:11.5px; color:var(--text-quiet); margin-top:3px; }
+.discover-header-actions { display:flex; align-items:center; gap:12px; flex:0 0 auto; }
+.discover-scanned-at { font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+.discover-header-chips { display:flex; align-items:center; gap:9px; margin-top:13px; flex-wrap:wrap; }
+
+/* Secondary "Scan repo" button (prototype line 511) */
+.discover-scan-btn { display:flex; align-items:center; gap:8px; background:var(--bg-surface-low); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:7px; padding:7px 13px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease,background-color 130ms ease; }
+.discover-scan-btn:hover { background:#2c2c34; border-color:var(--border-hover); color:var(--text-primary); }
+.discover-scan-btn:focus-visible { outline:none; border-color:var(--blue); color:var(--text-primary); box-shadow:0 0 0 1px var(--blue); }
+/* disabled state (opacity + cursor) comes from the global button:disabled rule. */
+.discover-scan-bars { display:inline-flex; align-items:flex-end; gap:1.5px; height:10px; }
+.discover-scan-bars span { width:2px; background:currentColor; border-radius:1px; }
+.discover-scan-bars span:nth-child(1) { height:5px; }
+.discover-scan-bars span:nth-child(2) { height:10px; }
+.discover-scan-bars span:nth-child(3) { height:4px; }
+.discover-scan-bars span:nth-child(4) { height:8px; }
+
+/* Source filter chips (pills) */
+.discover-chips { display:flex; flex-wrap:wrap; gap:7px; }
+.discover-chip { background:var(--bg-surface-low); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:20px; padding:6px 13px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease,background-color 130ms ease; }
+.discover-chip:hover { border-color:var(--border-hover); color:var(--text-primary); }
+.discover-chip:focus-visible { outline:none; border-color:var(--blue); color:var(--text-primary); box-shadow:0 0 0 1px var(--blue); }
+.discover-chip.active { border-color:var(--blue); color:var(--blue); background:rgba(138,184,255,.1); }
+.discover-chip.dimmed { opacity:.5; cursor:default; }
+.discover-chip.dimmed:hover { border-color:var(--border-default); color:var(--text-secondary); }
+.discover-chip-count { font-family:var(--font-mono); font-size:10.5px; color:var(--text-tertiary); margin-left:2px; }
+.discover-chip.active .discover-chip-count { color:var(--blue); }
+
+/* Free-text filter input */
+.discover-filter { margin-left:auto; flex:0 0 auto; width:190px; max-width:40%; background:var(--bg-page); color:var(--text-secondary); border:1px solid var(--border-subtle); border-radius:7px; padding:7px 11px; font-size:12px; font-family:var(--font-body); outline:none; box-sizing:border-box; transition:border-color 130ms ease; }
+.discover-filter::placeholder { color:var(--text-ghost); }
+.discover-filter:focus { border-color:var(--border-hover); }
+
+/* Group sections */
+.discover-groups { display:flex; flex-direction:column; gap:24px; padding:20px 24px 26px; }
+.discover-empty { text-align:center; color:var(--text-tertiary); font-size:12.5px; padding:40px 16px; line-height:1.5; }
+.discover-group { border:none; }
+.discover-group-summary { display:flex; align-items:center; gap:10px; cursor:pointer; list-style:none; flex-wrap:wrap; padding-block:2px; }
+.discover-group-summary::-webkit-details-marker { display:none; }
+.discover-group-chevron { width:0; height:0; border-left:5px solid var(--text-tertiary); border-top:4px solid transparent; border-bottom:4px solid transparent; flex:0 0 auto; transition:transform 130ms ease; }
+.discover-group[open] > .discover-group-summary > .discover-group-chevron { transform:rotate(90deg); }
+.discover-group-label { font-family:var(--font-display); font-weight:700; font-size:13.5px; color:var(--text-primary); }
+.discover-group-count { background:var(--border-faint); color:var(--text-tertiary); font-family:var(--font-mono); border-radius:6px; padding:2px 8px; font-size:10.5px; }
+.discover-group-path { font-family:var(--font-mono); font-size:10px; color:var(--text-faint); margin-left:4px; }
+.discover-group-soon { font-family:var(--font-mono); font-size:9.5px; font-weight:600; letter-spacing:.06em; color:var(--text-tertiary); background:var(--bg-surface-low); border:1px solid #2c2c33; padding:2px 8px; border-radius:6px; }
+.discover-group-marketplace .discover-group-label { color:var(--text-soft); }
+.discover-group-subtitle { font-size:11.5px; color:var(--text-quiet); margin:8px 0 0 22px; }
+.discover-group-cards { display:grid; grid-template-columns:repeat(2,1fr); gap:13px; margin-top:14px; }
+
+/* Discover card */
+.discover-card { position:relative; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:10px; padding:14px; display:flex; flex-direction:column; overflow:hidden; transition:border-color 130ms ease,box-shadow 130ms ease,transform 130ms ease; }
+.discover-card:hover { border-color:var(--border-default); box-shadow:0 8px 24px rgba(0,0,0,.35); transform:translateY(-1px); }
+.discover-card:focus-visible { outline:none; border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.discover-card-rail { position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; }
+
+/* Marketplace placeholder variant: dashed, ghosted, no hover lift */
+.discover-card-marketplace { background:transparent; border:1px dashed var(--border-default); opacity:.85; }
+.discover-card-marketplace:hover { border-color:var(--border-default); box-shadow:none; transform:none; }
+
+.discover-card-header { display:flex; align-items:flex-start; gap:10px; }
+.discover-card-name { font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--text-primary); flex:1; min-width:0; }
+
+/* Source badge: pushed right, ellipsis on long paths, glyph prefix */
+.discover-source-badge { display:inline-flex; align-items:center; gap:6px; margin-left:auto; background:var(--bg-surface-low); color:var(--text-tertiary); border:1px solid var(--border-subtle); border-radius:6px; padding:2px 8px; font-size:10px; font-family:var(--font-mono); max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.discover-badge-glyph { flex:0 0 auto; }
+.discover-badge-glyph.plugin { width:9px; height:9px; border-radius:2px; background:var(--text-ghost); }
+.discover-badge-glyph.file { width:9px; height:10px; border:1px solid var(--text-tertiary); border-radius:1px; }
+
+/* Engine + confidence row */
+.discover-card-engine-row { display:flex; align-items:center; gap:9px; margin-top:11px; }
+.discover-engine { background:var(--bg-surface-low); color:var(--text-tertiary); border:1px solid var(--border-subtle); border-radius:6px; padding:2px 8px; font-size:10px; font-family:var(--font-mono); }
+.discover-card-confidence { margin-left:auto; display:flex; align-items:center; gap:5px; }
+.discover-conf-tick { color:var(--green-deep); font-size:11px; line-height:1; }
+.discover-confidence { display:inline-block; width:8px; height:8px; flex:0 0 auto; line-height:8px; font-size:8px; overflow:hidden; }
+.confidence-verified { color:var(--green-deep); }
+.confidence-likely { color:var(--amber); }
+.confidence-instructions { color:var(--text-tertiary); }
+.discover-conf-label { font-family:var(--font-mono); font-size:10px; color:var(--text-tertiary); }
+
+/* Description, clamped to 2 lines */
+.discover-card-desc { margin:11px 0 0; color:var(--text-soft); font-size:12px; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+/* Skill chips */
+.discover-skill-chips { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:12px; }
+.discover-skill-chip { background:var(--bg-surface-low); color:#aeaeb6; border:1px solid #2c2c33; border-radius:6px; padding:3px 8px; font-size:10px; font-family:var(--font-mono); }
+.discover-overflow { align-self:center; color:var(--text-tertiary); font-family:var(--font-mono); font-size:10px; background:var(--bg-code); border:1px solid var(--border-subtle); border-radius:6px; padding:3px 8px; }
+.discover-skill-none { margin-top:12px; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+
+/* Card actions footer */
+.discover-card-actions { display:flex; align-items:center; gap:8px; margin-top:14px; padding-top:13px; border-top:1px solid var(--border-faint); }
+
+/* Dispatch: bordered secondary (prototype line 564) */
+.discover-btn { background:transparent; color:var(--text-secondary); border:1px solid #36363e; border-radius:7px; padding:8px 13px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease,border-color 130ms ease,background-color 130ms ease; }
+.discover-btn:hover { background:var(--bg-card); border-color:var(--border-hover); color:var(--text-primary); }
+.discover-btn:focus-visible { outline:none; border-color:var(--blue); color:var(--text-primary); box-shadow:0 0 0 1px var(--blue); }
+.discover-btn-dispatch:hover { background:var(--bg-card); border-color:var(--border-hover); color:var(--text-primary); }
+
+/* Browse: borderless text button (prototype line 565) */
+.discover-btn-browse { background:transparent; border:none; color:var(--text-ghost); padding:8px 6px; font-size:12px; font-weight:600; cursor:pointer; font-family:var(--font-body); transition:color 130ms ease; }
+.discover-btn-browse:hover { color:var(--text-secondary); background:transparent; border:none; }
+.discover-btn-browse:focus-visible { outline:none; color:var(--text-secondary); box-shadow:none; }
+
+/* Adopt: BORDERED/secondary by default, matching Dispatch (prototype line 563).
+   The green tick + green treatment appear only after adopting (.adopted). */
+.discover-btn-adopt { display:inline-flex; align-items:center; gap:6px; background:transparent; color:var(--text-secondary); border:1px solid #36363e; font-weight:600; }
+.discover-btn-adopt:hover { background:var(--bg-card); border-color:var(--border-hover); color:var(--text-primary); }
+.discover-btn-adopt:focus-visible { outline:none; border-color:var(--blue); color:var(--text-primary); box-shadow:0 0 0 1px var(--blue); }
+/* The green check shows only once Adopt has fired (presentation: .adopted) */
+.discover-adopt-check { display:none; }
+.discover-btn-adopt.adopted { background:rgba(70,201,138,.16); border-color:rgba(70,201,138,.45); color:var(--green-deep); }
+.discover-btn-adopt.adopted .discover-adopt-check { display:inline; }
+.discover-btn-adopt.adopted:hover { background:rgba(70,201,138,.24); border-color:rgba(70,201,138,.55); color:var(--green-deep); }
+
+/* ─── Browse drawer ──────────────────────────────────────────────────────────── */
+.browse-drawer { padding:18px; color:var(--text-primary); }
+.browse-title { margin:0 0 8px; font-family:var(--font-display); font-size:15px; font-weight:700; color:var(--text-primary); }
+.browse-source-path { font-family:var(--font-mono); font-size:11px; color:var(--text-tertiary); margin-bottom:11px; }
+.browse-desc { color:var(--text-secondary); font-size:13px; line-height:1.5; white-space:pre-wrap; }
+.browse-skills { margin-top:11px; font-size:12px; color:var(--text-secondary); display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.browse-skill-chip { background:var(--bg-surface-low); color:#aeaeb6; border:1px solid #2c2c33; border-radius:6px; padding:3px 8px; font-size:10px; font-family:var(--font-mono); }
+
+/* ===========================================================================
+   === ANATOMY === (from anatomy.css)
+   Agent Anatomy editor: left ANATOMY rail + single scroll canvas of
+   Identity / Soul / Instructions / Tools / Skills / Engine / Autonomy.
+   The #root[data-view="anatomy"] flex-row layout is defined in the GLOBAL
+   section above.
+   =========================================================================== */
+
+/* ─── Rail (left anatomy index) ──────────────────────────────────────────────── */
+.anatomy-rail { width:178px; flex-shrink:0; min-height:0; display:flex; flex-direction:column; padding:18px 14px; border-right:1px solid var(--border-faint); background:var(--bg-rail); overflow-y:auto; box-sizing:border-box; }
+/* "ANATOMY" mono eyebrow above the rows (prototype line 657). */
+.anatomy-rail-eyebrow { font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:.14em; color:var(--text-faint); margin:0 6px 12px; }
+.anatomy-rail-rows { display:flex; flex-direction:column; gap:2px; }
+.anatomy-rail-row {
+  display:flex; align-items:center; gap:10px; padding:7px 8px;
+  border-radius:7px; cursor:pointer; text-decoration:none;
+  transition: var(--t-interactive);
+}
+.anatomy-rail-row:hover { background:#202024; }
+.anatomy-rail-row:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 1px var(--blue);
+}
+/* Active section: card background + bright label (prototype highlight). */
+.anatomy-rail-row[data-section].active { background:#202024; }
+/* Status dot: hollow by default, filled blue when the section has content. */
+.anatomy-dot { width:8px; height:8px; border-radius:50%; border:1px solid var(--border-default); flex-shrink:0; background:transparent; }
+.anatomy-dot.filled { background:var(--blue); border-color:var(--blue); box-shadow:0 0 0 1px rgba(138,184,255,.25); }
+.anatomy-rail-label { font-family:'Manrope',sans-serif; font-size:12px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color 120ms ease; }
+.anatomy-rail-row.active .anatomy-rail-label { color:var(--text-primary); font-weight:600; }
+
+/* ─── Canvas (modal chrome: header + scrolling body + footer) ─────────────────── */
+.anatomy-canvas { flex:1; min-width:0; min-height:0; display:flex; flex-direction:column; overflow:hidden; }
+/* Only the body scrolls; header and footer stay pinned (prototype 648-789).
+   min-height:0 lets this flex child shrink below its content so overflow-y:auto
+   actually engages (without it the body grows past the viewport and the top of
+   the form becomes unreachable: scrolls down but not back up). */
+.anatomy-canvas-body { flex:1; min-height:0; overflow-y:auto; padding:22px 24px; display:flex; flex-direction:column; gap:26px; min-width:0; }
+
+/* ─── Modal header (title + close) (prototype 649-652) ───────────────────────── */
+.anatomy-header {
+  flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+  padding:17px 20px 15px; border-bottom:1px solid #2a2a30;
+}
+.anatomy-header-title { font-family:'Manrope',sans-serif; font-weight:700; font-size:16px; color:var(--text-primary); }
+.anatomy-header-close {
+  background:transparent; border:none; cursor:pointer;
+  color:var(--text-ghost); font-size:19px; line-height:1; padding:2px 4px;
+  transition:color 120ms ease;
+}
+.anatomy-header-close:hover { color:#d6d6da; }
+.anatomy-header-close:focus-visible { outline:none; box-shadow:0 0 0 1px var(--blue); border-radius:5px; }
+
+/* ─── Modal footer (Cancel / Save agent) (prototype 786-789) ─────────────────── */
+.anatomy-footer {
+  flex:0 0 auto; display:flex; justify-content:flex-end; gap:8px;
+  padding:13px 20px; border-top:1px solid #2a2a30; background:var(--bg-code);
+}
+.anatomy-footer-cancel {
+  background:var(--bg-card); border:1px solid #36363e; color:var(--text-secondary);
+  padding:10px 18px; border-radius:8px; font-size:13px; font-weight:600;
+  cursor:pointer; font-family:'Inter',system-ui,sans-serif; transition: var(--t-interactive);
+}
+.anatomy-footer-cancel:hover { background:var(--bg-raised); }
+.anatomy-footer-cancel:focus-visible { outline:none; box-shadow:0 0 0 1px var(--blue); }
+.anatomy-footer-save {
+  background:#2f2f37; border:1px solid #44444e; color:var(--text-primary);
+  padding:10px 22px; border-radius:8px; font-size:13px; font-weight:600;
+  cursor:pointer; font-family:'Inter',system-ui,sans-serif; transition: var(--t-interactive);
+}
+.anatomy-footer-save:hover { background:#383841; }
+.anatomy-footer-save:focus-visible { outline:none; box-shadow:0 0 0 1px var(--blue); }
+
+/* ─── Section ────────────────────────────────────────────────────────────────── */
+.anatomy-section { display:flex; flex-direction:column; }
+
+/* ─── Eyebrow (mono uppercase label + contextual hint + right summary) ────────── */
+.anatomy-eyebrow { display:flex; align-items:baseline; gap:9px; margin-bottom:11px; }
+.anatomy-eyebrow-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:600; letter-spacing:.14em; color:var(--text-faint); }
+/* The contrasting helper word: "who it is" vs "what it does" vs "what it can touch". */
+.anatomy-eyebrow-hint { font-size:11.5px; color:#74747c; font-family:'Inter',system-ui,sans-serif; }
+.anatomy-eyebrow .anatomy-tools-summary,
+.anatomy-eyebrow .anatomy-skills-count { margin-left:auto; }
+
+/* ─── Helper copy (descriptive lines under eyebrows) ─────────────────────────── */
+.anatomy-helper { font-size:11.5px; color:var(--text-tertiary); line-height:1.5; margin:0 0 10px; text-wrap:pretty; }
+.anatomy-tools-note { margin:9px 0 0; color:#74747c; }
+
+/* ─── Identity ───────────────────────────────────────────────────────────────── */
+.anatomy-identity-name { font-family:'Manrope',sans-serif; font-size:18px; font-weight:700; color:var(--text-primary); line-height:1.3; }
+/* Vitals line: a pulse icon leads the "engine · autonomy" mono text (prototype 674-677). */
+.anatomy-identity-meta { display:flex; align-items:center; gap:8px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-ghost); margin-top:9px; }
+.anatomy-vitals-icon { flex-shrink:0; color:var(--text-ghost); }
+.anatomy-vitals-text { min-width:0; }
+
+/* ─── Twin markdown editors (Soul / Instructions file cards) ─────────────────── */
+.anatomy-textarea-card {
+  border:1px solid #2a2a30; border-radius:9px; overflow:hidden; background:var(--bg-inset);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.anatomy-textarea-card:focus-within {
+  border-color:var(--blue);
+  box-shadow:0 0 0 1px var(--blue);
+}
+.anatomy-textarea-card-bar {
+  display:flex; align-items:center; gap:8px; padding:10px 14px;
+  border-bottom:1px solid var(--border-faint); background:var(--bg-code);
+}
+.anatomy-file-glyph { font-size:13px; color:#aeaeb6; line-height:1; }
+.anatomy-file-name { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-tertiary); }
+/* The editor is markdown, mono per prototype. */
+.anatomy-textarea {
+  width:100%; min-height:104px; background:transparent;
+  border:none; border-radius:0;
+  color:var(--text-editor); font-size:11.5px; font-family:'JetBrains Mono',monospace;
+  line-height:1.7; padding:13px 14px; box-sizing:border-box; resize:vertical; outline:none;
+  transition: var(--t-interactive);
+}
+.anatomy-textarea[data-action="role-set-soul"] { min-height:158px; }
+.anatomy-textarea:focus,
+.anatomy-textarea:focus-visible { outline:none; }
+/* "saved as soul.md" / "saved as instructions.md" footnote. */
+.anatomy-file-footer { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-faint); margin-top:7px; }
+
+/* ─── Tools grid (grouped Built-in / MCP) ────────────────────────────────────── */
+.anatomy-tools-grid { display:flex; flex-direction:column; gap:2px; border:1px solid var(--bg-card); border-radius:10px; overflow:hidden; background:var(--bg-grid); }
+/* Group headers: BUILT-IN, MCP SERVERS. */
+.anatomy-tools-group-label { font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.14em; color:var(--text-faint); padding:11px 14px 8px; }
+.anatomy-tools-grid > .anatomy-tool-row + .anatomy-tools-group-label,
+.anatomy-tools-grid > .anatomy-tool-row.mcp:first-of-type { border-top:1px solid var(--border-hair); }
+.anatomy-tool-row {
+  display:grid; grid-template-columns:auto 1fr auto auto; align-items:center;
+  gap:11px; padding:10px 14px;
+  background:transparent; border:none; border-top:1px solid var(--border-hair);
+  transition: background 120ms ease;
+}
+.anatomy-tool-row:hover { background:rgba(255,255,255,.03); }
+.anatomy-tool-name { font-size:12.5px; color:var(--text-body); }
+.anatomy-tool-name.mono { font-family:'JetBrains Mono',monospace; }
+
+/* Sliding on/off toggle (track + knob) for the read grant (prototype 725).
+   The grant state is the nested checkbox; the track/knob are driven off :checked. */
+.anatomy-tool-toggle {
+  display:inline-flex; align-items:center; cursor:pointer; flex-shrink:0;
+}
+/* The real checkbox is visually hidden but still focusable and router-readable. */
+.anatomy-tool-toggle .anatomy-tool-read-input {
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  border:0; clip:rect(0 0 0 0); overflow:hidden;
+}
+.anatomy-tool-toggle-track {
+  position:relative; display:inline-block; width:30px; height:17px;
+  border-radius:9px; background:#2a2a30; border:1px solid #34343a;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.anatomy-tool-toggle-knob {
+  position:absolute; top:2px; left:2px; width:11px; height:11px;
+  border-radius:50%; background:#6c6c74;
+  transition:left 120ms ease, background 120ms ease;
+}
+/* On state: green track, knob slides right and brightens. */
+.anatomy-tool-toggle:has(.anatomy-tool-read-input:checked) .anatomy-tool-toggle-track {
+  background:rgba(70,201,138,.30); border-color:rgba(70,201,138,.55);
+}
+.anatomy-tool-toggle:has(.anatomy-tool-read-input:checked) .anatomy-tool-toggle-knob {
+  left:15px; background:var(--green);
+}
+.anatomy-tool-toggle:focus-within .anatomy-tool-toggle-track {
+  box-shadow:0 0 0 2px rgba(138,184,255,.45);
+}
+
+/* Write toggle (Edit/Run/Git): same slider, hidden checkbox, amber when on. */
+.anatomy-tool-toggle .anatomy-tool-write-input {
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  border:0; clip:rect(0 0 0 0); overflow:hidden;
+}
+.anatomy-tool-toggle:has(.anatomy-tool-write-input:checked) .anatomy-tool-toggle-track {
+  background:rgba(226,179,90,.30); border-color:rgba(226,179,90,.55);
+}
+.anatomy-tool-toggle:has(.anatomy-tool-write-input:checked) .anatomy-tool-toggle-knob {
+  left:15px; background:var(--amber);
+}
+
+/* Static read badge: green, sits between the name and the write badge. */
+.anatomy-tool-read-badge {
+  font-size:11px; font-weight:600; color:var(--green-deep);
+  background:rgba(70,201,138,.10); border:1px solid rgba(70,201,138,.25);
+  border-radius:7px; padding:1px 7px; white-space:nowrap;
+}
+
+/* Static write badge: amber label for write-only built-ins (Edit/Run/Git). */
+.anatomy-tool-write-badge {
+  font-size:11px; font-weight:600; color:var(--amber);
+  background:rgba(226,179,90,.10); border:1px solid rgba(226,179,90,.25);
+  border-radius:7px; padding:1px 7px; white-space:nowrap;
+}
+
+/* Write badge: amber, separate from read. OFF by default; amber dot appears when on. */
+.anatomy-tool-write {
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; font-weight:600; color:var(--amber);
+  background:rgba(226,179,90,.10); border:1px solid rgba(226,179,90,.25);
+  border-radius:7px; padding:1px 7px; white-space:nowrap; cursor:pointer;
+}
+/* The little amber dot shown when write is granted. */
+.anatomy-write-dot { width:6px; height:6px; border-radius:50%; background:var(--amber-deep); display:none; }
+.anatomy-tool-write:has(.anatomy-tool-write-input:checked) .anatomy-write-dot { display:inline-block; }
+/* The write checkbox is visually hidden but still focusable and router-readable. */
+.anatomy-tool-write .anatomy-tool-write-input {
+  position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+  border:0; clip:rect(0 0 0 0); overflow:hidden;
+}
+.anatomy-tool-write:focus-within { box-shadow:0 0 0 2px rgba(226,179,90,.45); }
+/* Read-only tools have no write control: keep the column aligned. */
+.anatomy-tool-write-placeholder { display:inline-block; width:1px; }
+/* Connect-a-server affordance row. */
+.anatomy-tools-connect { display:flex; align-items:center; gap:9px; padding:9px 14px; border-top:1px solid var(--border-hair); color:var(--text-ghost); cursor:pointer; transition:color 120ms ease; }
+.anatomy-tools-connect:hover { color:var(--text-tertiary); }
+.anatomy-tools-connect-plus { font-size:15px; line-height:1; margin-top:-2px; }
+.anatomy-tools-connect-label { font-size:12px; font-family:'JetBrains Mono',monospace; }
+
+/* ─── Tools summary (right of the eyebrow: "N granted, M can write") ──────────── */
+.anatomy-tools-summary { display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-size:10.5px; flex-wrap:wrap; }
+.anatomy-tools-granted { color:var(--text-tertiary); }
+.anatomy-tools-separator { color:var(--text-ghost); }
+.anatomy-tools-can-write { color:var(--text-tertiary); }
+.anatomy-tools-can-write.amber { color:var(--amber); }
+
+/* ─── Skills (removable chips + add action) ──────────────────────────────────── */
+.anatomy-skills-count { font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-tertiary); }
+.anatomy-skills-list { display:flex; flex-wrap:wrap; gap:8px; }
+.anatomy-skill-chip {
+  display:inline-flex; align-items:center; gap:7px;
+  background:#202026; border:1px solid #2c2c33;
+  border-radius:7px; padding:6px 9px;
+  font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-secondary);
+  transition: var(--t-interactive);
+}
+.anatomy-skill-chip:hover { border-color:var(--border-hover); }
+.anatomy-skill-glyph { color:#aeaeb6; }
+/* Per-skill usage link icon (prototype 761): a small link glyph beside the name. */
+.anatomy-skill-usage { display:inline-flex; align-items:center; gap:3px; color:#6a6a6a; cursor:pointer; transition:color 120ms ease; }
+.anatomy-skill-usage:hover { color:var(--text-secondary); }
+.anatomy-skill-usage:focus-visible { outline:none; box-shadow:0 0 0 1px var(--blue); border-radius:4px; }
+.anatomy-skill-usage-icon { display:block; }
+.anatomy-skill-remove { cursor:pointer; color:var(--text-ghost); font-size:11px; line-height:1; transition:color 120ms ease; }
+.anatomy-skill-remove:hover { color:var(--red); }
+/* Dashed "+ Add skill" affordance. */
+.anatomy-skill-add {
+  display:inline-flex; align-items:center; gap:6px;
+  background:transparent; border:1px dashed #3a3a44; border-radius:7px;
+  padding:6px 11px; font-family:'JetBrains Mono',monospace; font-size:11px;
+  color:var(--text-tertiary); cursor:pointer; transition: var(--t-interactive);
+}
+.anatomy-skill-add:hover { border-color:#4a4a56; color:var(--text-secondary); }
+
+/* In-editor skill picker: a rounded panel toggled open under "+ Add skill",
+   one clickable row per attachable skill. [hidden] collapses it (display:none). */
+.anatomy-skill-picker {
+  margin-top:10px;
+  display:flex; flex-direction:column; gap:8px;
+  background:var(--bg-inset); border:1px solid var(--border-default);
+  border-radius:9px; padding:10px;
+}
+.anatomy-skill-picker[hidden] { display:none; }
+.anatomy-skill-picker-row {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg-card); border:1px solid var(--border-default);
+  border-radius:7px; padding:9px 10px; cursor:pointer;
+  transition: var(--t-interactive);
+}
+.anatomy-skill-picker-row:hover { background:var(--bg-card-hover); border-color:var(--border-hover); }
+.anatomy-skill-picker-glyph { color:#aeaeb6; font-size:11px; }
+.anatomy-skill-picker-name {
+  font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-secondary);
+}
+.anatomy-skill-picker-hint {
+  margin-left:auto; font-family:'JetBrains Mono',monospace; font-size:10px;
+  color:var(--text-faint);
+}
+/* Muted, non-clickable empty state (all attached / none available). */
+.anatomy-skill-picker-empty {
+  padding:7px 10px; font-family:'JetBrains Mono',monospace; font-size:11px;
+  color:var(--text-faint); cursor:default;
+}
+
+/* ─── Engine pills ───────────────────────────────────────────────────────────── */
+.anatomy-engine-pills { display:flex; flex-wrap:wrap; gap:7px; }
+.anatomy-engine-pill {
+  background:var(--bg-raised); border:1px solid var(--border-default);
+  border-radius:20px; padding:5px 13px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-secondary);
+  cursor:pointer; transition: var(--t-interactive);
+}
+.anatomy-engine-pill:hover { border-color:#4a4a56; color:var(--text-primary); }
+.anatomy-engine-pill:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 1px var(--blue);
+  border-color:var(--blue);
+}
+/* Active engine: BORDER-highlighted, not filled (prototype 771). A subtle raised
+   surface plus a brighter border + bright text reads as selected without a
+   saturated blue fill. */
+.anatomy-engine-pill.active {
+  background:var(--bg-card); border-color:var(--border-hover);
+  color:var(--text-primary); font-weight:600;
+}
+.anatomy-engine-pill.active:hover { border-color:#52525c; }
+
+/* Not-yet-supported engines: rendered disabled with a "soon" tag. De-emphasized,
+   flatter surface, no hover lift. Placed after the base/hover/active rules so it
+   wins by source order even though the button is already [disabled]. */
+.anatomy-engine-pill--soon {
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--bg-inset); border:1px solid var(--border-subtle);
+  color:var(--text-ghost); cursor:not-allowed; opacity:.6;
+}
+.anatomy-engine-pill--soon:hover {
+  background:var(--bg-inset); border-color:var(--border-subtle);
+  color:var(--text-ghost);
+}
+.anatomy-engine-soon {
+  display:inline-flex; align-items:center;
+  font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint);
+  background:var(--bg-raised); border:1px solid var(--border-subtle);
+  border-radius:5px; padding:1px 5px; line-height:1.4; margin-left:1px;
+}
+
+/* ─── Autonomy segmented control ─────────────────────────────────────────────── */
+.anatomy-autonomy-control {
+  display:flex; gap:4px;
+  background:var(--bg-inset); border:1px solid #2a2a30; border-radius:8px; padding:4px;
+}
+.anatomy-autonomy-btn {
+  background:transparent; border:1px solid transparent;
+  border-radius:7px; padding:5px 13px; font-size:12px; color:var(--text-secondary);
+  cursor:pointer; font-family:'Inter',system-ui,sans-serif;
+  transition: var(--t-interactive);
+}
+.anatomy-autonomy-btn:hover { background:rgba(255,255,255,.05); color:var(--text-primary); }
+.anatomy-autonomy-btn:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 1px var(--blue);
+  border-color:var(--blue);
+}
+/* Active autonomy: subtle raised segment, not a saturated blue fill (prototype 779).
+   A soft surface + faint border + bright text marks the selected segment quietly. */
+.anatomy-autonomy-btn.active {
+  background:var(--bg-card); border-color:#3a3a44;
+  color:var(--text-primary); font-weight:600;
+}
+.anatomy-autonomy-btn.active:hover { background:var(--bg-card); }
+
+/* ─── Grant gate (amber-bordered confirmation) ───────────────────────────────── */
+.anatomy-grant-gate {
+  background:var(--bg-card); border:1px solid var(--border-default);
+  border-radius:8px; padding:12px 14px; margin-top:10px;
+  display:flex; flex-direction:column; gap:10px;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+/* Amber-border variant: the "you are granting write access" safety moment.
+   Faint amber wash + bright border makes it stand out from the canvas. */
+.anatomy-grant-gate.amber-border {
+  border-color:var(--amber);
+  background:rgba(226,179,90,.06);
+}
+.anatomy-grant-gate-head { display:flex; align-items:center; gap:7px; }
+.anatomy-grant-gate-glyph { color:var(--amber); font-size:12px; }
+.anatomy-grant-gate-title { font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--amber); }
+.anatomy-grant-gate-copy { font-size:13px; color:var(--text-secondary); line-height:1.5; margin:0; }
+.anatomy-grant-gate-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+/* Primary action: grant. Blue fill, high contrast. */
+.anatomy-grant-btn {
+  background:var(--blue); color:#161618;
+  border:1px solid transparent; border-radius:7px;
+  padding:6px 16px; font-size:13px; font-weight:600;
+  cursor:pointer; font-family:'Inter',system-ui,sans-serif;
+  transition: var(--t-interactive);
+}
+.anatomy-grant-btn:hover { background:#a0c8ff; }
+.anatomy-grant-btn:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 2px var(--blue);
+  border-color:transparent;
+}
+/* Secondary action: attach without granting, less prominent. */
+.anatomy-attach-btn {
+  background:var(--bg-raised); border:1px solid var(--border-default);
+  border-radius:7px; padding:6px 14px; font-size:13px; color:var(--text-secondary);
+  cursor:pointer; font-family:'Inter',system-ui,sans-serif;
+  transition: var(--t-interactive);
+}
+.anatomy-attach-btn:hover { border-color:var(--border-hover); color:var(--text-primary); }
+.anatomy-attach-btn:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 1px var(--blue);
+  border-color:var(--blue);
+}
+/* Ghost action: cancel, lowest visual weight. */
+.anatomy-cancel-btn {
+  background:transparent; border:1px solid var(--border-default);
+  border-radius:7px; padding:6px 14px; font-size:13px; color:var(--text-ghost);
+  cursor:pointer; font-family:'Inter',system-ui,sans-serif;
+  transition: var(--t-interactive);
+}
+.anatomy-cancel-btn:hover { border-color:var(--border-hover); color:var(--text-secondary); }
+.anatomy-cancel-btn:focus-visible {
+  outline:none;
+  box-shadow:0 0 0 1px var(--blue);
+  border-color:var(--blue);
+}
+
+/* ── Button interaction polish ───────────────────────────────────────────────
+   One consistent transition (var(--t-interactive): ease-out + transform) plus a
+   subtle tactile press (translateY 1px) across every clickable button. This
+   unifies the mix of per-button transitions (some 120ms, some 130ms, two with
+   none) and adds the missing :active feedback so clicks feel responsive, not
+   floating. Graphite tokens only; no var(--vscode-*). */
+.bh-newagent, .bh-library, .card-review, .open-review-btn,
+.drawer button, button[data-action], .delegation-approve, .delegation-deny,
+.composer-chip, .composer-engine-pill, .composer-dispatch,
+.agent-run-btn, .team-launch-btn, .team-edit-btn, .skill-new-btn,
+.discover-scan-btn, .discover-chip, .discover-btn, .discover-btn-adopt,
+.anatomy-footer-cancel, .anatomy-footer-save, .anatomy-engine-pill, .anatomy-skill-add,
+.card, .agent-card, .skill-card, .discover-card, .team-card,
+.tab-chip.ghost, .drawer .tabs .tab, .tab-bar .lib-tab,
+.drawer-close, .composer-close, .composer-cancel,
+.task-close, .task-submit, .task-cancel,
+.save-btn, .delete-btn, .editor-close, .picker-close {
+  transition: var(--t-interactive);
+}
+.bh-newagent:active:not(:disabled), .bh-library:active:not(:disabled),
+.card-review:active:not(:disabled), .open-review-btn:active:not(:disabled),
+.drawer button:active:not(:disabled), button[data-action]:active:not(:disabled),
+.delegation-approve:active:not(:disabled), .delegation-deny:active:not(:disabled),
+.composer-chip:active:not(:disabled), .composer-engine-pill:active:not(:disabled),
+.composer-dispatch:active:not(:disabled),
+.agent-run-btn:active:not(:disabled), .team-launch-btn:active:not(:disabled),
+.team-edit-btn:active:not(:disabled), .skill-new-btn:active:not(:disabled),
+.discover-scan-btn:active:not(:disabled), .discover-chip:active:not(:disabled),
+.discover-btn:active:not(:disabled), .discover-btn-adopt:active:not(:disabled),
+.anatomy-footer-cancel:active:not(:disabled), .anatomy-footer-save:active:not(:disabled),
+.anatomy-engine-pill:active:not(:disabled), .anatomy-skill-add:active:not(:disabled),
+.card:active, .agent-card:active, .skill-card:active, .discover-card:active, .team-card:active,
+.tab-chip.ghost:active:not(:disabled), .drawer .tabs .tab:active:not(:disabled),
+.tab-bar .lib-tab:active:not(:disabled),
+.drawer-close:active:not(:disabled), .composer-close:active:not(:disabled),
+.composer-cancel:active:not(:disabled),
+.task-close:active:not(:disabled), .task-submit:active:not(:disabled),
+.task-cancel:active:not(:disabled),
+.save-btn:active:not(:disabled), .delete-btn:active:not(:disabled),
+.editor-close:active:not(:disabled), .picker-close:active:not(:disabled) {
+  transform: translateY(1px);
+}
+/* Disabled controls read as inert: no press feedback, no pointer cursor, dimmed.
+   This is the single source of disabled dimming; per-button rules must not also
+   set opacity or they would double-dim. */
+button:disabled, button[disabled] { cursor: not-allowed; opacity: .5; }
+
+/* ── Narrow dock breakpoint ───────────────────────────────────────────────────
+   When the panel is docked narrow, the drawer goes full-width (no scrim needed),
+   the three lane columns stack and scroll vertically, and the two-up grids
+   collapse to a single column so cards stay legible. */
+@media (max-width: 560px) {
+  .drawer { width:100%; max-width:none; }
+  .drawer-scrim { display:none; }
+  .lanes { flex-direction:column; overflow-y:auto; }
+  .skill-grid, .discover-group-cards { grid-template-columns:1fr; }
+}

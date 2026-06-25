@@ -20,9 +20,11 @@ describe("CopilotSession", () => {
     child.out("done editing files\n");
     child.close(0);
 
+    // Each line's trailing newline is preserved on its output event so the
+    // concatenated stream is faithful; summary() trims, so it is unchanged.
     expect(await events).toEqual([
-      { kind: "output", text: "working on it" },
-      { kind: "output", text: "done editing files" },
+      { kind: "output", text: "working on it\n" },
+      { kind: "output", text: "done editing files\n" },
       { kind: "done", summary: "done editing files" },
     ]);
   });
@@ -61,7 +63,7 @@ describe("CopilotSession", () => {
     child.close(0);
     const result = await events;
     expect(result.filter((e) => e.kind === "output")).toEqual([
-      { kind: "output", text: "real output" },
+      { kind: "output", text: "real output\n" },
     ]);
   });
 
@@ -74,7 +76,7 @@ describe("CopilotSession", () => {
     session.stop();
     expect(child.killed).toBe(true);
     const result = await events;
-    expect(result).toEqual([{ kind: "output", text: "starting" }]);
+    expect(result).toEqual([{ kind: "output", text: "starting\n" }]);
   });
 
   it("swallows output emitted after stop()", async () => {
@@ -107,9 +109,10 @@ describe("CopilotSession", () => {
     // not line boundaries, so each line must surface as its own event.
     child.out("first line\nsecond line\n");
     child.close(0);
+    // Still one event per line; the newline that delimited them is kept on each.
     expect(await events).toEqual([
-      { kind: "output", text: "first line" },
-      { kind: "output", text: "second line" },
+      { kind: "output", text: "first line\n" },
+      { kind: "output", text: "second line\n" },
       { kind: "done", summary: "second line" },
     ]);
   });
@@ -123,8 +126,9 @@ describe("CopilotSession", () => {
     child.out("edited cac");
     child.out("he.ts\n");
     child.close(0);
+    // Still a single joined event; the terminating newline is preserved.
     expect(await events).toEqual([
-      { kind: "output", text: "edited cache.ts" },
+      { kind: "output", text: "edited cache.ts\n" },
       { kind: "done", summary: "edited cache.ts" },
     ]);
   });
@@ -150,7 +154,7 @@ describe("CopilotSession", () => {
     child.out(Buffer.from("from a buffer\n", "utf8"));
     child.close(0);
     expect(await events).toEqual([
-      { kind: "output", text: "from a buffer" },
+      { kind: "output", text: "from a buffer\n" },
       { kind: "done", summary: "from a buffer" },
     ]);
   });
@@ -184,6 +188,33 @@ describe("CopilotSession", () => {
     child.close(0);
     const result = await events;
     expect(result).toEqual([{ kind: "done", summary: "Copilot run completed" }]);
+  });
+
+  it("preserves newlines so concatenated output reconstructs a multi-line delegate block", async () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    const events = collect(session.events);
+    // A complete, multi-line fenced delegate block as a real model would stream
+    // it. The downstream orchestrator concatenates output-event texts with no
+    // separator, so the emitted texts must carry their own line terminators or
+    // the block flattens into one run-on line and the delegation parser (which
+    // requires newlines) never matches.
+    const block = "```delegate\nrole: tornike\ntask: say hello world\n```";
+    // Deliver the bytes the way a real stream does: split across multiple
+    // chunks at arbitrary, mid-line boundaries.
+    child.out("```dele");
+    child.out("gate\nrole: tor");
+    child.out("nike\ntask: say hel");
+    child.out("lo world\n``");
+    child.out("`");
+    child.close(0);
+    const result = await events;
+    const reconstructed = result
+      .filter((e) => e.kind === "output")
+      .map((e) => (e as { text: string }).text)
+      .join("");
+    expect(reconstructed).toBe(block);
   });
 
   it("includes the stderr tail in the error message on a non-zero exit", async () => {

@@ -110,12 +110,13 @@ describe("orchestrator M6: sendBack", () => {
     expect(orch.getAgent(agent.id)!.conflict).toBeUndefined();
   });
 
-  it("throws if the agent is not done or conflict", () => {
+  it("throws if the agent is not done, conflict, or stopped", () => {
     const orch = new Orchestrator({ maxParallelAgents: 1 }, new FakeWorkspaceProvider());
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ id: "acp", script: [{ kind: "done", summary: "x" }] }));
     const agent = orch.spawn("Dev", "task");
-    expect(() => orch.sendBack(agent.id, "feedback")).toThrow(/cannot send back/i);
+    // Still "preparing" (synchronous): not a resumable state.
+    expect(() => orch.sendBack(agent.id, "feedback")).toThrow(/cannot resume/i);
   });
 
   it("throws for an unknown agent", () => {

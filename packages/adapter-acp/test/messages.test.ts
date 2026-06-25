@@ -84,7 +84,7 @@ describe("parseAcpLine", () => {
 
 describe("buildInitialize", () => {
   it("builds a valid ACP initialize request", () => {
-    const msg = buildInitialize({ instructions: "be helpful", permissionMode: "ask" });
+    const msg = buildInitialize({ systemPrompt: "be helpful", permissionMode: "ask" });
     expect(msg.method).toBe("initialize");
     expect((msg.params as any).permissionMode).toBe("ask");
     expect((msg.params as any).systemPrompt).toBe("be helpful");

@@ -1,4 +1,5 @@
 import type { AgentSession, EngineAdapter, HealthStatus, Role, Task, Workspace } from "@maestro/core";
+import { ACP_ENGINE_ID } from "@maestro/core";
 import { ACP_CAPABILITIES } from "./capabilities.js";
 import { AcpSession } from "./session.js";
 import { defaultAcpTransportFn } from "./transport.js";
@@ -30,7 +31,7 @@ export interface AcpAdapterOptions {
 }
 
 export class AcpAdapter implements EngineAdapter {
-  readonly id = "acp";
+  readonly id = ACP_ENGINE_ID;
   readonly capabilities = ACP_CAPABILITIES;
   private readonly command: string;
   private readonly transportFn: AcpTransportFn;
@@ -62,6 +63,9 @@ export class AcpAdapter implements EngineAdapter {
       instructions: role.instructions,
       model: role.engine.model,
       autonomy: role.autonomy,
+      soulDoc: task.soulDoc,
+      tools: role.tools,
+      skills: task.skills,
     });
     session.start(task);
     return session;

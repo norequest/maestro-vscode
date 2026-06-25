@@ -1,22 +1,56 @@
 import type { AgentSession, ApprovalDecision, EngineAdapter } from "./adapter.js";
+import { buildLeadBrief, parseDelegateDirectives } from "./delegation.js";
 import { Emitter } from "./emitter.js";
 import { isDiscardableState, isTerminalState } from "./events.js";
 import type {
   Agent,
+  AgentDefaults,
   AgentEvent,
   AgentState,
+  DelegationProposal,
+  DispatchSpec,
   MergeResult,
   OrchestratorConfig,
   OrchestratorEvent,
   PersistedAgentRecord,
+  PreambleResolver,
   Role,
+  SpawnOptions,
   Task,
   Team,
 } from "./types.js";
-import { isWorkspaceManager, type WorkspaceProvider } from "./workspace.js";
+import { isWorkspaceManager, type WorkspaceManager, type WorkspaceProvider } from "./workspace.js";
+
+/** Per-lead bookkeeping for parsing delegation directives out of the stream. */
+interface LeadContext {
+  team: Team;
+  leadRoleName: string;
+  /** Accumulated lead output, scanned for complete ```delegate blocks. */
+  buffer: string;
+  /** role+task keys already turned into proposals, so a growing buffer never re-proposes. */
+  seen: Set<string>;
+  /**
+   * When true, a valid teammate delegation is approved the instant it is parsed
+   * (reusing the human-approval spawn path, so maxParallelAgents still applies),
+   * instead of waiting as a pending proposal. Default false: behavior unchanged.
+   */
+  autoApprove: boolean;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** De-duplicate a list of names, preserving the FIRST occurrence of each. */
+function dedupe(names: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of names) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
 }
 
 export class Orchestrator {
@@ -32,9 +66,22 @@ export class Orchestrator {
   private readonly generations = new Map<string, number>();
   private readonly emitter = new Emitter<OrchestratorEvent>();
   private readonly idGen: () => string;
+  // Lead agents whose output is scanned for delegation directives, keyed by agent id.
+  private readonly leads = new Map<string, LeadContext>();
+  // Fleet sub-agents: maps a conductor's engine toolCallId to the virtual child's
+  // agent id. Keyed by `${conductorId}::${callId}` so two conductors that reuse
+  // the same callId never collide.
+  private readonly subAgentByCall = new Map<string, string>();
+  // Delegation proposals awaiting (or past) the conductor's approval, keyed by id.
+  private readonly delegations = new Map<string, DelegationProposal>();
+  private delegationSeq = 0;
   private running = 0;
   // Merges serialize: each call chains onto this lock before touching the git index.
   private mergeLock: Promise<void> = Promise.resolve();
+  private preambleResolver?: PreambleResolver;
+  // Config-driven DEFAULT layer composed into every spawn's effective role.
+  // Empty by default, so without a setDefaults call spawn behavior is unchanged.
+  private defaults: AgentDefaults = {};
 
   constructor(
     private readonly config: OrchestratorConfig,
@@ -47,6 +94,19 @@ export class Orchestrator {
 
   registerAdapter(adapter: EngineAdapter): void {
     this.adapters.set(adapter.id, adapter);
+  }
+
+  setPreambleResolver(fn: PreambleResolver): void {
+    this.preambleResolver = fn;
+  }
+
+  /**
+   * Set the config-driven DEFAULT layer composed into every agent's preamble.
+   * General `instructions`/`skills` apply to all agents; `leadSkills` only to the
+   * lead. Optional and back-compatible: not calling this leaves spawn unchanged.
+   */
+  setDefaults(d: AgentDefaults): void {
+    this.defaults = d;
   }
 
   registerRole(role: Role): void {
@@ -65,12 +125,26 @@ export class Orchestrator {
     return this.agents.get(id);
   }
 
-  spawn(roleName: string, description: string): Agent {
-    const role = this.roles.get(roleName);
-    if (!role) throw new Error(`Unknown role: ${roleName}`);
+  spawn(roleName: string, description: string, opts: SpawnOptions = {}): Agent {
+    const base = this.roles.get(roleName);
+    if (!base) throw new Error(`Unknown role: ${roleName}`);
+    const role = this.effectiveRole(base, opts);
     const id = this.idGen();
-    const task: Task = { id: `task-${id}`, description, roleName };
-    const agent: Agent = { id, task, role, state: "preparing", log: [] };
+    const task: Task = {
+      id: `task-${id}`,
+      description,
+      roleName,
+      ...(opts.goal !== undefined ? { goal: opts.goal } : {}),
+      ...(opts.agentProfiles !== undefined ? { agentProfiles: opts.agentProfiles } : {}),
+    };
+    const agent: Agent = {
+      id,
+      task,
+      role,
+      state: "preparing",
+      log: [],
+      ...(opts.parentId !== undefined ? { parentId: opts.parentId } : {}),
+    };
     this.agents.set(id, agent);
     this.emitter.emit({ kind: "agent-added", agent });
     this.tryStart(agent);
@@ -78,19 +152,114 @@ export class Orchestrator {
   }
 
   /**
-   * Dispatch a whole team in one call: for each role in order, register it (so
-   * spawn can resolve it by name) then spawn an agent on the shared description.
-   * Returns the new agents in role order. An empty team returns []. This is a thin
-   * convenience over registerRole + spawn, so the concurrency queue and
-   * maxParallelAgents behavior are inherited unchanged: launching a team larger
-   * than the parallel limit starts the first N and queues the rest exactly as
-   * repeated spawn() calls would.
+   * Build the EFFECTIVE role for one spawn: the registered role with the
+   * config-driven DEFAULT layer and any per-dispatch overrides folded in, WITHOUT
+   * mutating the registered role.
+   *
+   * Instructions order (general layer applies to ALL agents): defaults.instructions
+   * first, then the per-agent prefix (e.g. the lead brief), then the role's own
+   * instructions. Each segment is omitted when empty, so a role with no defaults and
+   * no prefix is returned untouched.
+   *
+   * Skills: defaults.skills (all agents), then defaults.leadSkills (lead only),
+   * then the role's own skills, de-duplicated by name preserving first occurrence.
+   * The injected preamble resolver resolves these merged names, so the default
+   * skills ride in on role.skills for free with no resolver change.
    */
-  launchTeam(team: Team, description: string): Agent[] {
-    return team.roles.map((role) => {
+  private effectiveRole(base: Role, opts: SpawnOptions): Role {
+    const instructions = [
+      this.defaults.instructions?.trim() ? this.defaults.instructions : undefined,
+      opts.instructionsPrefix,
+      base.instructions,
+    ]
+      .filter((s): s is string => s !== undefined && s !== "")
+      .join("\n\n");
+
+    const mergedSkills = dedupe([
+      ...(this.defaults.skills ?? []),
+      ...(opts.isLead ? (this.defaults.leadSkills ?? []) : []),
+      ...(base.skills ?? []),
+    ]);
+
+    const engineChanged = opts.engineId !== undefined || opts.model !== undefined;
+    const instructionsChanged = instructions !== base.instructions;
+    const skillsChanged = mergedSkills.length !== (base.skills?.length ?? 0);
+    // Nothing to fold in: return the registered role untouched (cheap, and keeps
+    // identity-equality for callers that compare against the registered role).
+    if (!engineChanged && !instructionsChanged && !skillsChanged) return base;
+
+    return {
+      ...base,
+      engine: {
+        id: opts.engineId ?? base.engine.id,
+        ...((opts.model ?? base.engine.model) !== undefined
+          ? { model: opts.model ?? base.engine.model }
+          : {}),
+      },
+      instructions,
+      ...(mergedSkills.length > 0 ? { skills: mergedSkills } : {}),
+    };
+  }
+
+  dispatch(spec: DispatchSpec): Agent {
+    if (spec.roleName) {
+      return this.spawn(spec.roleName, spec.description, {
+        ...(spec.goal !== undefined ? { goal: spec.goal } : {}),
+        ...(spec.engineId !== undefined ? { engineId: spec.engineId } : {}),
+        ...(spec.model !== undefined ? { model: spec.model } : {}),
+      });
+    }
+    if (spec.newRoleName) {
+      const role: Role = {
+        name: spec.newRoleName,
+        instructions: `Ad-hoc role dispatched from the Conducting Board. ${spec.description}`,
+        engine: {
+          id: spec.engineId ?? "copilot",
+          ...(spec.model !== undefined ? { model: spec.model } : {}),
+        },
+        autonomy: "auto-approve-safe",
+      };
       this.registerRole(role);
-      return this.spawn(role.name, description);
+      return this.spawn(role.name, spec.description, spec.goal !== undefined ? { goal: spec.goal } : {});
+    }
+    throw new Error("dispatch requires either roleName or newRoleName");
+  }
+
+  /**
+   * Dispatch a team lead-first. Every role is registered (so a later delegation
+   * resolves it by name), then ONLY the lead is spawned, with a brief that names
+   * its teammates and teaches the delegation format. The lead does small work
+   * itself and delegates the rest; each delegation becomes a proposal the
+   * conductor approves (see approveDelegation). Returns the single lead agent in
+   * a one-element array, or [] for an empty team.
+   *
+   * The lead is `team.lead` when set (and present in `roles`), else the first
+   * role. The lead inherits the concurrency queue exactly as spawn() does.
+   *
+   * With `opts.autoApprove`, the lead's delegations to VALID teammates spawn
+   * immediately (no pending human approval), reusing the same approve+spawn path
+   * so maxParallelAgents is still respected. Unknown/self roles are never
+   * auto-approved. Without it, behavior is unchanged.
+   */
+  launchTeam(team: Team, description: string, opts: { autoApprove?: boolean } = {}): Agent[] {
+    for (const role of team.roles) this.registerRole(role);
+    const lead =
+      (team.lead !== undefined ? team.roles.find((r) => r.name === team.lead) : undefined) ??
+      team.roles[0];
+    if (!lead) return [];
+    const agent = this.spawn(lead.name, description, {
+      instructionsPrefix: buildLeadBrief(team, lead),
+      // The lead holds the team roster, so the lead-only default skills apply.
+      isLead: true,
     });
+    this.leads.set(agent.id, {
+      team,
+      leadRoleName: lead.name,
+      buffer: "",
+      seen: new Set(),
+      autoApprove: opts.autoApprove ?? false,
+    });
+    return [agent];
   }
 
   private tryStart(agent: Agent): void {
@@ -129,6 +298,46 @@ export class Orchestrator {
       this.update(agent, "stopped");
       this.release();
       return;
+    }
+    if (this.preambleResolver) {
+      try {
+        const resolved = await this.preambleResolver(agent.role);
+        if (resolved.soulDoc !== undefined) agent.task = { ...agent.task, soulDoc: resolved.soulDoc };
+        if (resolved.skills !== undefined) agent.task = { ...agent.task, skills: resolved.skills };
+      } catch {
+        // resolver failure is non-fatal; continue without soul/skills
+      }
+    }
+    // Materialize the task's skills into the worktree so the engine can discover
+    // and load them on demand (skills are advertised by name in the preamble, not
+    // inlined). Guarded: only when the provider is a manager that supports
+    // writeSkills and the task actually carries skills; otherwise a no-op.
+    if (
+      typeof (this.workspaces as Partial<WorkspaceManager>).writeSkills === "function" &&
+      agent.task.skills &&
+      agent.task.skills.length > 0
+    ) {
+      try {
+        await (this.workspaces as WorkspaceManager).writeSkills!(agent.id, agent.task.skills);
+      } catch {
+        // materialization failure is non-fatal; the engine just lacks the files
+      }
+    }
+    // Materialize the task's agent profiles into the worktree at
+    // .github/agents/<name>.agent.md so the engine discovers them as worktree-local
+    // custom agents instead of the user's global ~/.copilot/agents. Guarded: only
+    // when the provider is a manager that supports writeAgentProfiles and the task
+    // actually carries profiles; otherwise a no-op.
+    if (
+      typeof (this.workspaces as Partial<WorkspaceManager>).writeAgentProfiles === "function" &&
+      agent.task.agentProfiles &&
+      agent.task.agentProfiles.length > 0
+    ) {
+      try {
+        await (this.workspaces as WorkspaceManager).writeAgentProfiles!(agent.id, agent.task.agentProfiles);
+      } catch {
+        // materialization failure is non-fatal; the engine just lacks the files
+      }
     }
     this.update(agent, "working");
     agent.engineCapabilities = {
@@ -171,7 +380,27 @@ export class Orchestrator {
   }
 
   private applyEvent(agent: Agent, event: AgentEvent): void {
-    if (isTerminalState(agent.state)) return;
+    if (isTerminalState(agent.state)) {
+      // A lead can finish (done) and still flush a final output line carrying the
+      // closing ``` of a delegate block. That trailing output lands AFTER the
+      // terminal event, so the normal output handler below never runs for it.
+      // Keep accumulating and scanning a finished lead's output so a block that
+      // only closes at stream end is still surfaced. Dedupe (lead.seen) makes
+      // this idempotent, so already-proposed directives are never double-proposed.
+      if (event.kind === "output") {
+        const lead = this.leads.get(agent.id);
+        if (lead) this.scanDelegations(agent, lead, event.text);
+      }
+      return;
+    }
+    // A stop() in flight wins over a late terminal event from the dying engine.
+    // A killed CLI can still flush a final `done` (exit 0) or `error`; without
+    // this, that event would mark the agent done/error and the user's Stop would
+    // be silently ignored (the agent would look finished, even mergeable).
+    if (this.stopping.has(agent.id) && (event.kind === "done" || event.kind === "error")) {
+      this.update(agent, "stopped");
+      return;
+    }
     switch (event.kind) {
       case "approval": {
         agent.pendingApprovalId = event.id;
@@ -195,18 +424,158 @@ export class Orchestrator {
       case "status":
         this.update(agent, event.state);
         break;
-      case "done":
+      case "done": {
         agent.summary = event.summary;
         agent.diff = event.diff;
+        // The `done` event carries summary/diff, not output text. If a complete
+        // ```delegate block is sitting in the lead's buffer exactly when
+        // completion arrives (the block closed at stream end), no further output
+        // event will trigger a scan. Do one final defensive scan of the existing
+        // buffer (text "") before marking terminal. scanDelegations reuses the
+        // lead's `seen` set, so already-proposed directives are not re-proposed.
+        const lead = this.leads.get(agent.id);
+        if (lead) this.scanDelegations(agent, lead, "");
         this.update(agent, "done");
         if (event.diff === undefined) this.computeDiff(agent);
         break;
+      }
       case "error":
         this.fail(agent, event.message);
         break;
-      case "output":
+      case "output": {
+        const lead = this.leads.get(agent.id);
+        if (lead) this.scanDelegations(agent, lead, event.text);
+        break;
+      }
       case "action":
         break;
+      case "subagent-started":
+        // Only a real conductor (a live, non-virtual agent) materializes a child.
+        // A virtual agent has no session of its own, so it never sees these.
+        if (!agent.virtual) this.startSubAgent(agent, event.callId, event.name, event.description);
+        break;
+      case "subagent-output":
+        if (!agent.virtual) this.outputSubAgent(agent, event.callId, event.text);
+        break;
+      case "subagent-done":
+        if (!agent.virtual) this.doneSubAgent(agent, event.callId, event.summary);
+        break;
+    }
+  }
+
+  /** Compose the map key that scopes a sub-agent callId to its conductor. */
+  private subAgentKey(conductorId: string, callId: string): string {
+    return `${conductorId}::${callId}`;
+  }
+
+  /**
+   * Surface a fleet sub-agent reported on a conductor's stream as a READ-ONLY
+   * virtual child. No process and no worktree is created: it shares the
+   * conductor's workspace reference, has no engine session of its own, and the
+   * conductor remains the single reviewable/mergeable unit. The role is resolved
+   * by name from the registry when present, else synthesized ad-hoc.
+   */
+  private startSubAgent(
+    conductor: Agent,
+    callId: string,
+    name: string,
+    description?: string,
+  ): void {
+    const role: Role = this.roles.get(name) ?? {
+      name,
+      instructions: "",
+      engine: { id: conductor.role.engine.id },
+      autonomy: "manual",
+    };
+    const id = this.idGen();
+    const task: Task = {
+      id: `task-${id}`,
+      description: description ?? name,
+      roleName: name,
+    };
+    const child: Agent = {
+      id,
+      task,
+      role,
+      state: "working",
+      log: [],
+      parentId: conductor.id,
+      // Shared reference to the conductor's workspace; may be undefined if the
+      // conductor has none yet, which is fine (a virtual child never merges).
+      workspace: conductor.workspace,
+      engineCapabilities: { approvals: false, steerable: false },
+      virtual: true,
+    };
+    this.agents.set(id, child);
+    this.subAgentByCall.set(this.subAgentKey(conductor.id, callId), id);
+    this.emitter.emit({ kind: "agent-added", agent: child });
+  }
+
+  /** Route a sub-agent's output into its virtual child's log; ignore if unknown. */
+  private outputSubAgent(conductor: Agent, callId: string, text: string): void {
+    const childId = this.subAgentByCall.get(this.subAgentKey(conductor.id, callId));
+    if (childId === undefined) return; // unknown callId: ignore silently
+    const child = this.agents.get(childId);
+    if (!child) return;
+    const event: AgentEvent = { kind: "output", text };
+    child.log.push(event);
+    this.emitter.emit({ kind: "agent-event", agentId: child.id, event });
+  }
+
+  /** Finish a virtual child in "done"; never computes a diff (it has no branch). */
+  private doneSubAgent(conductor: Agent, callId: string, summary?: string): void {
+    const childId = this.subAgentByCall.get(this.subAgentKey(conductor.id, callId));
+    if (childId === undefined) return; // unknown callId: ignore silently
+    const child = this.agents.get(childId);
+    if (!child || isTerminalState(child.state)) return;
+    if (summary !== undefined) child.summary = summary;
+    this.update(child, "done");
+  }
+
+  /**
+   * When a conductor reaches a terminal state, move any of its still-non-terminal
+   * virtual children to "done" so they do not hang as "working" forever (e.g. a
+   * sub-agent whose subagent-done never arrived because the session ended).
+   */
+  private reconcileVirtualChildren(conductorId: string): void {
+    for (const agent of this.agents.values()) {
+      if (agent.virtual && agent.parentId === conductorId && !isTerminalState(agent.state)) {
+        this.update(agent, "done");
+      }
+    }
+  }
+
+  /**
+   * Accumulate a lead's output and turn each new complete ```delegate block into
+   * a pending DelegationProposal. Deduped by role+task so a growing buffer never
+   * re-proposes an earlier block. A block naming an unknown role or the lead
+   * itself is recorded as seen (so it is not re-evaluated) and otherwise ignored.
+   */
+  private scanDelegations(agent: Agent, lead: LeadContext, text: string): void {
+    lead.buffer += text;
+    for (const directive of parseDelegateDirectives(lead.buffer)) {
+      const key = `${directive.role} ${directive.task}`;
+      if (lead.seen.has(key)) continue;
+      lead.seen.add(key);
+      const isTeammate =
+        directive.role !== lead.leadRoleName &&
+        lead.team.roles.some((r) => r.name === directive.role);
+      if (!isTeammate) continue; // unknown or self target: ignore
+      const proposal: DelegationProposal = {
+        id: `delegation-${++this.delegationSeq}`,
+        leadAgentId: agent.id,
+        roleName: directive.role,
+        task: directive.task,
+        state: "pending",
+      };
+      this.delegations.set(proposal.id, proposal);
+      this.emitter.emit({ kind: "delegation-proposed", proposal });
+      // Auto-approve path (default-lead launch): a vetted teammate spawns at once
+      // through the SAME approval+spawn helper a human click would use, so the
+      // audit log records proposed -> resolved(approved) and over-cap spawns queue
+      // exactly as a hand-approved delegation would. Without autoApprove the
+      // proposal stays pending until approveDelegation() is called.
+      if (lead.autoApprove) this.resolveApproval(proposal);
     }
   }
 
@@ -222,6 +591,12 @@ export class Orchestrator {
   private update(agent: Agent, state: AgentState): void {
     agent.state = state;
     this.emitter.emit({ kind: "agent-updated", agent });
+    // A conductor reaching a terminal state reconciles its virtual children so
+    // none hang as "working" after the session that fed them ended. Guarded to
+    // a non-virtual agent so a child's own done transition never recurses.
+    if (!agent.virtual && isTerminalState(state)) {
+      this.reconcileVirtualChildren(agent.id);
+    }
   }
 
   private fail(agent: Agent, message: string): void {
@@ -257,6 +632,7 @@ export class Orchestrator {
 
   approve(agentId: string, approvalId: string, decision: ApprovalDecision): void {
     const agent = this.requireAgent(agentId);
+    if (agent.virtual) throw new Error("approve is not available for a fleet sub-agent");
     if (agent.state !== "awaiting-approval") {
       throw new Error(`Agent ${agentId} is not awaiting approval`);
     }
@@ -269,12 +645,63 @@ export class Orchestrator {
   }
 
   steer(agentId: string, input: string): void {
+    const agent = this.agents.get(agentId);
+    if (agent?.virtual) throw new Error("steer is not available for a fleet sub-agent");
     const session = this.sessions.get(agentId);
     if (!session) throw new Error(`No active session for ${agentId}`);
     session.send(input);
   }
 
+  /** All delegation proposals (pending and resolved), newest last. */
+  getDelegations(): DelegationProposal[] {
+    return [...this.delegations.values()];
+  }
+
+  /**
+   * Approve a pending delegation: spawn the teammate on its subtask as a child of
+   * the lead. The teammate is a normal agent (own worktree, own diff, own review)
+   * and inherits the concurrency queue. Independent of the lead's session, so it
+   * works even after the lead has finished.
+   */
+  approveDelegation(proposalId: string): Agent {
+    const proposal = this.delegations.get(proposalId);
+    if (!proposal) throw new Error(`Unknown delegation: ${proposalId}`);
+    if (proposal.state !== "pending") {
+      throw new Error(`Delegation ${proposalId} is already ${proposal.state}`);
+    }
+    return this.resolveApproval(proposal);
+  }
+
+  /**
+   * The single approve+spawn path shared by the human gate (approveDelegation)
+   * and the auto-approve route (scanDelegations under autoApprove). Marks the
+   * proposal approved, emits delegation-resolved, and spawns the teammate as a
+   * child of the lead. The teammate is a normal agent (own worktree, own diff,
+   * own review) and inherits the concurrency queue via spawn() -> tryStart(), so
+   * over-cap spawns queue exactly like any other agent.
+   */
+  private resolveApproval(proposal: DelegationProposal): Agent {
+    proposal.state = "approved";
+    this.emitter.emit({ kind: "delegation-resolved", proposal });
+    return this.spawn(proposal.roleName, proposal.task, { parentId: proposal.leadAgentId });
+  }
+
+  /** Deny a pending delegation: nothing spawns; the proposal becomes "denied". */
+  denyDelegation(proposalId: string): void {
+    const proposal = this.delegations.get(proposalId);
+    if (!proposal) throw new Error(`Unknown delegation: ${proposalId}`);
+    if (proposal.state !== "pending") {
+      throw new Error(`Delegation ${proposalId} is already ${proposal.state}`);
+    }
+    proposal.state = "denied";
+    this.emitter.emit({ kind: "delegation-resolved", proposal });
+  }
+
   stop(agentId: string): void {
+    // A virtual fleet sub-agent has no session, slot, or queue entry: stopping it
+    // is meaningless, so no-op (least surprising; keeps the conductor the unit a
+    // user actually stops).
+    if (this.agents.get(agentId)?.virtual) return;
     const session = this.sessions.get(agentId);
     if (session) {
       // Live session: signal the engine and let consume() finish the agent in
@@ -303,6 +730,7 @@ export class Orchestrator {
 
   async merge(agentId: string): Promise<MergeResult> {
     const agent = this.requireAgent(agentId);
+    if (agent.virtual) throw new Error("merge is not available for a fleet sub-agent");
     if (agent.state !== "done" && agent.state !== "detached") {
       throw new Error(`Agent ${agentId} is not ready to merge (state: ${agent.state})`);
     }
@@ -349,6 +777,7 @@ export class Orchestrator {
    */
   async markPrCreated(agentId: string): Promise<void> {
     const agent = this.requireAgent(agentId);
+    if (agent.virtual) throw new Error("create PR is not available for a fleet sub-agent");
     if (agent.state !== "done") {
       throw new Error(`Agent ${agentId} is not ready for a PR (state: ${agent.state})`);
     }
@@ -382,6 +811,7 @@ export class Orchestrator {
 
   async retryCleanup(agentId: string): Promise<void> {
     const agent = this.requireAgent(agentId);
+    if (agent.virtual) throw new Error("retry cleanup is not available for a fleet sub-agent");
     if (agent.state !== "merge-cleanup-failed") {
       throw new Error(`Agent ${agentId} is not in merge-cleanup-failed state`);
     }
@@ -400,6 +830,7 @@ export class Orchestrator {
    */
   finishConflictResolution(agentId: string): void {
     const agent = this.requireAgent(agentId);
+    if (agent.virtual) throw new Error("finish conflict resolution is not available for a fleet sub-agent");
     if (agent.state !== "conflict") {
       throw new Error(`Agent ${agentId} is not in conflict state (state: ${agent.state})`);
     }
@@ -409,6 +840,7 @@ export class Orchestrator {
 
   async discard(agentId: string): Promise<void> {
     const agent = this.requireAgent(agentId);
+    if (agent.virtual) throw new Error("discard is not available for a fleet sub-agent");
     if (!isDiscardableState(agent.state)) {
       throw new Error(`Agent ${agentId} cannot be discarded (state: ${agent.state})`);
     }
@@ -443,6 +875,10 @@ export class Orchestrator {
    */
   hydrate(records: readonly PersistedAgentRecord[]): void {
     for (const record of records) {
+      // A virtual fleet sub-agent is derived from a live conductor stream and has
+      // no workspace or session of its own. There is no stream to rehydrate it
+      // from after a reload, so it is never restored as an independent agent.
+      if (record.agent.virtual) continue;
       // Copy the mutable log array so later consume() pushes don't mutate the
       // caller's snapshot, and so hydrating the same records twice yields
       // independent log arrays rather than one aliased array shared across agents.
@@ -474,16 +910,18 @@ export class Orchestrator {
   }
 
   /**
-   * Re-launch a done or conflict agent in its EXISTING worktree with feedback
-   * appended to the task description. The previous session already ended; the
-   * worktree is reused (launch() skips create when agent.workspace is set), so
-   * partial work on disk is preserved. done|conflict -> preparing -> working.
+   * Re-launch a done, conflict, or stopped agent in its EXISTING worktree. The
+   * previous session already ended; the worktree is reused (launch() skips create
+   * when agent.workspace is set), so partial work on disk is preserved. With
+   * feedback it is "send back" (done|conflict); with empty feedback it is "resume"
+   * (the natural action for a stopped agent). done|conflict|stopped -> preparing.
    */
   sendBack(agentId: string, feedback: string): Agent {
     const agent = this.requireAgent(agentId);
-    if (agent.state !== "done" && agent.state !== "conflict") {
+    if (agent.virtual) throw new Error("send back is not available for a fleet sub-agent");
+    if (agent.state !== "done" && agent.state !== "conflict" && agent.state !== "stopped") {
       throw new Error(
-        `Cannot send back agent ${agentId} (state: ${agent.state}); only done or conflict agents can be sent back`,
+        `Cannot resume agent ${agentId} (state: ${agent.state}); only done, conflict, or stopped agents can be resumed`,
       );
     }
     // Bump the run generation now (not just at relaunch): if a diff-on-done from
@@ -498,10 +936,14 @@ export class Orchestrator {
     agent.pendingApprovalId = undefined;
     agent.approvalDetail = undefined;
     agent.log = [];
-    agent.task = {
-      ...agent.task,
-      description: `${agent.task.description}\n\nConductor feedback: ${feedback}`,
-    };
+    // Only append feedback when there is some: a bare resume keeps the task intact.
+    const trimmed = feedback.trim();
+    if (trimmed.length > 0) {
+      agent.task = {
+        ...agent.task,
+        description: `${agent.task.description}\n\nConductor feedback: ${trimmed}`,
+      };
+    }
     this.update(agent, "preparing");
     this.tryStart(agent);
     return agent;

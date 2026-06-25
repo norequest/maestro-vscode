@@ -1,0 +1,14 @@
+{
+  "servers": [
+    {
+      "name": "file-writer",
+      "description": "Write files to disk",
+      "command": "npx",
+      "args": ["-y", "mcp-file-writer"]
+    },
+    {
+      "name": "code-search",
+      "description": "Search codebase (vscode override)"
+    }
+  ]
+}
