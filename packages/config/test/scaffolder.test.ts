@@ -342,7 +342,7 @@ describe("VENDORED_SKILLS", () => {
     for (const { body } of VENDORED_SKILLS) {
       expect(body.startsWith("# ")).toBe(true);
       expect(body).toContain(
-        "Adapted for Maestro from wshobson/agents (MIT). Original in docs/vendor/wshobson-agents.",
+        "Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.",
       );
     }
   });

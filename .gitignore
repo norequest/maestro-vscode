@@ -22,3 +22,6 @@ packages/*/.vscode-test/
 # byproducts, not source.
 packages/extension/.conductor/
 packages/extension/.github/
+
+# Internal docs (runbooks, design refs) kept local, not published to the repo
+/docs/

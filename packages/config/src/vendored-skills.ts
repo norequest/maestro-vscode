@@ -1,9 +1,9 @@
 import type { SkillManifest } from "./skill-types.js";
 
 /**
- * Three on-demand SKILL.md files vendored and ADAPTED for Maestro from
- * wshobson/agents (MIT). The verbatim originals live, read-only, under
- * docs/vendor/wshobson-agents/skills/ for traceability.
+ * Three on-demand SKILL.md files adapted for Maestro from
+ * github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md at the repo root
+ * for the upstream copyright and full license text.
  *
  * Maestro reality these rewrites target: agents are isolated git-worktree
  * subprocesses. They cannot message each other, broadcast, or request
@@ -37,7 +37,7 @@ export const TASK_COORDINATION_STRATEGIES_SKILL: VendoredSkill = {
   },
   body: `# Task Coordination Strategies
 
-Adapted for Maestro from wshobson/agents (MIT). Original in docs/vendor/wshobson-agents.
+Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
 How to decompose a task into units you can hand to teammates that run in
 isolation and compose cleanly. In Maestro there is no task graph and no
@@ -192,7 +192,7 @@ export const TEAM_COMPOSITION_PATTERNS_SKILL: VendoredSkill = {
   },
   body: `# Team Composition Patterns
 
-Adapted for Maestro from wshobson/agents (MIT). Original in docs/vendor/wshobson-agents.
+Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
 How to size a team and pick which roles to delegate to. In Maestro a team is a
 roster of roles defined in \`.conductor/roles\` and grouped in
@@ -319,7 +319,7 @@ export const TEAM_COMMUNICATION_PROTOCOLS_SKILL: VendoredSkill = {
   },
   body: `# Team Communication Protocols
 
-Adapted for Maestro from wshobson/agents (MIT). Original in docs/vendor/wshobson-agents.
+Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
 How teammates coordinate in Maestro, given that they cannot. Each teammate is an
 isolated git-worktree subprocess. There is no message bus, no send-to-all, no

@@ -9,9 +9,10 @@ Maestro dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/ACP), 
 ## Demo
 
 <!-- For the VS Code Marketplace listing, swap this relative path for the absolute raw URL
-     https://raw.githubusercontent.com/norequest/maestro-vscode/main/docs/media/demo.gif
-     (the Marketplace does not resolve relative paths). See docs/PUBLISHING.md. -->
-![Maestro: dispatch an agent, watch it stream in an isolated worktree, review the diff, merge.](docs/media/demo.gif)
+     https://raw.githubusercontent.com/norequest/maestro-vscode/main/media/demo.gif
+     (the Marketplace does not resolve relative paths). -->
+<p align="center"><img src="media/demo.gif" width="340" alt="Maestro: conduct a team of AI coding agents in VS Code" /></p>
+<p align="center"><a href="media/maestro-dev.mp4">Watch the full video</a></p>
 
 ## Features
 
@@ -45,9 +46,28 @@ Maestro dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/ACP), 
 
 Roles, teams, and skills live in a `.conductor/` directory in your workspace, which Maestro scaffolds on first run.
 
-## Learn more
+## Development
 
-See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for the architecture and how to build, test, and package Maestro, and [`docs/PUBLISHING.md`](docs/PUBLISHING.md) for the Marketplace release process.
+Maestro is a pnpm workspace monorepo (plain `pnpm -r`, no Turborepo). The orchestration brain (`@maestro/core` and the engine adapters) is pure TypeScript with no `vscode` imports, so it unit-tests in isolation; `@maestro/extension` is the only package that touches the VS Code API.
+
+```bash
+git clone https://github.com/norequest/maestro-vscode.git
+cd maestro-vscode
+pnpm install
+pnpm verify     # build, typecheck, and test every package
+pnpm -r test    # tests only
+```
+
+Work on the extension itself:
+
+```bash
+cd packages/extension
+pnpm watch                                     # esbuild watch (bundles host + webview)
+# then press F5 in VS Code to launch an Extension Development Host
+npx @vscode/vsce package --no-dependencies     # build a VSIX
+```
+
+A running Extension Development Host does not pick up a rebuild on its own: close that window and press F5 again (a reload is not enough).
 
 <details>
 <summary>Concepts and engine modes</summary>
@@ -82,6 +102,10 @@ Trade-off: fleet gives you one shared context and one combined diff. Isolated mo
 `config.yaml` in `.conductor/` controls workspace defaults, including `maxParallelAgents` (how many agents run at once; the rest queue).
 
 </details>
+
+## Contributing
+
+Maestro is pre-release and very much open to contributions. If you hit a bug, have an idea, or just have a question, please open a GitHub issue at https://github.com/norequest/maestro-vscode/issues. That is the best place to start a conversation, whether it is about an engine adapter, the Conducting Board UI, or the orchestration core. Pull requests are welcome too, and opening an issue first is a great way to make sure the change lands cleanly.
 
 ## License
 
