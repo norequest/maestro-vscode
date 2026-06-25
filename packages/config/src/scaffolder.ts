@@ -2,7 +2,7 @@ import * as nodePath from "node:path";
 import { serializeRole, serializeSkill } from "./serializer.js";
 import { SKILLS_DIR_SEGMENTS } from "./paths.js";
 import { VENDORED_SKILLS } from "./vendored-skills.js";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import type { SkillManifest } from "./skill-types.js";
 
 /** Minimal async fs interface for writing; injectable for offline testing. */
@@ -13,9 +13,9 @@ export interface FsWriter {
   exists(path: string): Promise<boolean>;
   /** Create a directory and all parents. No-op if it already exists. */
   mkdir(path: string): Promise<void>;
-  /** Remove a directory and all its contents recursively. Refuses to remove paths outside .conductor (containment guard). */
+  /** Remove a directory and all its contents recursively. Refuses to remove paths outside .hallucinate (containment guard). */
   removeDir(path: string): Promise<void>;
-  /** Remove a single file. No-op if it does not exist. Refuses to remove paths outside .conductor (containment guard). */
+  /** Remove a single file. No-op if it does not exist. Refuses to remove paths outside .hallucinate (containment guard). */
   removeFile(path: string): Promise<void>;
 }
 
@@ -40,8 +40,8 @@ const STARTER_SKILL: { manifest: SkillManifest; body: string } = {
     "Do not modify test files; only fix the source code under test.",
 };
 
-const STARTER_CONFIG_YAML = `# Maestro orchestrator configuration
-# See .conductor/roles/ to define roles and .conductor/teams/ to group them.
+const STARTER_CONFIG_YAML = `# Hallucinate run configuration
+# See .hallucinate/roles/ to define roles and .hallucinate/teams/ to group them.
 maxParallelAgents: 3
 
 # defaults: a config-driven layer composed into agents at spawn.
@@ -57,24 +57,24 @@ defaults:
 `;
 
 /**
- * Write a starter .conductor/ directory if it does not already exist.
- * Returns true if scaffolding was performed, false if .conductor/ was already present.
+ * Write a starter .hallucinate/ directory if it does not already exist.
+ * Returns true if scaffolding was performed, false if .hallucinate/ was already present.
  */
 export async function scaffoldIfMissing(
   workspaceRoot: string,
   fs: FsWriter,
 ): Promise<boolean> {
-  const conductorDir = nodePath.join(workspaceRoot, ".conductor");
+  const hallucinateDir = nodePath.join(workspaceRoot, ".hallucinate");
 
-  if (await fs.exists(conductorDir)) {
+  if (await fs.exists(hallucinateDir)) {
     return false;
   }
 
-  const rolesDir = nodePath.join(conductorDir, "roles");
-  const teamsDir = nodePath.join(conductorDir, "teams");
+  const rolesDir = nodePath.join(hallucinateDir, "roles");
+  const teamsDir = nodePath.join(hallucinateDir, "teams");
   // Skills live in the .github/skills home (the folder VS Code and Copilot
-  // read), NOT under .conductor. Roles, teams, and config.yaml stay in
-  // .conductor.
+  // read), NOT under .hallucinate. Roles, teams, and config.yaml stay in
+  // .hallucinate.
   const skillsDir = nodePath.join(workspaceRoot, ...SKILLS_DIR_SEGMENTS);
 
   await fs.mkdir(rolesDir);
@@ -84,7 +84,7 @@ export async function scaffoldIfMissing(
   const implementerPath = nodePath.join(rolesDir, "implementer.yaml");
   await fs.writeFile(implementerPath, serializeRole(STARTER_ROLE));
 
-  const configPath = nodePath.join(conductorDir, "config.yaml");
+  const configPath = nodePath.join(hallucinateDir, "config.yaml");
   await fs.writeFile(configPath, STARTER_CONFIG_YAML);
 
   await writeSkillIfMissing(skillsDir, STARTER_SKILL, fs);
@@ -96,7 +96,7 @@ export async function scaffoldIfMissing(
 }
 
 /**
- * Ensure the vendored skills exist under .github/skills/, even when .conductor/
+ * Ensure the vendored skills exist under .github/skills/, even when .hallucinate/
  * already exists (scaffoldIfMissing only writes them on a fresh tree).
  * Idempotent: never overwrites an existing SKILL.md. Creates .github/skills/ if
  * absent. Returns the names of skills newly written.
@@ -146,11 +146,11 @@ export async function writeSkillIfMissing(
 /**
  * Containment predicate for the node-backed writer's remove guards. True when
  * the resolved path segments place the target inside one of the two allowed
- * homes: .conductor (roles/teams/config) OR .github/skills (the skills home).
+ * homes: .hallucinate (roles/teams/config) OR .github/skills (the skills home).
  * Anything else (e.g. .github/workflows or an unrelated directory) is refused.
  */
 function isInsideAllowedHome(segments: string[]): boolean {
-  if (segments.includes(".conductor")) {
+  if (segments.includes(".hallucinate")) {
     return true;
   }
   return segments.includes(".github") && segments.includes("skills");
@@ -181,25 +181,25 @@ export async function makeNodeFsWriter(): Promise<FsWriter> {
     },
     async removeDir(p: string): Promise<void> {
       // Containment guard: only remove inside one of the two allowed homes,
-      // .conductor (roles/teams/config) or .github/skills (the skills home).
+      // .hallucinate (roles/teams/config) or .github/skills (the skills home).
       const path = await import("node:path");
       const segments = path.resolve(p).split(path.sep);
       if (!isInsideAllowedHome(segments)) {
         throw new Error(
-          `Refusing to removeDir "${p}": path is not inside a .conductor or .github/skills directory.`,
+          `Refusing to removeDir "${p}": path is not inside a .hallucinate or .github/skills directory.`,
         );
       }
       await fs.rm(p, { recursive: true, force: true });
     },
     async removeFile(p: string): Promise<void> {
       // Containment guard: the same homes removeDir allows. A role/team is a
-      // single file under .conductor/<kind>/<name>.yaml, and a skill file lives
+      // single file under .hallucinate/<kind>/<name>.yaml, and a skill file lives
       // under .github/skills/<name>/SKILL.md.
       const path = await import("node:path");
       const segments = path.resolve(p).split(path.sep);
       if (!isInsideAllowedHome(segments)) {
         throw new Error(
-          `Refusing to removeFile "${p}": path is not inside a .conductor or .github/skills directory.`,
+          `Refusing to removeFile "${p}": path is not inside a .hallucinate or .github/skills directory.`,
         );
       }
       // force:true makes a missing file a no-op (parity with removeDir).

@@ -53,7 +53,7 @@ function makeFakeWriter(): { writer: FsWriter; written: Map<string, string>; dir
 const ROOT = "/repo";
 
 describe("scaffoldIfMissing", () => {
-  it("writes a starter implementer role and config when .conductor/ is absent", async () => {
+  it("writes a starter implementer role and config when .hallucinate/ is absent", async () => {
     const { writer, written } = makeFakeWriter();
     const scaffolded = await scaffoldIfMissing(ROOT, writer);
 
@@ -101,19 +101,19 @@ describe("scaffoldIfMissing", () => {
     const { writer, written } = makeFakeWriter();
     await scaffoldIfMissing(ROOT, writer);
 
-    const configPath = `${ROOT}/.conductor/config.yaml`;
+    const configPath = `${ROOT}/.hallucinate/config.yaml`;
     written.set(configPath, "PRESEEDED CONFIG");
 
-    // .conductor/ now exists, so a second scaffold is a whole-tree no-op.
+    // .hallucinate/ now exists, so a second scaffold is a whole-tree no-op.
     const scaffolded = await scaffoldIfMissing(ROOT, writer);
     expect(scaffolded).toBe(false);
     expect(written.get(configPath)).toBe("PRESEEDED CONFIG");
   });
 
-  it("returns false and writes nothing when .conductor/ already exists", async () => {
+  it("returns false and writes nothing when .hallucinate/ already exists", async () => {
     const { writer, written } = makeFakeWriter();
-    // Pre-seed a file so .conductor/ appears to exist.
-    written.set(`${ROOT}/.conductor/roles/existing.yaml`, "name: Existing\n");
+    // Pre-seed a file so .hallucinate/ appears to exist.
+    written.set(`${ROOT}/.hallucinate/roles/existing.yaml`, "name: Existing\n");
 
     const scaffolded = await scaffoldIfMissing(ROOT, writer);
     expect(scaffolded).toBe(false);
@@ -121,24 +121,24 @@ describe("scaffoldIfMissing", () => {
     expect(written.size).toBe(1);
   });
 
-  it("creates the roles and teams subdirectories under .conductor", async () => {
+  it("creates the roles and teams subdirectories under .hallucinate", async () => {
     const { writer, dirs } = makeFakeWriter();
     await scaffoldIfMissing(ROOT, writer);
 
-    expect([...dirs].some((d) => d === `${ROOT}/.conductor/roles`)).toBe(true);
-    expect([...dirs].some((d) => d === `${ROOT}/.conductor/teams`)).toBe(true);
+    expect([...dirs].some((d) => d === `${ROOT}/.hallucinate/roles`)).toBe(true);
+    expect([...dirs].some((d) => d === `${ROOT}/.hallucinate/teams`)).toBe(true);
   });
 
-  it("writes roles, teams, and config under .conductor and skills under .github/skills", async () => {
+  it("writes roles, teams, and config under .hallucinate and skills under .github/skills", async () => {
     const { writer, written, dirs } = makeFakeWriter();
     await scaffoldIfMissing(ROOT, writer);
 
-    // Roles + config stay under .conductor.
-    expect(written.has(`${ROOT}/.conductor/roles/implementer.yaml`)).toBe(true);
-    expect(written.has(`${ROOT}/.conductor/config.yaml`)).toBe(true);
-    // Skills move to .github/skills, and NO .conductor/skills dir is created.
-    expect([...written.keys()].every((k) => !k.includes("/.conductor/skills/"))).toBe(true);
-    expect([...dirs].some((d) => d === `${ROOT}/.conductor/skills`)).toBe(false);
+    // Roles + config stay under .hallucinate.
+    expect(written.has(`${ROOT}/.hallucinate/roles/implementer.yaml`)).toBe(true);
+    expect(written.has(`${ROOT}/.hallucinate/config.yaml`)).toBe(true);
+    // Skills move to .github/skills, and NO .hallucinate/skills dir is created.
+    expect([...written.keys()].every((k) => !k.includes("/.hallucinate/skills/"))).toBe(true);
+    expect([...dirs].some((d) => d === `${ROOT}/.hallucinate/skills`)).toBe(false);
   });
 
   it("creates a .github/skills/run-tests/SKILL.md file", async () => {
@@ -208,7 +208,7 @@ describe("scaffoldIfMissing", () => {
     const skillPath = `${ROOT}/.github/skills/team-communication-protocols/SKILL.md`;
     written.set(skillPath, "PRESEEDED");
 
-    // .conductor/ now exists, so a second scaffold is a no-op and the file stays.
+    // .hallucinate/ now exists, so a second scaffold is a no-op and the file stays.
     const scaffolded = await scaffoldIfMissing(ROOT, writer);
     expect(scaffolded).toBe(false);
     expect(written.get(skillPath)).toBe("PRESEEDED");
@@ -244,11 +244,11 @@ describe("ensureVendoredSkills", () => {
   // The backfill target is now the .github/skills home.
   const SKILLS_DIR = `${ROOT}/.github/skills`;
 
-  it("writes all three vendored skills and returns their names when .conductor/ exists but skills/ is empty", async () => {
+  it("writes all three vendored skills and returns their names when .hallucinate/ exists but skills/ is empty", async () => {
     const { writer, written } = makeFakeWriter();
-    // Pre-seed a file so .conductor/ already exists (the scaffoldIfMissing
+    // Pre-seed a file so .hallucinate/ already exists (the scaffoldIfMissing
     // whole-tree guard would otherwise skip writing the skills).
-    written.set(`${ROOT}/.conductor/config.yaml`, "maxParallelAgents: 3\n");
+    written.set(`${ROOT}/.hallucinate/config.yaml`, "maxParallelAgents: 3\n");
 
     const added = await ensureVendoredSkills(ROOT, writer);
 
@@ -265,7 +265,7 @@ describe("ensureVendoredSkills", () => {
 
   it("each written SKILL.md parses back to an ok manifest under its own name", async () => {
     const { writer, written } = makeFakeWriter();
-    written.set(`${ROOT}/.conductor/config.yaml`, "maxParallelAgents: 3\n");
+    written.set(`${ROOT}/.hallucinate/config.yaml`, "maxParallelAgents: 3\n");
 
     await ensureVendoredSkills(ROOT, writer);
 
@@ -283,7 +283,7 @@ describe("ensureVendoredSkills", () => {
 
   it("is idempotent: a second call writes nothing and returns []", async () => {
     const { writer, written } = makeFakeWriter();
-    written.set(`${ROOT}/.conductor/config.yaml`, "maxParallelAgents: 3\n");
+    written.set(`${ROOT}/.hallucinate/config.yaml`, "maxParallelAgents: 3\n");
 
     const first = await ensureVendoredSkills(ROOT, writer);
     expect(first).toHaveLength(3);
@@ -294,7 +294,7 @@ describe("ensureVendoredSkills", () => {
 
   it("never overwrites a user-edited SKILL.md and excludes it from the returned names", async () => {
     const { writer, written } = makeFakeWriter();
-    written.set(`${ROOT}/.conductor/config.yaml`, "maxParallelAgents: 3\n");
+    written.set(`${ROOT}/.hallucinate/config.yaml`, "maxParallelAgents: 3\n");
 
     // A user has hand-edited one of the three skills before the ensure runs.
     const editedPath = `${SKILLS_DIR}/team-composition-patterns/SKILL.md`;
@@ -312,8 +312,8 @@ describe("ensureVendoredSkills", () => {
 
   it("creates .github/skills/ when it is missing", async () => {
     const { writer, dirs, written } = makeFakeWriter();
-    // .conductor/ exists (a role file is present) but no .github/skills/ yet.
-    written.set(`${ROOT}/.conductor/roles/implementer.yaml`, "name: Implementer\n");
+    // .hallucinate/ exists (a role file is present) but no .github/skills/ yet.
+    written.set(`${ROOT}/.hallucinate/roles/implementer.yaml`, "name: Implementer\n");
 
     await ensureVendoredSkills(ROOT, writer);
 
@@ -338,7 +338,7 @@ describe("VENDORED_SKILLS", () => {
     }
   });
 
-  it("each body begins with an H1 title and carries the Maestro provenance line", () => {
+  it("each body begins with an H1 title and carries the Hallucinate provenance line", () => {
     for (const { body } of VENDORED_SKILLS) {
       expect(body.startsWith("# ")).toBe(true);
       expect(body).toContain(
@@ -347,7 +347,7 @@ describe("VENDORED_SKILLS", () => {
     }
   });
 
-  it("strips every Claude-Code-only primitive Maestro does not have", () => {
+  it("strips every Claude-Code-only primitive Hallucinate does not have", () => {
     const forbidden = [
       "SendMessage",
       "broadcast",
@@ -383,13 +383,13 @@ describe("VENDORED_SKILLS", () => {
     expect(body).toContain("delegate");
   });
 
-  it("team-composition-patterns keeps the sizing heuristics and conductor-as-coordinator framing", () => {
+  it("team-composition-patterns keeps the sizing heuristics and lead-as-coordinator framing", () => {
     const { body } = TEAM_COMPOSITION_PATTERNS_SKILL;
     expect(body).toContain("# Team Composition Patterns");
     expect(body).toContain("smallest");
-    expect(body).toContain(".conductor/teams");
-    expect(body).toContain(".conductor/roles");
-    expect(body).toContain("conductor is ALWAYS the coordinator");
+    expect(body).toContain(".hallucinate/teams");
+    expect(body).toContain(".hallucinate/roles");
+    expect(body).toContain("lead is ALWAYS the coordinator");
   });
 
   it("team-communication-protocols keeps complete-context and integration framing plus an anti-patterns table", () => {
@@ -398,15 +398,15 @@ describe("VENDORED_SKILLS", () => {
     expect(body).toContain("complete context");
     expect(body).toContain("Anti-patterns");
     expect(body).toContain("same worktree");
-    expect(body).toContain("conductor");
+    expect(body).toContain("lead");
   });
 });
 
 describe("makeNodeFsWriter().removeFile", () => {
-  it("removes a single file inside .conductor", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+  it("removes a single file inside .hallucinate", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
-      const dir = join(root, ".conductor", "roles");
+      const dir = join(root, ".hallucinate", "roles");
       await mkdir(dir, { recursive: true });
       const file = join(dir, "implementer.yaml");
       await writeFile(file, "name: Implementer\n", "utf8");
@@ -420,12 +420,12 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("is a no-op when the file is already absent", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
-      await mkdir(join(root, ".conductor"), { recursive: true });
+      await mkdir(join(root, ".hallucinate"), { recursive: true });
       const writer = await makeNodeFsWriter();
       await expect(
-        writer.removeFile(join(root, ".conductor", "ghost.yaml")),
+        writer.removeFile(join(root, ".hallucinate", "ghost.yaml")),
       ).resolves.toBeUndefined();
     } finally {
       await rm(root, { recursive: true, force: true });
@@ -433,13 +433,13 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("refuses to remove a file outside the allowed homes (containment guard)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const file = join(root, "outside.txt");
       await writeFile(file, "keep me", "utf8");
       const writer = await makeNodeFsWriter();
       await expect(writer.removeFile(file)).rejects.toThrow(
-        /not inside a \.conductor or \.github\/skills directory/,
+        /not inside a \.hallucinate or \.github\/skills directory/,
       );
       // The file must survive the refused remove.
       expect(await readFile(file, "utf8")).toBe("keep me");
@@ -449,7 +449,7 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("removes a skill file inside .github/skills", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const dir = join(root, ".github", "skills", "run-tests");
       await mkdir(dir, { recursive: true });
@@ -465,7 +465,7 @@ describe("makeNodeFsWriter().removeFile", () => {
   });
 
   it("refuses to remove a file under .github/workflows (only .github/skills is allowed)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmfile-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmfile-"));
     try {
       const dir = join(root, ".github", "workflows");
       await mkdir(dir, { recursive: true });
@@ -474,7 +474,7 @@ describe("makeNodeFsWriter().removeFile", () => {
 
       const writer = await makeNodeFsWriter();
       await expect(writer.removeFile(file)).rejects.toThrow(
-        /not inside a \.conductor or \.github\/skills directory/,
+        /not inside a \.hallucinate or \.github\/skills directory/,
       );
       // The workflow file must survive the refused remove.
       expect(await readFile(file, "utf8")).toBe("name: CI\n");
@@ -485,10 +485,10 @@ describe("makeNodeFsWriter().removeFile", () => {
 });
 
 describe("makeNodeFsWriter().removeDir", () => {
-  it("removes a directory inside .conductor", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+  it("removes a directory inside .hallucinate", async () => {
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
-      const dir = join(root, ".conductor", "roles");
+      const dir = join(root, ".hallucinate", "roles");
       await mkdir(dir, { recursive: true });
       await writeFile(join(dir, "implementer.yaml"), "name: Implementer\n", "utf8");
 
@@ -503,7 +503,7 @@ describe("makeNodeFsWriter().removeDir", () => {
   });
 
   it("removes a skill directory inside .github/skills", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, ".github", "skills", "run-tests");
       await mkdir(dir, { recursive: true });
@@ -520,7 +520,7 @@ describe("makeNodeFsWriter().removeDir", () => {
   });
 
   it("refuses to remove a directory under .github/workflows (only .github/skills is allowed)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, ".github", "workflows");
       await mkdir(dir, { recursive: true });
@@ -528,7 +528,7 @@ describe("makeNodeFsWriter().removeDir", () => {
 
       const writer = await makeNodeFsWriter();
       await expect(writer.removeDir(dir)).rejects.toThrow(
-        /not inside a \.conductor or \.github\/skills directory/,
+        /not inside a \.hallucinate or \.github\/skills directory/,
       );
       // The workflows directory must survive the refused remove.
       expect(await readFile(join(dir, "ci.yml"), "utf8")).toBe("name: CI\n");
@@ -538,7 +538,7 @@ describe("makeNodeFsWriter().removeDir", () => {
   });
 
   it("refuses to remove an unrelated directory (containment guard)", async () => {
-    const root = await mkdtemp(join(tmpdir(), "maestro-rmdir-"));
+    const root = await mkdtemp(join(tmpdir(), "hallucinate-rmdir-"));
     try {
       const dir = join(root, "some-other-dir");
       await mkdir(dir, { recursive: true });
@@ -546,7 +546,7 @@ describe("makeNodeFsWriter().removeDir", () => {
 
       const writer = await makeNodeFsWriter();
       await expect(writer.removeDir(dir)).rejects.toThrow(
-        /not inside a \.conductor or \.github\/skills directory/,
+        /not inside a \.hallucinate or \.github\/skills directory/,
       );
       expect(await readFile(join(dir, "keep.txt"), "utf8")).toBe("keep me");
     } finally {

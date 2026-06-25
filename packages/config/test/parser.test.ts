@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { parseRoleYaml, parseTeamYaml, parseConfigYaml } from "../src/parser.js";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 
 const VALID_ROLE_YAML = `
 name: Implementer

@@ -6,8 +6,8 @@ import type {
   Role,
   Task,
   Workspace,
-} from "@maestro/core";
-import { COPILOT_ENGINE_ID } from "@maestro/core";
+} from "@hallucinate/core";
+import { COPILOT_ENGINE_ID } from "@hallucinate/core";
 import { buildAgentArgs, buildArgs, buildFleetArgs, type OutputFormat } from "./args.js";
 import { type AgentProfileWriter, ensureCopilotAgent } from "./agent-profile.js";
 import { resolveAuth } from "./auth.js";
@@ -68,13 +68,13 @@ export interface CopilotAdapterOptions {
   agentProfile?: AgentProfileWriter;
   /**
    * OPT-IN FLEET single-session mode. When `true`, the adapter spawns ONE
-   * conductor session (`copilot -p "<task verbatim>" --output-format json
+   * lead session (`copilot -p "<task verbatim>" --output-format json
    * --no-color`) that runs the roster's named custom agents as in-session
    * sub-agents, and parses their JSONL lifecycle into sub-agent events. The
    * extension supplies the `/fleet ...` text and roster as `task.description`,
    * which is passed VERBATIM. There is deliberately NO `--agent`: Copilot's
-   * built-in default orchestrator owns the `task` dispatch tool that `/fleet`
-   * drives, whereas a custom conductor agent teaches a dead ```delegate
+   * built-in default dispatcher owns the `task` dispatch tool that `/fleet`
+   * drives, whereas a custom lead agent teaches a dead ```delegate
    * convention and never dispatches. Default `false` keeps the per-teammate
    * spawn behavior byte-identical.
    */
@@ -111,8 +111,8 @@ export class CopilotAdapter implements EngineAdapter {
   private argvFor(task: Task, workspace: Workspace, role: Role): string[] {
     if (this.fleet) {
       // Fleet mode: pass the `/fleet ...` text VERBATIM via `-p` and let Copilot's
-      // built-in default orchestrator (which owns the `task` dispatch tool) run it.
-      // No preamble, and deliberately NO `--agent`: a custom conductor agent
+      // built-in default dispatcher (which owns the `task` dispatch tool) run it.
+      // No preamble, and deliberately NO `--agent`: a custom lead agent
       // teaches the dead ```delegate convention and `/fleet` never dispatches.
       return buildFleetArgs(task, workspace, role);
     }

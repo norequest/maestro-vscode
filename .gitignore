@@ -1,7 +1,7 @@
 node_modules/
 dist/
 packages/*/dist/
-.conductor/.runtime/
+.hallucinate/.runtime/
 .DS_Store
 **/.DS_Store
 
@@ -20,8 +20,11 @@ packages/*/.vscode-test/
 # Dogfood scaffold output: running the extension with packages/extension as the
 # workspace scaffolds vendored skills/config into these dirs. They are runtime
 # byproducts, not source.
-packages/extension/.conductor/
+packages/extension/.hallucinate/
 packages/extension/.github/
 
 # Internal docs (runbooks, design refs) kept local, not published to the repo
 /docs/
+
+# Local skill scaffold artifact (canonical source: packages/config/src/vendored-skills.ts)
+/.github/skills/

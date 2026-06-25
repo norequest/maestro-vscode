@@ -100,11 +100,11 @@ export type AgentEvent =
   | { kind: "status"; state: EngineState }
   | { kind: "done"; summary: string; diff?: Diff }
   | { kind: "error"; message: string }
-  // Fleet sub-agent lifecycle, emitted on a conductor's own session when its
+  // Fleet sub-agent lifecycle, emitted on a lead's own session when its
   // engine (e.g. Copilot's /fleet) runs named sub-agents inside one session.
   // The orchestrator surfaces these as read-only virtual children; no process
   // or worktree is created for them.
-  /** A named sub-agent started inside the conductor's session. callId is the engine's toolCallId used to correlate later events; name is the custom-agent name (e.g. "scribe-alpha"). */
+  /** A named sub-agent started inside the lead's session. callId is the engine's toolCallId used to correlate later events; name is the custom-agent name (e.g. "writer-alpha"). */
   | { kind: "subagent-started"; callId: string; name: string; description?: string }
   /** Output text from a running sub-agent. callId correlates it to the subagent-started event. */
   | { kind: "subagent-output"; callId: string; text: string }
@@ -145,9 +145,9 @@ export interface Role {
   instructions: string;
   engine: { id: string; model?: string };
   autonomy: Autonomy;
-  /** Names of skills resolved to .conductor/skills/<name>/SKILL.md at spawn. Additive; absent means none. */
+  /** Names of skills resolved to .hallucinate/skills/<name>/SKILL.md at spawn. Additive; absent means none. */
   skills?: string[];
-  /** Name of a soul file resolved to .conductor/souls/<soul>.md at spawn. */
+  /** Name of a soul file resolved to .hallucinate/souls/<soul>.md at spawn. */
   soul?: string;
   /** Tool grants for this role; absence of a write entry means read-only. */
   tools?: ToolGrant;
@@ -175,7 +175,7 @@ export interface Team {
 
 /**
  * A lead's request to bring a teammate in, parsed from a ```delegate block in the
- * lead's output. Pending until the conductor approves or denies it; approval
+ * lead's output. Pending until the lead approves or denies it; approval
  * spawns the teammate as a child of the lead.
  */
 export interface DelegationProposal {
@@ -209,7 +209,7 @@ export interface Agent {
   workspace?: Workspace;
   /** Set when this agent was delegated by a lead: the lead's agent id. */
   parentId?: string;
-  /** True for a stream-derived fleet sub-agent: nested under its conductor, shares the conductor worktree, has no own engine session or branch, and is read-only (no merge/approve/steer). */
+  /** True for a stream-derived fleet sub-agent: nested under its lead, shares the lead worktree, has no own engine session or branch, and is read-only (no merge/approve/steer). */
   virtual?: boolean;
 }
 
@@ -228,7 +228,7 @@ export type OrchestratorEvent =
   | { kind: "agent-added"; agent: Agent }
   | { kind: "agent-updated"; agent: Agent }
   | { kind: "agent-event"; agentId: string; event: AgentEvent }
-  /** A lead asked to bring a teammate in; pending the conductor's approval. */
+  /** A lead asked to bring a teammate in; pending the lead's approval. */
   | { kind: "delegation-proposed"; proposal: DelegationProposal }
   /** A delegation moved out of pending (approved or denied). */
   | { kind: "delegation-resolved"; proposal: DelegationProposal };

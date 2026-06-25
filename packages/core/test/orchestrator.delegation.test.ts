@@ -339,29 +339,29 @@ describe("Orchestrator delegation auto-approve (launchTeam autoApprove)", () => 
   });
 });
 
-describe("Orchestrator conductor-led model (team is a scoped roster of sub-agents)", () => {
-  it("conductor-led: the lead is the injected conductor, team roles are its loadable sub-agents", async () => {
-    // A team is a SCOPED ROSTER: the conductor (the default agent) is always the
-    // lead, and the team's specialist roles are the only sub-agents it may load.
-    // The conductor is NOT one of the specialist task-doers, and it is never
+describe("Orchestrator lead-driven model (team is a scoped roster of sub-agents)", () => {
+  it("lead-driven: the lead is the injected default agent, team roles are its loadable sub-agents", async () => {
+    // A team is a SCOPED ROSTER: the lead (the default agent) is always the
+    // one launched, and the team's specialist roles are the only sub-agents it
+    // may load. The lead is NOT one of the specialist task-doers, and it is never
     // itself spawned as a teammate / sub-agent of itself.
     const orch = new Orchestrator({ maxParallelAgents: 3 }, new FakeWorkspaceProvider());
-    const conductorRole = role("Conductor");
+    const leadRole = role("Lead");
     const roleA = role("roleA");
     const roleB = role("roleB");
     const team: Team = {
       name: "Backend",
-      lead: "Conductor",
-      roles: [conductorRole, roleA, roleB],
+      lead: "Lead",
+      roles: [leadRole, roleA, roleB],
     };
-    // The conductor loads roleA as a sub-agent, and also emits a block for a role
+    // The lead loads roleA as a sub-agent, and also emits a block for a role
     // NOT in the team (roleZ), which must be ignored. The block naming roleB is
     // omitted on purpose, to keep the assertion about a single spawned sub-agent.
-    const conductorOutput = [
+    const leadOutput = [
       delegateBlock("roleA", "own the API layer"),
       delegateBlock("roleZ", "this role is not on the team"),
     ].join("\n");
-    orch.registerAdapter(leadAdapter("Conductor", conductorOutput));
+    orch.registerAdapter(leadAdapter("Lead", leadOutput));
     orch.registerAdapter(pendingAdapter("roleA"));
     orch.registerAdapter(pendingAdapter("roleB"));
 
@@ -370,11 +370,11 @@ describe("Orchestrator conductor-led model (team is a scoped roster of sub-agent
       if (e.kind === "delegation-proposed") proposed.push(e.proposal);
     });
 
-    // launchTeam spawns ONLY the Conductor (lead), not the whole roster.
+    // launchTeam spawns ONLY the Lead, not the whole roster.
     const agents = orch.launchTeam(team, "do X", { autoApprove: true });
     expect(agents).toHaveLength(1);
-    const conductor = agents[0]!;
-    expect(conductor.role.name).toBe("Conductor");
+    const lead = agents[0]!;
+    expect(lead.role.name).toBe("Lead");
     expect(orch.getAgents()).toHaveLength(1);
 
     await new Promise((r) => setTimeout(r, 10));
@@ -383,13 +383,13 @@ describe("Orchestrator conductor-led model (team is a scoped roster of sub-agent
     // was ignored, never proposed.
     expect(proposed.map((p) => p.roleName)).toEqual(["roleA"]);
 
-    const subAgents = orch.getAgents().filter((a) => a.id !== conductor.id);
+    const subAgents = orch.getAgents().filter((a) => a.id !== lead.id);
     expect(subAgents).toHaveLength(1);
     const roleAAgent = subAgents[0]!;
     expect(roleAAgent.role.name).toBe("roleA");
-    // It spawned as a child of the Conductor, exactly like a CLI main agent
+    // It spawned as a child of the Lead, exactly like a CLI main agent
     // loading a sub-agent.
-    expect(roleAAgent.parentId).toBe(conductor.id);
+    expect(roleAAgent.parentId).toBe(lead.id);
     expect(roleAAgent.task.description).toBe("own the API layer");
 
     // Auto-approved: the roleA delegation resolved, no pending proposal remains.
@@ -398,9 +398,9 @@ describe("Orchestrator conductor-led model (team is a scoped roster of sub-agent
     expect(delegations[0]!.state).toBe("approved");
     expect(delegations.some((p) => p.state === "pending")).toBe(false);
 
-    // The Conductor is never itself spawned as a teammate / sub-agent of itself.
-    expect(orch.getAgents().filter((a) => a.role.name === "Conductor")).toHaveLength(1);
-    expect(orch.getAgents().every((a) => a.parentId !== conductor.id || a.id !== conductor.id)).toBe(true);
-    expect(orch.getAgents().some((a) => a.role.name === "Conductor" && a.parentId !== undefined)).toBe(false);
+    // The Lead is never itself spawned as a teammate / sub-agent of itself.
+    expect(orch.getAgents().filter((a) => a.role.name === "Lead")).toHaveLength(1);
+    expect(orch.getAgents().every((a) => a.parentId !== lead.id || a.id !== lead.id)).toBe(true);
+    expect(orch.getAgents().some((a) => a.role.name === "Lead" && a.parentId !== undefined)).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import type { SoulDoc } from "@maestro/core";
+import type { SoulDoc } from "@hallucinate/core";
 import type { FsReader } from "./loader.js";
 import * as nodePath from "node:path";
 
@@ -58,7 +58,7 @@ export type LoadSoulResult =
   | { error: string; source: string };
 
 /**
- * Load a soul from `.conductor/souls/<soulName>.md` via the injected FsReader.
+ * Load a soul from `.hallucinate/souls/<soulName>.md` via the injected FsReader.
  * Never throws; returns an error object when the file is missing.
  */
 export async function loadSoul(
@@ -66,8 +66,8 @@ export async function loadSoul(
   soulName: string,
   fs: FsReader,
 ): Promise<LoadSoulResult> {
-  const soulPath = nodePath.join(workspaceRoot, ".conductor", "souls", `${soulName}.md`);
-  const source = nodePath.join(".conductor", "souls", `${soulName}.md`);
+  const soulPath = nodePath.join(workspaceRoot, ".hallucinate", "souls", `${soulName}.md`);
+  const source = nodePath.join(".hallucinate", "souls", `${soulName}.md`);
 
   try {
     const markdown = await fs.readFile(soulPath);

@@ -1,5 +1,5 @@
 /* ===========================================================================
-   Maestro single-page webview stylesheet (app.css)
+   Hallucinate single-page webview stylesheet (app.css)
 
    Concatenation of the three per-view stylesheets, reconciled into ONE file
    for the consolidated single-page webview:
@@ -84,11 +84,11 @@
 @keyframes eqbar { 0% { transform:scaleY(0.3) } 100% { transform:scaleY(1) } }
 @keyframes blink { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
 /* Subtle fade + tiny rise applied to freshly rendered content ONLY on a real
-   tab/view change (the client adds .maestro-enter after the innerHTML swap).
+   tab/view change (the client adds .hallucinate-enter after the innerHTML swap).
    opacity + transform only, so it stays on the compositor and never reflows. */
-@keyframes maestro-enter { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-.maestro-enter { animation:maestro-enter 160ms ease-out both; will-change:opacity, transform; }
-@media (prefers-reduced-motion: reduce) { .maestro-enter { animation:none; } }
+@keyframes hallucinate-enter { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.hallucinate-enter { animation:hallucinate-enter 160ms ease-out both; will-change:opacity, transform; }
+@media (prefers-reduced-motion: reduce) { .hallucinate-enter { animation:none; } }
 /* Looping decorative animations (equalisers, pulsing dots, scanning banner) are
    silenced under reduced-motion: they convey liveness, not state, so stopping
    them costs no information. */
@@ -406,7 +406,7 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
   flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 
-/* Conductor affordance: a faint mono count of sub-agents in the meta row,
+/* Lead affordance: a faint mono count of sub-agents in the meta row,
    styled like the "via" provenance marker so the hierarchy reads quietly. */
 .card .subagents {
   font-size:10.5px; color:var(--text-ghost);
@@ -415,9 +415,9 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 }
 
 /* ─── Nested sub-agent cards ─────────────────────────────────────────────────
-   A delegated child renders indented under its conductor (which sits directly
+   A delegated child renders indented under its lead (which sits directly
    above it in the same lane), with a subtle elbow connector tying the two
-   together and a faint accent border so the team reads as one conductor with
+   together and a faint accent border so the team reads as one lead with
    its sub-agents, not scattered flat cards. No fragile fixed heights: the
    connector is anchored to the card top and uses a short fixed run. */
 .card.is-child {

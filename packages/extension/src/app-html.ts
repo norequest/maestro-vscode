@@ -3,7 +3,7 @@ import { makeNonce, FONT_HEAD_LINKS, csp } from "./html.js";
 export { makeNonce };
 
 /**
- * The single-page app shell ("Conducting Board"). Mirrors getStageHtml but is the
+ * The single-page app shell ("Board"). Mirrors getStageHtml but is the
  * ONE webview shell for the whole extension: the board, library, anatomy, and
  * review surfaces all live inside `#root`, swapped in-place by the app-main.js
  * router.
@@ -30,7 +30,7 @@ export function getAppHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   ${FONT_HEAD_LINKS}
   <link href="${styleUri}" rel="stylesheet" />
-  <title>Conducting Board</title>
+  <title>Board</title>
 </head>
 <body>
   <div id="root"></div>

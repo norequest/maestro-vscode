@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Agent } from "@maestro/core";
+import type { Agent } from "@hallucinate/core";
 import { buildConflictResolveMessage, buildPrTitle, buildPrBody, conflictFileBase, markPrCreatedAfterPush } from "../src/merge-helpers.js";
 
 describe("conflictFileBase (Issue 6)", () => {
@@ -33,7 +33,7 @@ describe("buildPrBody", () => {
     const body = buildPrBody("All good.", ["a.ts"]);
     expect(body).toContain("All good.");
     expect(body).toContain("a.ts");
-    expect(body).toContain("Maestro");
+    expect(body).toContain("Hallucinate");
   });
   it("handles undefined summary", () => {
     expect(buildPrBody(undefined, [])).toContain("No summary provided");

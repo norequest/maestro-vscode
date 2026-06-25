@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Agent, DispatchSpec, OrchestratorEvent } from "@maestro/core";
-import type { CockpitState } from "@maestro/cockpit";
+import type { Agent, DispatchSpec, OrchestratorEvent } from "@hallucinate/core";
+import type { CockpitState } from "@hallucinate/cockpit";
 import { createCockpit, type OrchestratorLike } from "../src/controller.js";
 
 function fakeOrch() {
@@ -240,7 +240,7 @@ describe("createCockpit", () => {
     expect(() => cockpit.handle({ type: "open-review", agentId: "a9" })).not.toThrow();
   });
 
-  // ─── Lead-orchestrated teams: delegation approve / deny ───────────────────
+  // ─── Lead-coordinated teams: delegation approve / deny ───────────────────
 
   it("approve-delegation calls orch.approveDelegation with the delegation id", () => {
     const { orch, calls } = fakeOrch();

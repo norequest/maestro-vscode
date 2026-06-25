@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   // activate() registers commands only when a workspace folder is open, so open
   // an empty temp folder. The folder need not be a git repo: GitWorkspaceManager
   // only stores the path at construction, and the hydrate path is guarded.
-  const workspaceDir = mkdtempSync(path.join(tmpdir(), "maestro-e2e-"));
+  const workspaceDir = mkdtempSync(path.join(tmpdir(), "hallucinate-e2e-"));
 
   // VS Code derives a Unix-domain IPC socket from --user-data-dir. The default
   // path lives under the deeply nested package dir (.vscode-test/user-data),

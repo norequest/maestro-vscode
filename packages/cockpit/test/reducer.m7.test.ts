@@ -1,6 +1,6 @@
 import { describe as d7, it as i7, expect as e7 } from "vitest";
 import { initialModel as im7, reduce as r7 } from "../src/reducer.js";
-import type { Agent as A7 } from "@maestro/core";
+import type { Agent as A7 } from "@hallucinate/core";
 
 d7("reducer M7: detached attention", () => {
   i7("flags a detached card as attention", () => {

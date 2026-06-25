@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role, Team } from "@maestro/core";
+import type { Role, Team } from "@hallucinate/core";
 import { teamQuickPickItems } from "../src/team-picker.js";
 
 const role = (name: string): Role => ({

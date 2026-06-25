@@ -1,5 +1,5 @@
 /**
- * Real ConfigGateway implementation over @maestro/config + node fs.
+ * Real ConfigGateway implementation over @hallucinate/config + node fs.
  * Implements the ConfigGateway interface from library-controller.ts.
  * Node imports are isolated here; library-controller.ts stays node-free.
  */
@@ -7,7 +7,7 @@
 import * as nodePath from "node:path";
 import {
   loadSkills,
-  loadConductorDir,
+  loadHallucinateDir,
   loadSoul,
   serializeSkill,
   serializeRole,
@@ -16,8 +16,8 @@ import {
   makeNodeFsWriter,
   KNOWN_ENGINE_IDS,
   SKILLS_DIR_SEGMENTS,
-} from "@maestro/config";
-import type { Role } from "@maestro/core";
+} from "@hallucinate/config";
+import type { Role } from "@hallucinate/core";
 import type { ConfigGateway } from "./library-controller.js";
 import type { AnatomyGateway } from "./anatomy-controller.js";
 
@@ -40,7 +40,7 @@ function defaultRole(name: string): Role {
  * Refuse any name that is not a single, clean path segment before it is joined
  * onto a filesystem path. This is the R6 containment guard at the source: a name
  * carrying a separator or "." / ".." could otherwise traverse out of its home dir
- * (.github/skills/ for skills, .conductor/ for roles and teams; the writer's
+ * (.github/skills/ for skills, .hallucinate/ for roles and teams; the writer's
  * removeDir guard is only a backstop). Skill and role names that fail this are
  * rejected, never sanitized, so a write can never land outside the intended
  * <home>/<name>.
@@ -76,7 +76,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
 
     async loadRoles() {
       const fsReader = await makeNodeFsReader();
-      const result = await loadConductorDir(repoRoot, fsReader);
+      const result = await loadHallucinateDir(repoRoot, fsReader);
       return result.roles.map((r) => ({
         name: r.name,
         engineId: r.engine.id,
@@ -86,7 +86,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
 
     async loadTeams() {
       const fsReader = await makeNodeFsReader();
-      const result = await loadConductorDir(repoRoot, fsReader);
+      const result = await loadHallucinateDir(repoRoot, fsReader);
       return result.teams.map((t) => ({
         name: t.name,
         roleNames: t.roles.map((r) => r.name),
@@ -97,7 +97,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       assertSafeSegment(manifest.name, "skill");
       const fsWriter = await makeNodeFsWriter();
       // Skills live under .github/skills/ (shared with VS Code + Copilot). The
-      // location is defined once in @maestro/config as SKILLS_DIR_SEGMENTS so the
+      // location is defined once in @hallucinate/config as SKILLS_DIR_SEGMENTS so the
       // write target stays in lock-step with what the loader reads.
       const skillDir = nodePath.join(repoRoot, ...SKILLS_DIR_SEGMENTS, manifest.name);
       await fsWriter.mkdir(skillDir);
@@ -111,7 +111,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       // assertSafeSegment above is the containment guard: name is proven to be a
       // single clean path segment, so the join cannot escape the skills home.
       // We use node fs.rm directly here rather than the config writer's removeDir,
-      // because that writer's guard only permits paths under .conductor and would
+      // because that writer's guard only permits paths under .hallucinate and would
       // refuse the .github/skills home. force:true makes a missing dir a no-op.
       const { rm } = await import("node:fs/promises");
       const skillDir = nodePath.join(repoRoot, ...SKILLS_DIR_SEGMENTS, name);
@@ -120,10 +120,10 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
 
     async setRoleSkills(roleName, skills) {
       const fsReader = await makeNodeFsReader();
-      const result = await loadConductorDir(repoRoot, fsReader);
+      const result = await loadHallucinateDir(repoRoot, fsReader);
       const role = result.roles.find((r) => r.name === roleName);
       if (!role) {
-        throw new Error(`Role "${roleName}" not found in .conductor/roles/`);
+        throw new Error(`Role "${roleName}" not found in .hallucinate/roles/`);
       }
       // Produce updated role: omit skills key when empty (keeps file clean)
       const updatedRole = skills.length > 0
@@ -132,12 +132,12 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       const serialized = serializeRole(updatedRole);
 
       // Use a safe filename: lowercase roleName, spaces to hyphens.
-      // The loader reads all *.yaml files in .conductor/roles/ so the exact
+      // The loader reads all *.yaml files in .hallucinate/roles/ so the exact
       // filename does not need to match, but mirroring the scaffolder's
       // convention (implementer.yaml for role "Implementer") keeps it tidy.
       const baseName = roleName.toLowerCase().replace(/\s+/g, "-");
       assertSafeSegment(baseName, "role");
-      const rolePath = nodePath.join(repoRoot, ".conductor", "roles", `${baseName}.yaml`);
+      const rolePath = nodePath.join(repoRoot, ".hallucinate", "roles", `${baseName}.yaml`);
 
       const fsWriter = await makeNodeFsWriter();
       await fsWriter.writeFile(rolePath, serialized);
@@ -148,7 +148,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       const baseName = seed.name.toLowerCase().replace(/\s+/g, "-");
       assertSafeSegment(baseName, "role");
       const fsWriter = await makeNodeFsWriter();
-      const rolePath = nodePath.join(repoRoot, ".conductor", "roles", `${baseName}.yaml`);
+      const rolePath = nodePath.join(repoRoot, ".hallucinate", "roles", `${baseName}.yaml`);
       await fsWriter.writeFile(rolePath, serializeRole(defaultRole(seed.name)));
     },
 
@@ -158,7 +158,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       const baseName = name.toLowerCase().replace(/\s+/g, "-");
       assertSafeSegment(baseName, "role");
       const fsWriter = await makeNodeFsWriter();
-      const rolePath = nodePath.join(repoRoot, ".conductor", "roles", `${baseName}.yaml`);
+      const rolePath = nodePath.join(repoRoot, ".hallucinate", "roles", `${baseName}.yaml`);
       await fsWriter.removeFile(rolePath);
     },
 
@@ -166,7 +166,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       const baseName = team.name.toLowerCase().replace(/\s+/g, "-");
       assertSafeSegment(baseName, "team");
       const fsWriter = await makeNodeFsWriter();
-      const teamPath = nodePath.join(repoRoot, ".conductor", "teams", `${baseName}.yaml`);
+      const teamPath = nodePath.join(repoRoot, ".hallucinate", "teams", `${baseName}.yaml`);
       // serializeTeam stores roles as NAME strings, so pass role objects whose
       // only meaningful field is .name (no full Role fabrication needed). The
       // loader resolves these names back to real roles at load time.
@@ -181,7 +181,7 @@ export function makeConfigGateway(repoRoot: string): ConfigGateway {
       const baseName = name.toLowerCase().replace(/\s+/g, "-");
       assertSafeSegment(baseName, "team");
       const fsWriter = await makeNodeFsWriter();
-      const teamPath = nodePath.join(repoRoot, ".conductor", "teams", `${baseName}.yaml`);
+      const teamPath = nodePath.join(repoRoot, ".hallucinate", "teams", `${baseName}.yaml`);
       await fsWriter.removeFile(teamPath);
     },
   };
@@ -191,14 +191,14 @@ export function makeAnatomyGateway(repoRoot: string): AnatomyGateway {
   return {
     async loadRole(roleName: string) {
       const fsReader = await makeNodeFsReader();
-      const result = await loadConductorDir(repoRoot, fsReader);
+      const result = await loadHallucinateDir(repoRoot, fsReader);
       return result.roles.find((r) => r.name === roleName) ?? null;
     },
 
     async loadSoulBody(roleName: string) {
       try {
         const fsReader = await makeNodeFsReader();
-        const result = await loadConductorDir(repoRoot, fsReader);
+        const result = await loadHallucinateDir(repoRoot, fsReader);
         const role = result.roles.find((r) => r.name === roleName);
         if (!role || !role.soul) return "";
         const soulResult = await loadSoul(repoRoot, role.soul, fsReader);
@@ -219,13 +219,13 @@ export function makeAnatomyGateway(repoRoot: string): AnatomyGateway {
       const baseName = role.name.toLowerCase().replace(/\s+/g, "-");
       assertSafeSegment(baseName, "role");
       const fsWriter = await makeNodeFsWriter();
-      const rolePath = nodePath.join(repoRoot, ".conductor", "roles", `${baseName}.yaml`);
+      const rolePath = nodePath.join(repoRoot, ".hallucinate", "roles", `${baseName}.yaml`);
       await fsWriter.writeFile(rolePath, serializeRole(role));
     },
 
     async writeSoul(roleName, body) {
       const fsReader = await makeNodeFsReader();
-      const result = await loadConductorDir(repoRoot, fsReader);
+      const result = await loadHallucinateDir(repoRoot, fsReader);
       const role = result.roles.find((r) => r.name === roleName);
       if (!role) throw new Error(`Role "${roleName}" not found`);
 
@@ -233,14 +233,14 @@ export function makeAnatomyGateway(repoRoot: string): AnatomyGateway {
       assertSafeSegment(soulName, "soul");
 
       const fsWriter = await makeNodeFsWriter();
-      const soulPath = nodePath.join(repoRoot, ".conductor", "souls", `${soulName}.md`);
+      const soulPath = nodePath.join(repoRoot, ".hallucinate", "souls", `${soulName}.md`);
       await fsWriter.writeFile(soulPath, body);
 
       if (!role.soul) {
         const updatedRole = { ...role, soul: soulName };
         const baseName = roleName.toLowerCase().replace(/\s+/g, "-");
         assertSafeSegment(baseName, "role");
-        const rolePath = nodePath.join(repoRoot, ".conductor", "roles", `${baseName}.yaml`);
+        const rolePath = nodePath.join(repoRoot, ".hallucinate", "roles", `${baseName}.yaml`);
         await fsWriter.writeFile(rolePath, serializeRole(updatedRole));
       }
     },

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 import { applyDefaults } from "../src/config-defaults.js";
-import type { AgentDefaults } from "@maestro/core";
+import type { AgentDefaults } from "@hallucinate/core";
 
 /**
  * extension.ts imports `vscode` at the module top level, so it cannot be imported
@@ -30,7 +30,7 @@ describe("defaults wiring in extension.ts (source)", () => {
     expect(extensionSrc).toMatch(/applyDefaults\(orch,\s*loaded\.config\)/);
   });
 
-  it("scaffolds .conductor on the team-launch path so the lead's playbook lands on disk", () => {
+  it("scaffolds .hallucinate on the team-launch path so the lead's playbook lands on disk", () => {
     // launchTeamByName must best-effort scaffold before loading, so a fresh repo
     // gets config.yaml (with defaults) + the vendored coordination SKILL.md files.
     const launchStart = extensionSrc.indexOf("const launchTeamByName");
@@ -40,16 +40,16 @@ describe("defaults wiring in extension.ts (source)", () => {
     expect(launchBody).toMatch(/scaffoldIfMissing\(repoRoot,\s*fsWriter\)/);
   });
 
-  it("imports ensureVendoredSkills from @maestro/config", () => {
+  it("imports ensureVendoredSkills from @hallucinate/config", () => {
     expect(extensionSrc).toMatch(/ensureVendoredSkills/);
     // It must come from the config package import line, alongside scaffoldIfMissing.
     expect(extensionSrc).toMatch(
-      /import\s*\{[^}]*ensureVendoredSkills[^}]*\}\s*from\s*"@maestro\/config"/s,
+      /import\s*\{[^}]*ensureVendoredSkills[^}]*\}\s*from\s*"@hallucinate\/config"/s,
     );
   });
 
-  it("ensures the vendored skills on the team-launch path even when .conductor already exists", () => {
-    // After the best-effort scaffold (which no-ops on an existing .conductor),
+  it("ensures the vendored skills on the team-launch path even when .hallucinate already exists", () => {
+    // After the best-effort scaffold (which no-ops on an existing .hallucinate),
     // launchTeamByName must still ensure the three coordination skills land on
     // disk so the lead's playbook resolves to real SKILL.md files, not prompt text.
     const launchStart = extensionSrc.indexOf("const launchTeamByName");
@@ -59,11 +59,11 @@ describe("defaults wiring in extension.ts (source)", () => {
     expect(launchBody).toMatch(/ensureVendoredSkills\(repoRoot,\s*fsWriter\)/);
   });
 
-  it("ensures the vendored skills at activation (setupConducting) so they appear without a launch", () => {
-    // The user's workspace already has a .conductor, so scaffoldIfMissing never
-    // writes the skills. setupConducting must ensure them at activation time so the
+  it("ensures the vendored skills at activation (setupSession) so they appear without a launch", () => {
+    // The user's workspace already has a .hallucinate, so scaffoldIfMissing never
+    // writes the skills. setupSession must ensure them at activation time so the
     // three coordination SKILL.md files exist on disk before any team is launched.
-    const setupStart = extensionSrc.indexOf("async function setupConducting");
+    const setupStart = extensionSrc.indexOf("async function setupSession");
     expect(setupStart).toBeGreaterThanOrEqual(0);
     const setupEnd = extensionSrc.indexOf("// ── Library controller", setupStart);
     expect(setupEnd).toBeGreaterThan(setupStart);

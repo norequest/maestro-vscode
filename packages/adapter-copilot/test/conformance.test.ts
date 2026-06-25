@@ -1,5 +1,5 @@
-import type { AdapterFactory } from "@maestro/conformance";
-import { runConformanceSuite } from "@maestro/conformance";
+import type { AdapterFactory } from "@hallucinate/conformance";
+import { runConformanceSuite } from "@hallucinate/conformance";
 import { CopilotAdapter } from "../src/adapter.js";
 import type { FakeChild } from "./fake-spawn.js";
 import { makeFakeSpawn } from "./fake-spawn.js";

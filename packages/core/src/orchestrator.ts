@@ -68,11 +68,11 @@ export class Orchestrator {
   private readonly idGen: () => string;
   // Lead agents whose output is scanned for delegation directives, keyed by agent id.
   private readonly leads = new Map<string, LeadContext>();
-  // Fleet sub-agents: maps a conductor's engine toolCallId to the virtual child's
-  // agent id. Keyed by `${conductorId}::${callId}` so two conductors that reuse
+  // Fleet sub-agents: maps a lead's engine toolCallId to the virtual child's
+  // agent id. Keyed by `${leadId}::${callId}` so two leads that reuse
   // the same callId never collide.
   private readonly subAgentByCall = new Map<string, string>();
-  // Delegation proposals awaiting (or past) the conductor's approval, keyed by id.
+  // Delegation proposals awaiting (or past) the lead's approval, keyed by id.
   private readonly delegations = new Map<string, DelegationProposal>();
   private delegationSeq = 0;
   private running = 0;
@@ -212,7 +212,7 @@ export class Orchestrator {
     if (spec.newRoleName) {
       const role: Role = {
         name: spec.newRoleName,
-        instructions: `Ad-hoc role dispatched from the Conducting Board. ${spec.description}`,
+        instructions: `Ad-hoc role dispatched from the Board. ${spec.description}`,
         engine: {
           id: spec.engineId ?? "copilot",
           ...(spec.model !== undefined ? { model: spec.model } : {}),
@@ -230,7 +230,7 @@ export class Orchestrator {
    * resolves it by name), then ONLY the lead is spawned, with a brief that names
    * its teammates and teaches the delegation format. The lead does small work
    * itself and delegates the rest; each delegation becomes a proposal the
-   * conductor approves (see approveDelegation). Returns the single lead agent in
+   * lead approves (see approveDelegation). Returns the single lead agent in
    * a one-element array, or [] for an empty team.
    *
    * The lead is `team.lead` when set (and present in `roles`), else the first
@@ -450,7 +450,7 @@ export class Orchestrator {
       case "action":
         break;
       case "subagent-started":
-        // Only a real conductor (a live, non-virtual agent) materializes a child.
+        // Only a real lead (a live, non-virtual agent) materializes a child.
         // A virtual agent has no session of its own, so it never sees these.
         if (!agent.virtual) this.startSubAgent(agent, event.callId, event.name, event.description);
         break;
@@ -463,20 +463,20 @@ export class Orchestrator {
     }
   }
 
-  /** Compose the map key that scopes a sub-agent callId to its conductor. */
-  private subAgentKey(conductorId: string, callId: string): string {
-    return `${conductorId}::${callId}`;
+  /** Compose the map key that scopes a sub-agent callId to its lead. */
+  private subAgentKey(leadId: string, callId: string): string {
+    return `${leadId}::${callId}`;
   }
 
   /**
-   * Surface a fleet sub-agent reported on a conductor's stream as a READ-ONLY
+   * Surface a fleet sub-agent reported on a lead's stream as a READ-ONLY
    * virtual child. No process and no worktree is created: it shares the
-   * conductor's workspace reference, has no engine session of its own, and the
-   * conductor remains the single reviewable/mergeable unit. The role is resolved
+   * lead's workspace reference, has no engine session of its own, and the
+   * lead remains the single reviewable/mergeable unit. The role is resolved
    * by name from the registry when present, else synthesized ad-hoc.
    */
   private startSubAgent(
-    conductor: Agent,
+    lead: Agent,
     callId: string,
     name: string,
     description?: string,
@@ -484,7 +484,7 @@ export class Orchestrator {
     const role: Role = this.roles.get(name) ?? {
       name,
       instructions: "",
-      engine: { id: conductor.role.engine.id },
+      engine: { id: lead.role.engine.id },
       autonomy: "manual",
     };
     const id = this.idGen();
@@ -499,21 +499,21 @@ export class Orchestrator {
       role,
       state: "working",
       log: [],
-      parentId: conductor.id,
-      // Shared reference to the conductor's workspace; may be undefined if the
-      // conductor has none yet, which is fine (a virtual child never merges).
-      workspace: conductor.workspace,
+      parentId: lead.id,
+      // Shared reference to the lead's workspace; may be undefined if the
+      // lead has none yet, which is fine (a virtual child never merges).
+      workspace: lead.workspace,
       engineCapabilities: { approvals: false, steerable: false },
       virtual: true,
     };
     this.agents.set(id, child);
-    this.subAgentByCall.set(this.subAgentKey(conductor.id, callId), id);
+    this.subAgentByCall.set(this.subAgentKey(lead.id, callId), id);
     this.emitter.emit({ kind: "agent-added", agent: child });
   }
 
   /** Route a sub-agent's output into its virtual child's log; ignore if unknown. */
-  private outputSubAgent(conductor: Agent, callId: string, text: string): void {
-    const childId = this.subAgentByCall.get(this.subAgentKey(conductor.id, callId));
+  private outputSubAgent(lead: Agent, callId: string, text: string): void {
+    const childId = this.subAgentByCall.get(this.subAgentKey(lead.id, callId));
     if (childId === undefined) return; // unknown callId: ignore silently
     const child = this.agents.get(childId);
     if (!child) return;
@@ -523,8 +523,8 @@ export class Orchestrator {
   }
 
   /** Finish a virtual child in "done"; never computes a diff (it has no branch). */
-  private doneSubAgent(conductor: Agent, callId: string, summary?: string): void {
-    const childId = this.subAgentByCall.get(this.subAgentKey(conductor.id, callId));
+  private doneSubAgent(lead: Agent, callId: string, summary?: string): void {
+    const childId = this.subAgentByCall.get(this.subAgentKey(lead.id, callId));
     if (childId === undefined) return; // unknown callId: ignore silently
     const child = this.agents.get(childId);
     if (!child || isTerminalState(child.state)) return;
@@ -533,13 +533,13 @@ export class Orchestrator {
   }
 
   /**
-   * When a conductor reaches a terminal state, move any of its still-non-terminal
+   * When a lead reaches a terminal state, move any of its still-non-terminal
    * virtual children to "done" so they do not hang as "working" forever (e.g. a
    * sub-agent whose subagent-done never arrived because the session ended).
    */
-  private reconcileVirtualChildren(conductorId: string): void {
+  private reconcileVirtualChildren(leadId: string): void {
     for (const agent of this.agents.values()) {
-      if (agent.virtual && agent.parentId === conductorId && !isTerminalState(agent.state)) {
+      if (agent.virtual && agent.parentId === leadId && !isTerminalState(agent.state)) {
         this.update(agent, "done");
       }
     }
@@ -591,7 +591,7 @@ export class Orchestrator {
   private update(agent: Agent, state: AgentState): void {
     agent.state = state;
     this.emitter.emit({ kind: "agent-updated", agent });
-    // A conductor reaching a terminal state reconciles its virtual children so
+    // A lead reaching a terminal state reconciles its virtual children so
     // none hang as "working" after the session that fed them ended. Guarded to
     // a non-virtual agent so a child's own done transition never recurses.
     if (!agent.virtual && isTerminalState(state)) {
@@ -699,7 +699,7 @@ export class Orchestrator {
 
   stop(agentId: string): void {
     // A virtual fleet sub-agent has no session, slot, or queue entry: stopping it
-    // is meaningless, so no-op (least surprising; keeps the conductor the unit a
+    // is meaningless, so no-op (least surprising; keeps the lead the unit a
     // user actually stops).
     if (this.agents.get(agentId)?.virtual) return;
     const session = this.sessions.get(agentId);
@@ -875,7 +875,7 @@ export class Orchestrator {
    */
   hydrate(records: readonly PersistedAgentRecord[]): void {
     for (const record of records) {
-      // A virtual fleet sub-agent is derived from a live conductor stream and has
+      // A virtual fleet sub-agent is derived from a live lead stream and has
       // no workspace or session of its own. There is no stream to rehydrate it
       // from after a reload, so it is never restored as an independent agent.
       if (record.agent.virtual) continue;
@@ -941,7 +941,7 @@ export class Orchestrator {
     if (trimmed.length > 0) {
       agent.task = {
         ...agent.task,
-        description: `${agent.task.description}\n\nConductor feedback: ${trimmed}`,
+        description: `${agent.task.description}\n\nLead feedback: ${trimmed}`,
       };
     }
     this.update(agent, "preparing");

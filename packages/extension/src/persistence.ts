@@ -1,4 +1,4 @@
-import type { Agent, OrchestratorEvent, PersistedAgentRecord } from "@maestro/core";
+import type { Agent, OrchestratorEvent, PersistedAgentRecord } from "@hallucinate/core";
 
 // Section A: Codec ----------------------------------------------------------
 
@@ -46,7 +46,7 @@ export function isSafeAgentId(id: string): boolean {
 /** The `<id>.jsonl` filename for a safe id; throws on an unsafe id. Pure. */
 export function safeAgentFileName(id: string): string {
   if (!isSafeAgentId(id)) {
-    throw new Error(`[Maestro persistence] unsafe agent id rejected: ${JSON.stringify(id)}`);
+    throw new Error(`[Hallucinate persistence] unsafe agent id rejected: ${JSON.stringify(id)}`);
   }
   return `${id}.jsonl`;
 }
@@ -147,7 +147,7 @@ export class EventLogger {
     if (this.forgotten.has(agentId)) return;
     void this.enqueue(agentId, () =>
       this.backend.append(agentId, serializeEvent(event)).catch((err: unknown) => {
-        console.error(`[Maestro persistence] failed to persist event for ${agentId}:`, err);
+        console.error(`[Hallucinate persistence] failed to persist event for ${agentId}:`, err);
       }),
     );
   }
@@ -186,7 +186,7 @@ function agentIdOf(event: OrchestratorEvent): string | null {
       return event.agent.id;
     case "agent-event":
       return event.agentId;
-    // Delegation proposals are ephemeral conductor prompts, not agent lifecycle,
+    // Delegation proposals are ephemeral lead prompts, not agent lifecycle,
     // so they are not written to any per-agent log. Returning null skips persist.
     case "delegation-proposed":
     case "delegation-resolved":

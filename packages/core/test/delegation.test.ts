@@ -69,7 +69,7 @@ describe("buildLeadBrief", () => {
 
   it("frames the lead as the default agent that loads specialists as sub-agents", () => {
     const brief = buildLeadBrief(team, team.roles[0]!);
-    // Conductor / default-agent framing, not hinging on the team name.
+    // Lead / default-agent framing, not hinging on the team name.
     expect(brief).toContain("You are the default agent.");
     expect(brief).toContain("Specialists you can load as sub-agents:");
     // It no longer opens with the old "LEAD of the team" phrasing.

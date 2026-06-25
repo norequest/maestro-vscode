@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Role, Task, ToolGrant } from "@maestro/core";
-import { composePreamble } from "@maestro/core";
+import type { Role, Task, ToolGrant } from "@hallucinate/core";
+import { composePreamble } from "@hallucinate/core";
 
 /**
- * Translate a Maestro Role into a GitHub Copilot CLI "custom agent" file
+ * Translate a Hallucinate Role into a GitHub Copilot CLI "custom agent" file
  * (`<slug>.agent.md`) and place it where `copilot --agent <slug>` will find it.
  *
  * Why this module exists: without it the adapter flattens the entire persona
@@ -25,11 +25,11 @@ export function slugForRole(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return slug || "maestro-agent";
+  return slug || "hallucinate-agent";
 }
 
 /**
- * Map Maestro's granular ToolGrant onto Copilot's tool vocabulary
+ * Map Hallucinate's granular ToolGrant onto Copilot's tool vocabulary
  * (read | search | edit | execute). Returns undefined when no grants are
  * declared, so the frontmatter omits `tools` and Copilot grants all tools (its
  * default). A read-only role maps to just read/search; Run and Git both map to
@@ -59,7 +59,7 @@ function deriveDescription(role: Role): string {
   const firstLine = role.instructions.split(/\n/)[0]?.trim() ?? "";
   const firstSentence = firstLine.split(/(?<=[.!?])\s/)[0]?.trim() ?? firstLine;
   const text = (firstSentence || firstLine).trim();
-  if (!text) return `Maestro agent ${role.name}`;
+  if (!text) return `Hallucinate agent ${role.name}`;
   return text.length > 160 ? `${text.slice(0, 159)}…` : text;
 }
 
@@ -139,7 +139,7 @@ export const nodeAgentProfileWriter: AgentProfileWriter = {
 /**
  * Write a repo-level Copilot agent at `<repoRoot>/.github/agents/<slug>.agent.md`.
  * This is the location the VS Code Copilot Chat picker (and the CLI) read, so
- * writing here at create/save time makes a Maestro agent visible in Copilot
+ * writing here at create/save time makes a Hallucinate agent visible in Copilot
  * without a dispatch. Returns whether the file was newly created (vs overwritten)
  * so the caller can show the "reload window" hint only once.
  */

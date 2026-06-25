@@ -1,4 +1,4 @@
-import type { ApprovalDecision } from "@maestro/core";
+import type { ApprovalDecision } from "@hallucinate/core";
 import type { AcpMessage, AcpPermissionMode } from "./types.js";
 
 /** Parse one NDJSON line from ACP stdout. Returns null on empty/invalid lines. */

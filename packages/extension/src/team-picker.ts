@@ -1,6 +1,6 @@
-/** Pure helper for the "Maestro: Launch Team" command. No vscode import, so unit-testable under Vitest. */
+/** Pure helper for the "Hallucinate: Launch Team" command. No vscode import, so unit-testable under Vitest. */
 
-import type { Team } from "@maestro/core";
+import type { Team } from "@hallucinate/core";
 
 /** A QuickPick row for one team. `team` is carried so the caller can dispatch the picked one. */
 export interface TeamQuickPickItem {

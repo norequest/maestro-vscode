@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentDefaults } from "@maestro/core";
+import type { AgentDefaults } from "@hallucinate/core";
 import { resolveDefaults, applyDefaults, FALLBACK_LEAD_SKILLS } from "../src/config-defaults.js";
 
 describe("resolveDefaults", () => {

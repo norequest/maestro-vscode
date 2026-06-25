@@ -5,7 +5,7 @@ import { FakeWorkspaceManager, FakeWorkspaceProvider } from "../src/workspace.js
 import type { AgentEvent, Role } from "../src/types.js";
 
 const role: Role = {
-  name: "Conductor",
+  name: "Lead",
   instructions: "lead a fleet",
   engine: { id: "fake" },
   autonomy: "manual",
@@ -27,7 +27,7 @@ function waitFor(orch: Orchestrator, pred: () => boolean): Promise<void> {
   });
 }
 
-/** The fleet stream a conductor's engine emits: two named sub-agents inside one session. */
+/** The fleet stream a lead's engine emits: two named sub-agents inside one session. */
 const fleetScript: AgentEvent[] = [
   { kind: "subagent-started", callId: "call-alpha", name: "scribe-alpha", description: "draft the notes" },
   { kind: "subagent-output", callId: "call-alpha", text: "alpha is drafting" },
@@ -39,24 +39,24 @@ const fleetScript: AgentEvent[] = [
 ];
 
 describe("Orchestrator fleet sub-agents", () => {
-  it("surfaces fleet sub-agents as read-only virtual children sharing the conductor's worktree", async () => {
+  it("surfaces fleet sub-agents as read-only virtual children sharing the lead's worktree", async () => {
     const workspaces = new FakeWorkspaceManager();
     const orch = new Orchestrator({ maxParallelAgents: 2 }, workspaces);
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ script: fleetScript }));
 
-    const conductor = orch.spawn("Conductor", "produce release notes");
-    await waitFor(orch, () => orch.getAgent(conductor.id)?.state === "done");
-    // The conductor's own done diff was supplied, so wait until both children
-    // have finished too (the conductor terminal reconcile would also do this,
-    // but here the subagent-done events arrive before the conductor's done).
+    const lead = orch.spawn("Lead", "produce release notes");
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
+    // The lead's own done diff was supplied, so wait until both children
+    // have finished too (the lead terminal reconcile would also do this,
+    // but here the subagent-done events arrive before the lead's done).
     await waitFor(
       orch,
       () => orch.getAgents().filter((a) => a.virtual).every((a) => a.state === "done"),
     );
 
-    // Only the conductor created a worktree: children spawn no process/worktree.
-    expect(workspaces.created).toEqual([conductor.id]);
+    // Only the lead created a worktree: children spawn no process/worktree.
+    expect(workspaces.created).toEqual([lead.id]);
 
     const children = orch.getAgents().filter((a) => a.virtual);
     expect(children).toHaveLength(2);
@@ -66,11 +66,11 @@ describe("Orchestrator fleet sub-agents", () => {
     expect(alpha).toBeDefined();
     expect(beta).toBeDefined();
 
-    // Nested under the conductor, sharing its workspace reference.
-    expect(alpha.parentId).toBe(conductor.id);
-    expect(beta.parentId).toBe(conductor.id);
-    expect(alpha.workspace).toBe(orch.getAgent(conductor.id)!.workspace);
-    expect(beta.workspace).toBe(orch.getAgent(conductor.id)!.workspace);
+    // Nested under the lead, sharing its workspace reference.
+    expect(alpha.parentId).toBe(lead.id);
+    expect(beta.parentId).toBe(lead.id);
+    expect(alpha.workspace).toBe(orch.getAgent(lead.id)!.workspace);
+    expect(beta.workspace).toBe(orch.getAgent(lead.id)!.workspace);
 
     // Each received its own output in its log.
     expect(alpha.log).toEqual([{ kind: "output", text: "alpha is drafting" }]);
@@ -99,7 +99,7 @@ describe("Orchestrator fleet sub-agents", () => {
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ script: fleetScript }));
 
-    const conductor = orch.spawn("Conductor", "produce release notes");
+    const lead = orch.spawn("Lead", "produce release notes");
     await waitFor(orch, () => orch.getAgents().some((a) => a.virtual));
     const child = orch.getAgents().find((a) => a.virtual)!;
 
@@ -108,8 +108,8 @@ describe("Orchestrator fleet sub-agents", () => {
       /approve is not available for a fleet sub-agent/i,
     );
 
-    // Let the conductor finish so the run drains cleanly.
-    await waitFor(orch, () => orch.getAgent(conductor.id)?.state === "done");
+    // Let the lead finish so the run drains cleanly.
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
   });
 
   it("rejects steer, sendBack, and discard on a virtual child too", async () => {
@@ -118,7 +118,7 @@ describe("Orchestrator fleet sub-agents", () => {
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ script: fleetScript }));
 
-    const conductor = orch.spawn("Conductor", "produce release notes");
+    const lead = orch.spawn("Lead", "produce release notes");
     await waitFor(orch, () => orch.getAgents().some((a) => a.virtual));
     const child = orch.getAgents().find((a) => a.virtual)!;
 
@@ -126,24 +126,24 @@ describe("Orchestrator fleet sub-agents", () => {
     expect(() => orch.sendBack(child.id, "again")).toThrow(/send back is not available for a fleet sub-agent/i);
     await expect(orch.discard(child.id)).rejects.toThrow(/discard is not available for a fleet sub-agent/i);
 
-    await waitFor(orch, () => orch.getAgent(conductor.id)?.state === "done");
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
   });
 
-  it("reconciles a still-working child to done when the conductor finishes first", async () => {
-    // The conductor finishes WITHOUT a subagent-done for the started child: the
+  it("reconciles a still-working child to done when the lead finishes first", async () => {
+    // The lead finishes WITHOUT a subagent-done for the started child: the
     // child must not hang as "working".
     const script: AgentEvent[] = [
       { kind: "subagent-started", callId: "call-x", name: "worker-x", description: "do x" },
       { kind: "subagent-output", callId: "call-x", text: "x is working" },
-      { kind: "done", summary: "conductor finished early" },
+      { kind: "done", summary: "lead finished early" },
     ];
     const workspaces = new FakeWorkspaceManager();
     const orch = new Orchestrator({ maxParallelAgents: 2 }, workspaces);
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ script }));
 
-    const conductor = orch.spawn("Conductor", "run a fleet");
-    await waitFor(orch, () => orch.getAgent(conductor.id)?.state === "done");
+    const lead = orch.spawn("Lead", "run a fleet");
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
 
     const child = orch.getAgents().find((a) => a.virtual)!;
     expect(child).toBeDefined();
@@ -161,12 +161,12 @@ describe("Orchestrator fleet sub-agents", () => {
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ script }));
 
-    const conductor = orch.spawn("Conductor", "run a fleet");
-    await waitFor(orch, () => orch.getAgent(conductor.id)?.state === "done");
+    const lead = orch.spawn("Lead", "run a fleet");
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
 
     const child = orch.getAgents().find((a) => a.virtual)!;
     expect(child.role.name).toBe("unregistered-helper");
-    // Ad-hoc role inherits the conductor's engine id and is description-defaulted to its name.
+    // Ad-hoc role inherits the lead's engine id and is description-defaulted to its name.
     expect(child.role.engine.id).toBe(role.engine.id);
     expect(child.task.description).toBe("unregistered-helper");
     expect(child.state).toBe("done");
@@ -183,12 +183,12 @@ describe("Orchestrator fleet sub-agents", () => {
     orch.registerRole(role);
     orch.registerAdapter(new FakeEngineAdapter({ script }));
 
-    const conductor = orch.spawn("Conductor", "run a fleet");
-    await waitFor(orch, () => orch.getAgent(conductor.id)?.state === "done");
+    const lead = orch.spawn("Lead", "run a fleet");
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
 
-    // No virtual child was ever created; only the conductor exists.
+    // No virtual child was ever created; only the lead exists.
     expect(orch.getAgents()).toHaveLength(1);
-    expect(orch.getAgent(conductor.id)!.state).toBe("done");
+    expect(orch.getAgent(lead.id)!.state).toBe("done");
   });
 
   it("does not rehydrate a virtual child as an independent agent", () => {
@@ -196,8 +196,8 @@ describe("Orchestrator fleet sub-agents", () => {
     orch.hydrate([
       {
         agent: {
-          id: "conductor-1",
-          task: { id: "t", description: "lead", roleName: "Conductor" },
+          id: "lead-1",
+          task: { id: "t", description: "lead", roleName: "Lead" },
           role,
           state: "done",
           log: [],
@@ -210,13 +210,13 @@ describe("Orchestrator fleet sub-agents", () => {
           role: { name: "scribe-alpha", instructions: "", engine: { id: "fake" }, autonomy: "manual" },
           state: "working",
           log: [],
-          parentId: "conductor-1",
+          parentId: "lead-1",
           virtual: true,
         },
       },
     ]);
 
-    expect(orch.getAgent("conductor-1")).toBeDefined();
+    expect(orch.getAgent("lead-1")).toBeDefined();
     expect(orch.getAgent("virtual-1")).toBeUndefined();
   });
 });

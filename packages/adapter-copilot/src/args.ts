@@ -1,12 +1,12 @@
-import type { Role, Task, Workspace } from "@maestro/core";
-import { composePreamble, renderToolsForPreamble } from "@maestro/core";
+import type { Role, Task, Workspace } from "@hallucinate/core";
+import { composePreamble, renderToolsForPreamble } from "@hallucinate/core";
 
 /**
  * The wire format Copilot is asked to stream on stdout.
  * - `"text"` (default): human-readable plain text, the unchanged v1 behavior.
  * - `"json"`: opt-in newline-delimited JSON via `--output-format json`, parsed
  *   into structured output events by {@link CopilotSession}.
- * - `"fleet"`: the JSONL stream of a single-session `/fleet` conductor run,
+ * - `"fleet"`: the JSONL stream of a single-session `/fleet` lead run,
  *   parsed into sub-agent lifecycle events (plus output/done/error) by
  *   {@link CopilotSession}. The wire flag is still `--output-format json`; this
  *   value only selects the fleet-aware line parser.
@@ -90,7 +90,7 @@ export function buildAgentArgs(
 }
 
 /**
- * Build the `copilot` argv for FLEET single-session mode: spawn ONE conductor
+ * Build the `copilot` argv for FLEET single-session mode: spawn ONE lead
  * session that runs named custom agents as in-session sub-agents and streams
  * their lifecycle as JSONL.
  *
@@ -98,9 +98,9 @@ export function buildAgentArgs(
  *   - passes `task.description` VERBATIM via `-p` (the extension supplies the
  *     leading `/fleet ...` text and the roster; the adapter must NOT prepend
  *     `/fleet` or compose any preamble),
- *   - does NOT pass `--agent`. Copilot's BUILT-IN default orchestrator owns the
+ *   - does NOT pass `--agent`. Copilot's BUILT-IN default dispatcher owns the
  *     `task` tool that `/fleet` uses to dispatch the named specialist agents in
- *     parallel. Selecting a custom conductor agent with `--agent` instead teaches
+ *     parallel. Selecting a custom lead agent with `--agent` instead teaches
  *     the OLD ```delegate fenced-block convention (not a wired mechanism in
  *     Copilot v1.0.65), so `/fleet` never dispatches and no files are created.
  *     Dropping `--agent` was empirically verified to dispatch reliably,

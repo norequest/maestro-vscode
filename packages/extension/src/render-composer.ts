@@ -1,4 +1,4 @@
-import type { ComposerOptions } from "@maestro/cockpit";
+import type { ComposerOptions } from "@hallucinate/cockpit";
 import { escapeHtml } from "./html.js";
 
 /** The brand equaliser mark (prototype eqbar) used on the modal header + Dispatch button. */
@@ -15,7 +15,7 @@ function eqMark(extraClass = ""): string {
  */
 function renderPresets(options: ComposerOptions): string {
   if (options.presets.length === 0) {
-    return `<p class="composer-no-presets">No roles defined in .conductor/roles/. Enter a name below to create an ad-hoc role.</p>`;
+    return `<p class="composer-no-presets">No roles defined in .hallucinate/roles/. Enter a name below to create an ad-hoc role.</p>`;
   }
   const chips = options.presets
     .map(

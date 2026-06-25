@@ -61,8 +61,8 @@ function specialty(instructions: string): string {
 }
 
 /**
- * Build the instructions prefix injected into the lead (the default agent /
- * conductor) at launch. It names the specialists the conductor can load as
+ * Build the instructions prefix injected into the lead (the default agent)
+ * at launch. It names the specialists the lead can load as
  * sub-agents and teaches the exact delegation format the orchestrator parses.
  *
  * Only the dynamic roster and the parseable ```delegate fence live here in code,
@@ -84,7 +84,7 @@ export function buildLeadBrief(team: Team, lead: Role): string {
     `Specialists you can load as sub-agents:`,
     roster,
     ``,
-    `To load a specialist, emit a fenced block exactly like this (the conductor approves each one before it starts):`,
+    `To load a specialist, emit a fenced block exactly like this (the lead approves each one before it starts):`,
     "```" + DELEGATE_FENCE,
     `role: <one specialist name from the list above>`,
     `task: <a self-contained subtask for them>`,

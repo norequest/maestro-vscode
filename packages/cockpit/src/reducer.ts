@@ -1,4 +1,4 @@
-import { stateNeedsAttention, countGrants, type Agent, type OrchestratorEvent } from "@maestro/core";
+import { stateNeedsAttention, countGrants, type Agent, type OrchestratorEvent } from "@hallucinate/core";
 import { laneFor, isResolvedState } from "./lane.js";
 import type { CardVM, DelegationVM } from "./protocol.js";
 

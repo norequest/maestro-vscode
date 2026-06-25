@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent, Role, Task, Workspace } from "@maestro/core";
+import type { AgentEvent, Role, Task, Workspace } from "@hallucinate/core";
 import { CopilotAdapter } from "../src/adapter.js";
 import { makeFakeSpawn } from "./fake-spawn.js";
 
 const role: Role = {
-  name: "Fleet Conductor",
+  name: "Fleet Lead",
   instructions: "Coordinate the scribes.",
   engine: { id: "copilot", model: "claude-sonnet-4.6" },
   autonomy: "yolo",
@@ -14,7 +14,7 @@ const role: Role = {
 const task: Task = {
   id: "t1",
   description: "/fleet write the docs with scribe-alpha and scribe-beta",
-  roleName: "Fleet Conductor",
+  roleName: "Fleet Lead",
 };
 const workspace: Workspace = { agentId: "a1", path: "/tmp/wt/a1", branch: "agent/a1" };
 
@@ -49,11 +49,11 @@ describe("CopilotAdapter fleet mode", () => {
     expect(args[2]).toBe("-p");
     // The description is passed VERBATIM (no /fleet prepend, no preamble).
     expect(args[3]).toBe("/fleet write the docs with scribe-alpha and scribe-beta");
-    // Fleet mode must NOT pass --agent: Copilot's built-in orchestrator owns the
-    // `task` dispatch tool; a custom conductor agent teaches a dead ```delegate
+    // Fleet mode must NOT pass --agent: Copilot's built-in dispatcher owns the
+    // `task` dispatch tool; a custom lead agent teaches a dead ```delegate
     // convention and never dispatches.
     expect(args).not.toContain("--agent");
-    expect(args).not.toContain("fleet-conductor");
+    expect(args).not.toContain("fleet-lead");
     expect(args).toContain("--no-ask-user");
     expect(args).toContain("--allow-all");
     expect(args).toContain("--output-format");

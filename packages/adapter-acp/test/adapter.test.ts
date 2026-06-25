@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role, Task, Workspace } from "@maestro/core";
+import type { Role, Task, Workspace } from "@hallucinate/core";
 import { AcpAdapter } from "../src/adapter.js";
 import { FakeAcpTransport, acpSessionUpdate, acpTurnComplete } from "./fake-transport.js";
 import type { AcpTransportFn } from "../src/types.js";

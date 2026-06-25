@@ -61,7 +61,7 @@ const ROOT = "/repo";
 // PRIMARY skills home: the folder VS Code and Copilot read.
 const SKILLS_DIR = `${ROOT}/.github/skills`;
 // LEGACY skills home: still READ for back-compat (never written anymore).
-const LEGACY_SKILLS_DIR = `${ROOT}/.conductor/skills`;
+const LEGACY_SKILLS_DIR = `${ROOT}/.hallucinate/skills`;
 
 const RUN_TESTS_MD = `---
 name: run-tests
@@ -203,7 +203,7 @@ Generate the spec.
     expect(result.errors).toHaveLength(0);
   });
 
-  it("reads a skill placed only in legacy .conductor/skills (back-compat)", async () => {
+  it("reads a skill placed only in legacy .hallucinate/skills (back-compat)", async () => {
     const fs = makeFakeFs({
       [`${LEGACY_SKILLS_DIR}/legacy-only/SKILL.md`]: `---
 name: legacy-only
@@ -248,7 +248,7 @@ GITHUB BODY
 `;
     const legacyVersion = `---
 name: shared
-description: Conductor home loses.
+description: Legacy home loses.
 allowed-tools:
   - Git
 ---
@@ -285,6 +285,6 @@ LEGACY BODY
     expect(result.errors.length).toBe(2);
     const sources = result.errors.map((e) => e.source);
     expect(sources.some((s) => s.includes(".github/skills/bad-github"))).toBe(true);
-    expect(sources.some((s) => s.includes(".conductor/skills/bad-legacy"))).toBe(true);
+    expect(sources.some((s) => s.includes(".hallucinate/skills/bad-legacy"))).toBe(true);
   });
 });

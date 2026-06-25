@@ -11,8 +11,8 @@
  * NO vscode imports. NO node imports. Pure TS with injected deps.
  */
 
-import type { DiscoverResult, DiscoveredItem, AdoptDraft, McpInventory, Provenance } from "@maestro/config";
-import { mapToRole } from "@maestro/config";
+import type { DiscoverResult, DiscoveredItem, AdoptDraft, McpInventory, Provenance } from "@hallucinate/config";
+import { mapToRole } from "@hallucinate/config";
 import type { HostToLibrary, LibraryToHost } from "./library-protocol.js";
 
 // ─── DiscoverDeps ─────────────────────────────────────────────────────────────
@@ -29,7 +29,7 @@ export interface DiscoverDeps {
   /** Return the live MCP inventory (already loaded by the extension host). */
   mcpInventory(): McpInventory;
   /**
-   * Adopt the role: the host persists it to `.conductor/roles/`, refreshes the
+   * Adopt the role: the host persists it to `.hallucinate/roles/`, refreshes the
    * Library so the Agents tab lists it, then opens the Anatomy editor on the saved
    * role for optional tuning. The controller itself never touches disk.
    */

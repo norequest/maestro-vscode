@@ -136,7 +136,7 @@ Run the project linter and report all violations with file:line references.
 If the linter is not configured, check for an ESLint, Prettier, or similar config file and run the appropriate tool.
 `,
 
-  [`${ROOT}/.conductor/roles/implementer.yaml`]: `name: Implementer
+  [`${ROOT}/.hallucinate/roles/implementer.yaml`]: `name: Implementer
 instructions: Implement the requested feature in this worktree. Write tests, make them green, then commit.
 engine:
   id: copilot
@@ -145,7 +145,7 @@ skills:
   - run-tests
 `,
 
-  [`${ROOT}/.conductor/roles/unreadable.yaml`]: `name: Unreadable Role
+  [`${ROOT}/.hallucinate/roles/unreadable.yaml`]: `name: Unreadable Role
 instructions: This file will throw on read.
 `,
 
@@ -230,7 +230,7 @@ You are a general-purpose assistant. When given a task, analyze the codebase and
 };
 
 // The unreadable.yaml path is in the fake FS but readFile will throw on it.
-const THROW_SET = new Set([`${ROOT}/.conductor/roles/unreadable.yaml`]);
+const THROW_SET = new Set([`${ROOT}/.hallucinate/roles/unreadable.yaml`]);
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -244,7 +244,7 @@ describe("discoverWorkspace", () => {
     const kindSet = new Set(result.items.map((i) => i.kind));
     expect(kindSet.has("claude-agent")).toBe(true);
     expect(kindSet.has("claude-skill")).toBe(true);
-    expect(kindSet.has("conductor-role")).toBe(true);
+    expect(kindSet.has("hallucinate-role")).toBe(true);
     expect(kindSet.has("continue-agent")).toBe(true);
     expect(kindSet.has("cursor-rule")).toBe(true);
     expect(kindSet.has("copilot-agent")).toBe(true);
@@ -260,7 +260,7 @@ describe("discoverWorkspace", () => {
     // We have 9 readable items (one per kind above). unreadable.yaml is skipped.
     // CLAUDE.md -> instructions (1), planner.agent.md -> copilot-agent (1),
     // legacy.chatmode.md -> copilot-chatmode (1), security-reviewer.md -> claude-agent (1),
-    // lint/SKILL.md -> claude-skill (1), implementer.yaml -> conductor-role (1),
+    // lint/SKILL.md -> claude-skill (1), implementer.yaml -> hallucinate-role (1),
     // helper.yaml -> continue-agent (1), style.mdc -> cursor-rule (1),
     // foo.prompt.md -> prompt (1).
     expect(result.items).toHaveLength(9);
@@ -284,7 +284,7 @@ describe("discoverWorkspace", () => {
     const fs = makeFakeFs(FIXTURE_FILES, THROW_SET);
     const result = await discoverWorkspace(ROOT, fs);
 
-    expect(result.skipped).toContain(`${ROOT}/.conductor/roles/unreadable.yaml`);
+    expect(result.skipped).toContain(`${ROOT}/.hallucinate/roles/unreadable.yaml`);
   });
 
   it("does not include the unreadable path as a discovered item", async () => {
@@ -360,10 +360,10 @@ describe("discoverWorkspace", () => {
     expect(nonSkills.every((i) => !i.isSkill)).toBe(true);
   });
 
-  it("conductor-role item has correct name and engineHint", async () => {
+  it("hallucinate-role item has correct name and engineHint", async () => {
     const fs = makeFakeFs(FIXTURE_FILES, THROW_SET);
     const result = await discoverWorkspace(ROOT, fs);
-    const role = result.items.find((i) => i.kind === "conductor-role");
+    const role = result.items.find((i) => i.kind === "hallucinate-role");
     expect(role).toBeDefined();
     expect(role!.name).toBe("Implementer");
     expect(role!.engineHint).toBe("copilot");
@@ -393,12 +393,12 @@ describe("discoverWorkspace", () => {
     expect(fileWriter!.writeCapable).toBe(true);
   });
 
-  it("collapses a conductor role and its Copilot agent mirror to one item", async () => {
+  it("collapses a native role and its Copilot agent mirror to one item", async () => {
     // The same logical agent ("implementer") exists BOTH as a canonical
-    // .conductor/roles/implementer.yaml role AND as a .github/agents/implementer.agent.md
-    // Copilot mirror that Maestro itself writes. Without dedup, Discover would show it twice.
+    // .hallucinate/roles/implementer.yaml role AND as a .github/agents/implementer.agent.md
+    // Copilot mirror that Hallucinate itself writes. Without dedup, Discover would show it twice.
     const dupFiles: Record<string, string> = {
-      [`${ROOT}/.conductor/roles/implementer.yaml`]: `name: Implementer
+      [`${ROOT}/.hallucinate/roles/implementer.yaml`]: `name: Implementer
 instructions: Implement the requested feature in this worktree. Write tests, make them green, then commit.
 engine:
   id: copilot
@@ -406,7 +406,7 @@ autonomy: auto-approve-safe
 `,
       [`${ROOT}/.github/agents/implementer.agent.md`]: `---
 name: Implementer
-description: Copilot mirror of the implementer role written by Maestro.
+description: Copilot mirror of the implementer role written by Hallucinate.
 tools:
   - Read
   - Edit
@@ -425,8 +425,8 @@ You implement the requested feature in this worktree, write tests, and commit.
     const implementers = result.items.filter((i) => normalize(i.name) === "implementer");
     // Exactly one survivor for the "implementer" name.
     expect(implementers).toHaveLength(1);
-    // The canonical conductor role wins; the Copilot mirror was dropped.
-    expect(implementers[0]!.kind).toBe("conductor-role");
+    // The canonical native role wins; the Copilot mirror was dropped.
+    expect(implementers[0]!.kind).toBe("hallucinate-role");
     // No copilot-agent item remains for this agent.
     const copilotMirrors = result.items.filter(
       (i) => i.kind === "copilot-agent" && normalize(i.name) === "implementer",
@@ -436,13 +436,13 @@ You implement the requested feature in this worktree, write tests, and commit.
 
   it("multiple unreadable files all land in skipped", async () => {
     const extraThrow = new Set([
-      `${ROOT}/.conductor/roles/unreadable.yaml`,
+      `${ROOT}/.hallucinate/roles/unreadable.yaml`,
       `${ROOT}/.continue/agents/helper.yaml`,
     ]);
     const fs = makeFakeFs(FIXTURE_FILES, extraThrow);
     const result = await discoverWorkspace(ROOT, fs);
 
-    expect(result.skipped).toContain(`${ROOT}/.conductor/roles/unreadable.yaml`);
+    expect(result.skipped).toContain(`${ROOT}/.hallucinate/roles/unreadable.yaml`);
     expect(result.skipped).toContain(`${ROOT}/.continue/agents/helper.yaml`);
     // continue-agent kind should be absent because its only file is unreadable.
     const kindSet = new Set(result.items.map((i) => i.kind));

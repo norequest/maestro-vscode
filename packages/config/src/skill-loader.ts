@@ -44,18 +44,18 @@ export interface SkillLoadResult {
  * Loads all skills from BOTH skills homes under the given workspace root:
  *   - `.github/skills/<name>/SKILL.md` (PRIMARY: the folder VS Code and
  *     Copilot read), and
- *   - `.conductor/skills/<name>/SKILL.md` (LEGACY: still read for back-compat,
+ *   - `.hallucinate/skills/<name>/SKILL.md` (LEGACY: still read for back-compat,
  *     never written anymore).
  *
  * Results merge by skill name with the `.github` home WINNING on a collision:
- * a `.conductor` skill never overwrites a `.github` skill of the same name. If
+ * a `.hallucinate` skill never overwrites a `.github` skill of the same name. If
  * a directory does not exist it is skipped; if NEITHER exists, returns an empty
  * result with no errors. Each subdirectory under a skills home is treated as
  * one skill. Malformed SKILL.md files are collected as errors, not thrown.
  * Warnings and errors from both homes accumulate.
  *
  * All filesystem access goes through the injected `FsReader`, which enforces
- * the `.conductor` symlink containment boundary (Issue 27 / S8).
+ * the `.hallucinate` symlink containment boundary (Issue 27 / S8).
  */
 export async function loadSkills(
   workspaceRoot: string,
@@ -71,7 +71,7 @@ export async function loadSkills(
 
   // Scan the primary home first, then the legacy home. Because we populate the
   // by-name collections only when a name is not already present, the primary
-  // `.github` skill wins on a name collision with a legacy `.conductor` skill.
+  // `.github` skill wins on a name collision with a legacy `.hallucinate` skill.
   const primaryDir = nodePath.join(workspaceRoot, ...SKILLS_DIR_SEGMENTS);
   const legacyDir = nodePath.join(workspaceRoot, ...LEGACY_SKILLS_DIR_SEGMENTS);
 
@@ -85,7 +85,7 @@ export async function loadSkills(
  * Scan one skills home, merging its skills into `result`. A directory that does
  * not exist is skipped (existing not-exists guard). A name already present in
  * `result` (i.e. claimed by an earlier home) is NOT overwritten, which is what
- * lets `.github` win over `.conductor` when this is called for `.github` first.
+ * lets `.github` win over `.hallucinate` when this is called for `.github` first.
  * Warnings and errors accumulate into `result` regardless.
  */
 async function scanSkillsHome(

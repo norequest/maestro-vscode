@@ -4,11 +4,11 @@ import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 
 /**
- * CONDUCTOR_ROLE and DEFAULT_ROLE live in extension.ts, which imports `vscode` at
+ * LEAD_ROLE and DEFAULT_ROLE live in extension.ts, which imports `vscode` at
  * the module top level and so cannot be imported into a Vitest (node) test. We
  * assert on the source instead.
  *
- * Model: the CONDUCTOR is the single "default agent" that ALWAYS leads (over every
+ * Model: the LEAD is the single "default agent" that ALWAYS leads (over every
  * specialist for a no-team run, or a team's scoped roster for a team run). It is a
  * THIN lead persona: it must NOT hardcode the coordination skills, because the
  * playbook now rides in via the config-driven default layer (`defaults.leadSkills`,
@@ -29,10 +29,10 @@ function roleBlock(name: string): string {
   return extensionSrc.slice(start, end);
 }
 
-describe("CONDUCTOR_ROLE", () => {
+describe("LEAD_ROLE", () => {
   it("does NOT hardcode the coordination skills (they now come from config defaults.leadSkills)", () => {
-    expect(roleBlock("CONDUCTOR_ROLE")).not.toMatch(/skills:\s*\[\s*"task-coordination-strategies"/);
-    expect(roleBlock("CONDUCTOR_ROLE")).not.toMatch(/delegation-playbook/);
+    expect(roleBlock("LEAD_ROLE")).not.toMatch(/skills:\s*\[\s*"task-coordination-strategies"/);
+    expect(roleBlock("LEAD_ROLE")).not.toMatch(/delegation-playbook/);
   });
 });
 

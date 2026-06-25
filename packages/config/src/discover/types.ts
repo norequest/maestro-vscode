@@ -1,6 +1,6 @@
 /**
  * Confidence tier for discovered agents/roles.
- * - verified: file format unambiguously identifies this as an agent (e.g. .agent.md, conductor role)
+ * - verified: file format unambiguously identifies this as an agent (e.g. .agent.md, a native .hallucinate role)
  * - likely: format suggests an agent but is not definitive (e.g. prompt files, skill files)
  * - instructions: generic instructions file; may or may not be intended as an agent
  */
@@ -12,7 +12,7 @@ export type Confidence = "verified" | "likely" | "instructions";
  */
 export type SourceKind =
   | "claude-agent"
-  | "conductor-role"
+  | "hallucinate-role"
   | "copilot-agent"
   | "copilot-chatmode"
   | "prompt"

@@ -1,5 +1,5 @@
 /**
- * The single inbound dispatcher for the one "Conducting Board" panel, extracted
+ * The single inbound dispatcher for the one "Board" panel, extracted
  * as a PURE factory (no vscode, no node) so it unit-tests against fake handlers.
  *
  * Every webview message is an AppToHost (already guarded by isAppMessage at the
@@ -14,7 +14,7 @@
  * the discover controller, kept verbatim so behaviour is unchanged.
  */
 
-import { isWebviewMessage, type WebviewToHost } from "@maestro/cockpit";
+import { isWebviewMessage, type WebviewToHost } from "@hallucinate/cockpit";
 import { isLibraryMessage, type LibraryToHost } from "./library-protocol.js";
 import { isAnatomyMessage, type AnatomyToHost } from "./anatomy-protocol.js";
 import type { AppToHost } from "./app-protocol.js";

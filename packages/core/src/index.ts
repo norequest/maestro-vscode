@@ -1,4 +1,4 @@
-export const MAESTRO_CORE_VERSION = "0.0.0";
+export const HALLUCINATE_CORE_VERSION = "0.0.0";
 
 export * from "./types.js";
 export * from "./constants.js";

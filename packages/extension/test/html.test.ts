@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CardVM } from "@maestro/cockpit";
+import type { CardVM } from "@hallucinate/cockpit";
 import { escapeHtml, makeNonce } from "../src/html.js";
 import { renderCardHTML, renderDrawer } from "../src/render.js";
 

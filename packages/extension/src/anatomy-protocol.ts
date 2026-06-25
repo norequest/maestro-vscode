@@ -7,9 +7,9 @@
  * NO node imports in this file.
  */
 
-import type { Autonomy, ToolGrant } from "@maestro/core";
-import { AUTONOMY_VALUES as AUTONOMY_LEVELS } from "@maestro/core";
-import type { GrantGap } from "@maestro/config";
+import type { Autonomy, ToolGrant } from "@hallucinate/core";
+import { AUTONOMY_VALUES as AUTONOMY_LEVELS } from "@hallucinate/core";
+import type { GrantGap } from "@hallucinate/config";
 
 // ─── View-model ───────────────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import type { Autonomy } from "@maestro/core";
+import type { Autonomy } from "@hallucinate/core";
 
 /** The minimal shape of an ACP JSON-RPC message we care about. */
 export interface AcpMessage {

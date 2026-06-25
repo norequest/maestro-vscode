@@ -1,26 +1,26 @@
 {
-  "name": "maestro-conductor",
-  "displayName": "Maestro: Conduct AI Coding Agents",
-  "description": "Conduct a team of AI coding agents in isolated git worktrees.",
+  "name": "hallucinate",
+  "displayName": "Hallucinate: Run AI Coding Agents",
+  "description": "Run a team of AI coding agents in isolated git worktrees.",
   "version": "0.1.10",
   "icon": "media/icon.png",
   "license": "MIT",
   "publisher": "norequest",
   "repository": {
     "type": "git",
-    "url": "https://github.com/norequest/maestro-vscode.git",
+    "url": "https://github.com/norequest/hallucinate.git",
     "directory": "packages/extension"
   },
-  "homepage": "https://github.com/norequest/maestro-vscode#readme",
+  "homepage": "https://github.com/norequest/hallucinate#readme",
   "bugs": {
-    "url": "https://github.com/norequest/maestro-vscode/issues"
+    "url": "https://github.com/norequest/hallucinate/issues"
   },
   "keywords": [
     "ai",
     "agents",
     "github-copilot",
     "coding-agent",
-    "orchestration",
+    "coordination",
     "git-worktree",
     "acp",
     "multi-agent"
@@ -41,67 +41,67 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "maestro",
-          "title": "Maestro",
-          "icon": "media/maestro.svg"
+          "id": "hallucinate",
+          "title": "Hallucinate",
+          "icon": "media/hallucinate.svg"
         }
       ]
     },
     "views": {
-      "maestro": [
+      "hallucinate": [
         {
-          "id": "maestro.home",
-          "name": "Maestro",
+          "id": "hallucinate.home",
+          "name": "Hallucinate",
           "type": "webview"
         }
       ]
     },
     "commands": [
       {
-        "command": "maestro.newAgent",
-        "title": "Maestro: New Agent",
+        "command": "hallucinate.newAgent",
+        "title": "Hallucinate: New Agent",
         "icon": "$(add)"
       },
       {
-        "command": "maestro.spawnAgent",
-        "title": "Maestro: Spawn Agent (quick)",
+        "command": "hallucinate.spawnAgent",
+        "title": "Hallucinate: Spawn Agent (quick)",
         "icon": "$(add)"
       },
       {
-        "command": "maestro.launchTeam",
-        "title": "Maestro: Launch Team",
+        "command": "hallucinate.launchTeam",
+        "title": "Hallucinate: Launch Team",
         "icon": "$(organization)"
       },
       {
-        "command": "maestro.openStage",
-        "title": "Maestro: Open Conducting Board",
+        "command": "hallucinate.openStage",
+        "title": "Hallucinate: Open Board",
         "icon": "$(dashboard)"
       },
       {
-        "command": "maestro.openLibrary",
-        "title": "Maestro: Open Library",
+        "command": "hallucinate.openLibrary",
+        "title": "Hallucinate: Open Library",
         "icon": "$(library)"
       },
       {
-        "command": "maestro.openAnatomy",
-        "title": "Maestro: Edit Agent Anatomy",
+        "command": "hallucinate.openAnatomy",
+        "title": "Hallucinate: Edit Agent Anatomy",
         "icon": "$(settings-gear)"
       }
     ],
     "configuration": {
-      "title": "Maestro",
+      "title": "Hallucinate",
       "properties": {
-        "maestro.prMode": {
+        "hallucinate.prMode": {
           "type": "boolean",
           "default": false,
           "description": "Create a pull request (push branch + gh pr create) instead of a local merge."
         },
-        "maestro.prDraft": {
+        "hallucinate.prDraft": {
           "type": "boolean",
           "default": false,
           "description": "Open pull requests as drafts when PR mode is on."
         },
-        "maestro.discoverPlugins": {
+        "hallucinate.discoverPlugins": {
           "type": "boolean",
           "default": false,
           "description": "Scan installed Copilot plugins during discovery."
@@ -120,12 +120,12 @@
     "test:e2e": "node build.mjs && tsc -p integration/tsconfig.json && node out/integration/runTest.js"
   },
   "dependencies": {
-    "@maestro/core": "workspace:*",
-    "@maestro/cockpit": "workspace:*",
-    "@maestro/workspace": "workspace:*",
-    "@maestro/adapter-copilot": "workspace:*",
-    "@maestro/adapter-acp": "workspace:*",
-    "@maestro/config": "workspace:*"
+    "@hallucinate/core": "workspace:*",
+    "@hallucinate/cockpit": "workspace:*",
+    "@hallucinate/workspace": "workspace:*",
+    "@hallucinate/adapter-copilot": "workspace:*",
+    "@hallucinate/adapter-acp": "workspace:*",
+    "@hallucinate/config": "workspace:*"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",

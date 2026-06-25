@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateRole, validateTeam, validateOrchestratorConfig } from "../src/validator.js";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 
 const validRoleRaw = {
   name: "Implementer",

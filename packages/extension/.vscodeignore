@@ -11,4 +11,4 @@ vitest.config.ts
 node_modules/**
 resources/**
 .github/**
-.conductor/**
+.hallucinate/**

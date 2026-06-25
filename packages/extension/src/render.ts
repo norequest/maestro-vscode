@@ -1,4 +1,4 @@
-import type { CardVM, CockpitState, DelegationVM, Lane } from "@maestro/cockpit";
+import type { CardVM, CockpitState, DelegationVM, Lane } from "@hallucinate/cockpit";
 import { escapeHtml } from "./html.js";
 
 // ─── Lane / column layout ─────────────────────────────────────────────────────
@@ -70,8 +70,8 @@ function goalLine(card: CardVM): string {
 }
 
 /**
- * On a conductor card (one that some other card names as its parent), a faint
- * count of its sub-agents in the meta row, so a team run reads as one conductor
+ * On a lead card (one that some other card names as its parent), a faint
+ * count of its sub-agents in the meta row, so a team run reads as one lead
  * with N sub-agents. Singular "sub-agent" when N===1; nothing when N===0 (so a
  * non-parent card's markup is unchanged). The count comes from the full board.
  */
@@ -184,7 +184,7 @@ function removeButton(card: CardVM): string {
 function cardFooter(card: CardVM): string {
   // A virtual fleet sub-agent is READ-ONLY: it has no worktree/branch/session, so
   // it is never reviewable, removable, or mergeable. Render no action affordances;
-  // the conductor stays the single reviewable/mergeable unit. A tiny faint hint
+  // the lead stays the single reviewable/mergeable unit. A tiny faint hint
   // stands in so the card still reads as intentionally action-free.
   if (card.virtual) {
     return `<div class="card-footer"><span class="card-readonly">read-only sub-agent</span></div>`;
@@ -290,14 +290,14 @@ function boardHeader(state: CockpitState): string {
   const counts = laneCounts(state.cards);
   // "Need you" must be honest: count agents that need a decision PLUS every
   // pending delegation proposal (rendered in the strip above the lanes), so the
-  // header total matches what is actually awaiting the conductor.
+  // header total matches what is actually awaiting the lead.
   const needsYou = counts.needsYou + counts.conflict + (state.delegations?.length ?? 0);
   const total = state.cards.length;
   const agentWord = total === 1 ? "agent" : "agents";
   return `<header class="board-header">
     <div class="bh-left">
       <span class="bh-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-      <span class="bh-title">Maestro</span>
+      <span class="bh-title">Hallucinate</span>
       <span class="bh-sep"></span>
       <span class="bh-meta">${total} ${agentWord}&ensp;·&ensp;branch <span class="bh-branch">main</span></span>
       <button class="bh-newagent" data-action="new-task" type="button"><span class="plus">+</span>New task</button>
@@ -338,7 +338,7 @@ function statusBar(state: CockpitState): string {
     <span class="sb-branch"><svg class="sb-branch-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6.5" cy="6" r="2.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="7" r="2.5"/><path d="M6.5 8.5v7M9 7h4.5a3 3 0 013 3"/></svg>main</span>
     <span class="sb-running">${counts.working} running</span>
     <span class="sb-awaiting">${awaiting} awaiting review</span>
-    <span class="sb-version">Maestro</span>
+    <span class="sb-version">Hallucinate</span>
   </div>`;
 }
 
@@ -383,7 +383,7 @@ function delegationsBlock(state: CockpitState): string {
 }
 
 /**
- * The full Conducting Board: tab strip, header, the pending-delegations block,
+ * The full Board: tab strip, header, the pending-delegations block,
  * three lane columns, status bar. Pre-existing callers expect a single string;
  * the drawer is appended separately by the webview client.
  */
@@ -530,9 +530,9 @@ function drawerFooter(card: CardVM): string {
 
   // A virtual fleet sub-agent is READ-ONLY: no approval panel, steer box, send-back
   // box, or merge/discard actions. Its drawer is a view-only window onto the
-  // sub-agent's output; the conductor remains the only actionable unit.
+  // sub-agent's output; the lead remains the only actionable unit.
   if (card.virtual) {
-    return `<footer class="drawer-actions drawer-footer-readonly"><span class="drawer-readonly-note">This is a read-only sub-agent. Act on the conductor instead.</span></footer>`;
+    return `<footer class="drawer-actions drawer-footer-readonly"><span class="drawer-readonly-note">This is a read-only sub-agent. Act on the lead instead.</span></footer>`;
   }
 
   // BLOCKED (awaiting input): the prototype shows a waiting note + an

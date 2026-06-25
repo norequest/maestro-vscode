@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSkillIndex } from "../src/skill-index.js";
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import type { SkillManifest } from "../src/skill-types.js";
 
 function makeRole(name: string, skills?: string[]): Role {

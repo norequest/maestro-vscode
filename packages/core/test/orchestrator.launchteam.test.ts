@@ -26,7 +26,7 @@ function waitForState(orch: Orchestrator, agentId: string, target: string): Prom
   });
 }
 
-describe("Orchestrator.launchTeam (lead-orchestrated)", () => {
+describe("Orchestrator.launchTeam (lead-driven)", () => {
   it("spawns ONLY the lead (first role by default), not the whole roster", async () => {
     const workspaces = new FakeWorkspaceProvider();
     const orch = new Orchestrator({ maxParallelAgents: 3 }, workspaces);

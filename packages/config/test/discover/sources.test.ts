@@ -64,14 +64,14 @@ describe("parseDiscoveredFile: claude-agent fixture", () => {
   });
 });
 
-describe("parseDiscoveredFile: conductor-role fixture", () => {
+describe("parseDiscoveredFile: hallucinate-role fixture", () => {
   it("extracts name, description, and keeps engine hint from role", () => {
-    const text = readFileSync(join(FIXTURES, ".conductor/roles/implementer.yaml"), "utf-8");
-    const item = parseDiscoveredFile("conductor-role", text, ".conductor/roles/implementer.yaml");
-    expect(item.kind).toBe("conductor-role");
+    const text = readFileSync(join(FIXTURES, ".hallucinate/roles/implementer.yaml"), "utf-8");
+    const item = parseDiscoveredFile("hallucinate-role", text, ".hallucinate/roles/implementer.yaml");
+    expect(item.kind).toBe("hallucinate-role");
     expect(item.name).toBe("Implementer");
     expect(typeof item.description).toBe("string");
-    // conductor roles already have known engine ids
+    // native roles already have known engine ids
     expect(["copilot", "acp"]).toContain(item.engineHint);
   });
 });

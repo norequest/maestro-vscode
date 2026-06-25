@@ -4,7 +4,7 @@
  * Colors are graphite class names only (R2: no var(--vscode-*)).
  *
  * Structure mirrors the approved Claude Design prototype agent form
- * (Maestro-prototype.html lines 644-793): a left "anatomy" sub-rail of status
+ * (Hallucinate-prototype.html lines 644-793): a left "anatomy" sub-rail of status
  * dots and a single scroll canvas (NOT tabs) of Identity / Soul / Instructions /
  * Tools / Skills / Engine / Autonomy. Soul and Instructions are twin markdown
  * file-cards with contrasting "who it is" vs "what it does" helper eyebrows; the
@@ -14,7 +14,7 @@
 
 import { escapeHtml } from "./html.js";
 import type { AnatomyVM } from "./anatomy-protocol.js";
-import type { GrantGap } from "@maestro/config";
+import type { GrantGap } from "@hallucinate/config";
 
 // ─── Built-in tool rows ───────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ const ALL_BUILTIN_TOOLS = [...BUILTIN_READ_TOOLS, ...BUILTIN_WRITE_TOOLS] as con
 const ENGINE_CHOICES = ["copilot", "acp", "gemini", "claude", "codex"] as const;
 
 // The engine ids that actually have a registered adapter and can be written to a
-// role. MUST mirror @maestro/config KNOWN_ENGINE_IDS. Kept local (not imported)
+// role. MUST mirror @hallucinate/config KNOWN_ENGINE_IDS. Kept local (not imported)
 // so this webview-bundled module never pulls config runtime into the browser
 // bundle. The other ENGINE_CHOICES are shown as "soon" and are not selectable.
 const SUPPORTED_ENGINE_IDS = new Set<string>(["copilot", "acp"]);

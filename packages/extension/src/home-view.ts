@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { makeNonce } from "./app-html.js";
 
 /**
- * The Maestro activity-bar launcher. A tiny webview view that gives the
+ * The Hallucinate activity-bar launcher. A tiny webview view that gives the
  * extension a persistent icon on the left activity bar (the roster tree was
  * removed; the wide board lives as an editor "hero", which an activity-bar icon
  * cannot host directly). Clicking the icon reveals this launcher; its cards
@@ -14,16 +14,16 @@ import { makeNonce } from "./app-html.js";
  * but only against a fixed allowlist so the webview can never run an arbitrary
  * command. There is no user content in the markup, so nothing needs escaping.
  *
- * The launcher is on-brand with the rest of Maestro: graphite tokens, the
+ * The launcher is on-brand with the rest of Hallucinate: graphite tokens, the
  * equalizer "signal" mark, Manrope display type, and a tidy card menu. The only
  * dynamic input is a single boolean (is a folder open) used to pick the footer
  * line.
  */
-const HOME_VIEW_ID = "maestro.home";
+const HOME_VIEW_ID = "hallucinate.home";
 
-const ALLOWED_COMMANDS = ["maestro.openStage", "maestro.newAgent", "maestro.openLibrary"];
+const ALLOWED_COMMANDS = ["hallucinate.openStage", "hallucinate.newAgent", "hallucinate.openLibrary"];
 
-class MaestroHomeProvider implements vscode.WebviewViewProvider {
+class HallucinateHomeProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -49,8 +49,8 @@ class MaestroHomeProvider implements vscode.WebviewViewProvider {
   }
 }
 
-export function registerMaestroHomeView(context: vscode.ExtensionContext): void {
-  const provider = new MaestroHomeProvider();
+export function registerHallucinateHomeView(context: vscode.ExtensionContext): void {
+  const provider = new HallucinateHomeProvider();
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(HOME_VIEW_ID, provider),
     // Keep the footer hint honest: when the user opens or closes a folder, the
@@ -69,7 +69,7 @@ function homeHtml(hasFolder: boolean, nonce: string): string {
   const footer = hasFolder
     ? `<div class="hint hint--ready">
         <span class="hint-dot" aria-hidden="true"></span>
-        <span>Ready to conduct.</span>
+        <span>Ready to run.</span>
       </div>`
     : `<div class="hint">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -84,7 +84,7 @@ function homeHtml(hasFolder: boolean, nonce: string): string {
 <meta charset="UTF-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Maestro</title>
+<title>Hallucinate</title>
 <style>
   :root {
     /* Backgrounds */
@@ -344,16 +344,16 @@ function homeHtml(hasFolder: boolean, nonce: string): string {
         <rect x="22.8" y="10" width="3.2" height="6" rx="1.2" fill="#8ab8ff" opacity="0.55"/>
       </svg>
       <div class="brand-text">
-        <div class="wordmark">Maestro</div>
-        <div class="tagline">Conduct a team of AI coding agents.</div>
+        <div class="wordmark">Hallucinate</div>
+        <div class="tagline">Run a team of AI coding agents.</div>
       </div>
     </header>
 
     <!-- Action cards -->
-    <nav class="menu" aria-label="Maestro actions">
+    <nav class="menu" aria-label="Hallucinate actions">
 
-      <!-- Primary: Open Conducting Board -->
-      <a class="card card--primary" role="button" tabindex="0" data-command="maestro.openStage">
+      <!-- Primary: Open Board -->
+      <a class="card card--primary" role="button" tabindex="0" data-command="hallucinate.openStage">
         <span class="card-icon" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none">
             <rect x="2"  y="8"  width="2.2" height="5" rx="0.9" fill="currentColor" opacity="0.6"/>
@@ -364,13 +364,13 @@ function homeHtml(hasFolder: boolean, nonce: string): string {
         </span>
         <span class="card-body">
           <span class="eyebrow">Start here</span>
-          <span class="card-title">Open Conducting Board</span>
+          <span class="card-title">Open Board</span>
           <span class="card-desc">Watch and steer your agents.</span>
         </span>
       </a>
 
       <!-- New agent -->
-      <a class="card" role="button" tabindex="0" data-command="maestro.newAgent">
+      <a class="card" role="button" tabindex="0" data-command="hallucinate.newAgent">
         <span class="card-icon" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="8" cy="5.5" r="2.6"/>
@@ -385,7 +385,7 @@ function homeHtml(hasFolder: boolean, nonce: string): string {
       </a>
 
       <!-- Library -->
-      <a class="card" role="button" tabindex="0" data-command="maestro.openLibrary">
+      <a class="card" role="button" tabindex="0" data-command="hallucinate.openLibrary">
         <span class="card-icon" aria-hidden="true">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M8 4.2 2.4 6.5 8 8.8l5.6-2.3L8 4.2Z"/>

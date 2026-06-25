@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Orchestrator, FakeWorkspaceProvider, isTerminalState } from "@maestro/core";
-import type { Role } from "@maestro/core";
+import { Orchestrator, FakeWorkspaceProvider, isTerminalState } from "@hallucinate/core";
+import type { Role } from "@hallucinate/core";
 import { AcpAdapter } from "../src/adapter.js";
 import {
   FakeAcpTransport,

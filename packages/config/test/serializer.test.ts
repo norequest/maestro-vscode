@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { serializeRole, serializeTeam, serializeSkill, serializeConfig } from "../src/serializer.js";
 import { parseRoleYaml, parseTeamYaml, parseConfigYaml } from "../src/parser.js";
 import { parseSkillMarkdown } from "../src/skill-parser.js";
-import type { Role, Team } from "@maestro/core";
-import type { MaestroConfig } from "../src/types.js";
+import type { Role, Team } from "@hallucinate/core";
+import type { HallucinateConfig } from "../src/types.js";
 
 const implementer: Role = {
   name: "Implementer",
@@ -210,7 +210,7 @@ describe("serializeTeam", () => {
 
 describe("serializeConfig defaults round-trip", () => {
   it("round-trips a populated defaults block through parseConfigYaml (deep-equals)", () => {
-    const config: MaestroConfig = {
+    const config: HallucinateConfig = {
       maxParallelAgents: 4,
       defaults: {
         instructions: "Always run the linter.",
@@ -228,7 +228,7 @@ describe("serializeConfig defaults round-trip", () => {
   });
 
   it("round-trips an empty-string instructions and empty skills array", () => {
-    const config: MaestroConfig = {
+    const config: HallucinateConfig = {
       maxParallelAgents: 3,
       defaults: { instructions: "", skills: [], leadSkills: ["task-coordination-strategies"] },
     };

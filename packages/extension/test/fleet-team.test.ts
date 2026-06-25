@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
-import type { AgentProfile, Role, SpawnOptions, Team } from "@maestro/core";
-import { slugForRole } from "@maestro/adapter-copilot";
+import type { AgentProfile, Role, SpawnOptions, Team } from "@hallucinate/core";
+import { slugForRole } from "@hallucinate/adapter-copilot";
 import {
   COPILOT_ENGINE_ID,
   FLEET_ENGINE_ID,
   buildFleetPrompt,
   launchFleetTeam,
   teammateDescription,
-  toFleetConductor,
+  toFleetLead,
   usesFleet,
 } from "../src/fleet-team.js";
 
@@ -21,32 +21,32 @@ const role = (name: string, instructions = `You are ${name}.`): Role => ({
   autonomy: "auto-approve-safe",
 });
 
-const conductor: Role = {
-  name: "Conductor",
-  instructions: "You are the conductor.",
+const lead: Role = {
+  name: "Lead",
+  instructions: "You are the lead.",
   engine: { id: "copilot" },
   autonomy: "auto-approve-safe",
 };
 
 describe("usesFleet", () => {
   it("is true for a Copilot lead", () => {
-    expect(usesFleet(conductor)).toBe(true);
-    expect(usesFleet({ ...conductor, engine: { id: COPILOT_ENGINE_ID } })).toBe(true);
+    expect(usesFleet(lead)).toBe(true);
+    expect(usesFleet({ ...lead, engine: { id: COPILOT_ENGINE_ID } })).toBe(true);
   });
 
   it("is false for an ACP (gemini) lead, so ACP keeps the delegate/spawn model", () => {
-    expect(usesFleet({ ...conductor, engine: { id: "acp" } })).toBe(false);
-    expect(usesFleet({ ...conductor, engine: { id: "gemini" } })).toBe(false);
+    expect(usesFleet({ ...lead, engine: { id: "acp" } })).toBe(false);
+    expect(usesFleet({ ...lead, engine: { id: "gemini" } })).toBe(false);
   });
 });
 
-describe("toFleetConductor", () => {
+describe("toFleetLead", () => {
   it("rewrites ONLY engine.id to the fleet id, preserving everything else", () => {
-    const c: Role = { ...conductor, engine: { id: "copilot", model: "gpt-5" }, skills: ["x"] };
-    const f = toFleetConductor(c);
+    const c: Role = { ...lead, engine: { id: "copilot", model: "gpt-5" }, skills: ["x"] };
+    const f = toFleetLead(c);
     expect(f.engine.id).toBe(FLEET_ENGINE_ID);
     expect(f.engine.model).toBe("gpt-5");
-    expect(f.name).toBe("Conductor");
+    expect(f.name).toBe("Lead");
     expect(f.instructions).toBe(c.instructions);
     expect(f.skills).toEqual(["x"]);
     // Pure: input untouched.
@@ -127,47 +127,47 @@ describe("launchFleetTeam", () => {
 
   const team: Team = { name: "Backend", roles: [role("ApiDev"), role("DbDev")] };
 
-  it("spawns ONLY the conductor (one process), never a process per teammate", async () => {
+  it("spawns ONLY the lead (one process), never a process per teammate", async () => {
     const s = spy();
-    await launchFleetTeam(team, "build the api", conductor, s.deps);
+    await launchFleetTeam(team, "build the api", lead, s.deps);
     expect(s.spawns).toHaveLength(1);
-    expect(s.spawns[0]!.roleName).toBe("Conductor");
+    expect(s.spawns[0]!.roleName).toBe("Lead");
   });
 
-  it("the conductor's spawn description is the '/fleet ...' prompt listing the roster slugs", async () => {
+  it("the lead's spawn description is the '/fleet ...' prompt listing the roster slugs", async () => {
     const s = spy();
-    await launchFleetTeam(team, "build the api", conductor, s.deps);
+    await launchFleetTeam(team, "build the api", lead, s.deps);
     const desc = s.spawns[0]!.description;
     expect(desc.startsWith("/fleet build the api")).toBe(true);
     expect(desc).toContain("- apidev:");
     expect(desc).toContain("- dbdev:");
   });
 
-  it("registers the conductor on the FLEET engine id and the teammates on their own", async () => {
+  it("registers the lead on the FLEET engine id and the teammates on their own", async () => {
     const s = spy();
-    await launchFleetTeam(team, "task", conductor, s.deps);
-    const cond = s.registered.find((r) => r.name === "Conductor");
-    expect(cond?.engineId).toBe(FLEET_ENGINE_ID);
+    await launchFleetTeam(team, "task", lead, s.deps);
+    const leadReg = s.registered.find((r) => r.name === "Lead");
+    expect(leadReg?.engineId).toBe(FLEET_ENGINE_ID);
     expect(s.registered.find((r) => r.name === "ApiDev")?.engineId).toBe("copilot");
     expect(s.registered.find((r) => r.name === "DbDev")?.engineId).toBe("copilot");
   });
 
-  it("passes agentProfiles to spawn: one per TEAMMATE, never one for the conductor", async () => {
+  it("passes agentProfiles to spawn: one per TEAMMATE, never one for the lead", async () => {
     const s = spy();
-    await launchFleetTeam(team, "task", conductor, s.deps);
-    // Profiles built only for the teammates, not the conductor.
+    await launchFleetTeam(team, "task", lead, s.deps);
+    // Profiles built only for the teammates, not the lead.
     expect(s.profiled).toEqual(["ApiDev", "DbDev"]);
     const profiles = s.spawns[0]!.opts?.agentProfiles ?? [];
     expect(profiles.map((p) => p.name)).toEqual(["apidev", "dbdev"]);
-    // No profile carries the conductor's slug.
-    expect(profiles.some((p) => p.name === slugForRole("Conductor"))).toBe(false);
+    // No profile carries the lead's slug.
+    expect(profiles.some((p) => p.name === slugForRole("Lead"))).toBe(false);
     // Each profile has non-empty content.
     for (const p of profiles) expect(p.content.length).toBeGreaterThan(0);
   });
 
   it("the materialized profile names (slugs) match the names advertised in the prompt roster", async () => {
     const s = spy();
-    await launchFleetTeam(team, "task", conductor, s.deps);
+    await launchFleetTeam(team, "task", lead, s.deps);
     const desc = s.spawns[0]!.description;
     const profiles = s.spawns[0]!.opts?.agentProfiles ?? [];
     for (const p of profiles) expect(desc).toContain(`- ${p.name}:`);
@@ -180,7 +180,7 @@ describe("launchFleetTeam", () => {
     expect("materializeAgent" in s.deps).toBe(false);
   });
 
-  it("skips a teammate whose profile build throws, still spawning the conductor", async () => {
+  it("skips a teammate whose profile build throws, still spawning the lead", async () => {
     const s = spy();
     const deps = {
       ...s.deps,
@@ -190,8 +190,8 @@ describe("launchFleetTeam", () => {
         return { name: slugForRole(r.name), content: `--- agent ${r.name} ---` };
       },
     };
-    await launchFleetTeam(team, "task", conductor, deps);
-    // The conductor still spawned despite the teammate's profile build throwing.
+    await launchFleetTeam(team, "task", lead, deps);
+    // The lead still spawned despite the teammate's profile build throwing.
     expect(s.spawns).toHaveLength(1);
     const profiles = s.spawns[0]!.opts?.agentProfiles ?? [];
     // The failing teammate is skipped; the healthy one is still materialized.
@@ -205,7 +205,7 @@ describe("launchFleetTeam", () => {
       buildTeammateProfile: (r: Role): AgentProfile | null =>
         r.name === "ApiDev" ? null : { name: slugForRole(r.name), content: "x" },
     };
-    await launchFleetTeam(team, "task", conductor, deps);
+    await launchFleetTeam(team, "task", lead, deps);
     expect(s.spawns).toHaveLength(1);
     const profiles = s.spawns[0]!.opts?.agentProfiles ?? [];
     expect(profiles.map((p) => p.name)).toEqual(["dbdev"]);
@@ -230,8 +230,8 @@ describe("fleet wiring in extension.ts (source)", () => {
   });
 
   it("the team-launch path chooses fleet for a Copilot lead, else the delegate model", () => {
-    expect(extensionSrc).toMatch(/if\s*\(usesFleet\(CONDUCTOR_ROLE\)\)/);
+    expect(extensionSrc).toMatch(/if\s*\(usesFleet\(LEAD_ROLE\)\)/);
     expect(extensionSrc).toMatch(/await launchFleetTeam\(/);
-    expect(extensionSrc).toMatch(/launchConductorTeam\(/);
+    expect(extensionSrc).toMatch(/launchLeadTeam\(/);
   });
 });

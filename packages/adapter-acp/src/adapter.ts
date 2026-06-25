@@ -1,5 +1,5 @@
-import type { AgentSession, EngineAdapter, HealthStatus, Role, Task, Workspace } from "@maestro/core";
-import { ACP_ENGINE_ID } from "@maestro/core";
+import type { AgentSession, EngineAdapter, HealthStatus, Role, Task, Workspace } from "@hallucinate/core";
+import { ACP_ENGINE_ID } from "@hallucinate/core";
 import { ACP_CAPABILITIES } from "./capabilities.js";
 import { AcpSession } from "./session.js";
 import { defaultAcpTransportFn } from "./transport.js";

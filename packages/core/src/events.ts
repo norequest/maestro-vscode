@@ -41,7 +41,7 @@ const DISCARDABLE_BY_STATE: Record<AgentState, boolean> = {
   "pr-created": true,
 };
 
-/** Needs attention = the UI should surface this agent to the conductor. */
+/** Needs attention = the UI should surface this agent to the lead. */
 const NEEDS_ATTENTION_BY_STATE: Record<AgentState, boolean> = {
   preparing: false,
   working: false,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role, Team } from "@maestro/core";
+import type { Role, Team } from "@hallucinate/core";
 import { composerOptions, buildDispatchMessage, canDispatch, ENGINE_FAMILIES } from "../src/composer.js";
 
 const role = (over: Partial<Role> = {}): Role => ({ name: "Test Author", instructions: "Write thorough unit tests for the changed code before implementing it.", engine: { id: "copilot" }, autonomy: "auto-approve-safe", ...over });

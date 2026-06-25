@@ -25,8 +25,8 @@ describe("getAppHtml", () => {
     expect(html).toContain('<div id="root"></div>');
   });
 
-  it("titles the panel 'Conducting Board'", () => {
-    expect(html).toContain("<title>Conducting Board</title>");
+  it("titles the panel 'Board'", () => {
+    expect(html).toContain("<title>Board</title>");
   });
 
   it("CSP allows inline style (the in-page review fragment ships its own <style>)", () => {

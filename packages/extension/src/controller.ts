@@ -1,6 +1,6 @@
-import type { Agent, ApprovalDecision, DispatchSpec, MergeResult, OrchestratorEvent, SpawnOptions } from "@maestro/core";
-import type { CockpitState, WebviewToHost } from "@maestro/cockpit";
-import { initialModel, reduce, selectState, setFocus } from "@maestro/cockpit";
+import type { Agent, ApprovalDecision, DispatchSpec, MergeResult, OrchestratorEvent, SpawnOptions } from "@hallucinate/core";
+import type { CockpitState, WebviewToHost } from "@hallucinate/cockpit";
+import { initialModel, reduce, selectState, setFocus } from "@hallucinate/cockpit";
 
 /** The slice of Orchestrator the cockpit drives. Keeps the controller unit-testable. */
 export interface OrchestratorLike {
@@ -53,7 +53,7 @@ export function createCockpit(
   /**
    * Host-injected confirm for the destructive "Clear all" bulk discard. Receives
    * the number of ready-to-review runs about to be dropped; resolves true only
-   * when the conductor confirms. Defaulting to "no confirm available" => deny
+   * when the user confirms. Defaulting to "no confirm available" => deny
    * keeps the controller safe and pure (the host wires a real modal).
    */
   confirmClearDone?: (count: number) => Promise<boolean>,
@@ -132,7 +132,7 @@ export function createCockpit(
           break;
         case "new-task":
           // The "+ New task" funnel is handled entirely host-side (it needs a
-          // fresh .conductor/ read + orchestrator/stage access). It never drives
+          // fresh .hallucinate/ read + orchestrator/stage access). It never drives
           // the cockpit model, so it is a no-op here; this case keeps the switch
           // exhaustive over WebviewToHost.
           break;

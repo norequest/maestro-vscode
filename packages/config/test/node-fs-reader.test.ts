@@ -6,19 +6,19 @@ import { makeNodeFsReader } from "../src/loader.js";
 
 /**
  * Real-filesystem regression tests for Issue 27 (S8): a symlink inside
- * .conductor/ must not become an arbitrary file-read primitive. The node-backed
- * reader resolves realpaths and refuses targets that escape the .conductor
+ * .hallucinate/ must not become an arbitrary file-read primitive. The node-backed
+ * reader resolves realpaths and refuses targets that escape the .hallucinate
  * boundary, and it skips symlinked directory entries when listing.
  */
 
 const tmpRoots: string[] = [];
 
 async function makeTmpRepo(): Promise<{ repoRoot: string; rolesDir: string; outsideDir: string }> {
-  const repoRoot = await fsp.mkdtemp(nodePath.join(os.tmpdir(), "maestro-config-"));
+  const repoRoot = await fsp.mkdtemp(nodePath.join(os.tmpdir(), "hallucinate-config-"));
   tmpRoots.push(repoRoot);
-  const rolesDir = nodePath.join(repoRoot, ".conductor", "roles");
+  const rolesDir = nodePath.join(repoRoot, ".hallucinate", "roles");
   await fsp.mkdir(rolesDir, { recursive: true });
-  // A sibling directory OUTSIDE .conductor that a malicious symlink may target.
+  // A sibling directory OUTSIDE .hallucinate that a malicious symlink may target.
   const outsideDir = nodePath.join(repoRoot, "secrets");
   await fsp.mkdir(outsideDir, { recursive: true });
   return { repoRoot, rolesDir, outsideDir };
@@ -34,7 +34,7 @@ afterEach(async () => {
 });
 
 describe("makeNodeFsReader symlink containment (Issue 27)", () => {
-  it("reads a regular .yaml file inside .conductor", async () => {
+  it("reads a regular .yaml file inside .hallucinate", async () => {
     const { rolesDir } = await makeTmpRepo();
     const filePath = nodePath.join(rolesDir, "implementer.yaml");
     await fsp.writeFile(filePath, "name: Implementer\n", "utf-8");
@@ -44,7 +44,7 @@ describe("makeNodeFsReader symlink containment (Issue 27)", () => {
     expect(text).toContain("Implementer");
   });
 
-  it("refuses to read a symlink inside .conductor that points OUTSIDE the dir", async () => {
+  it("refuses to read a symlink inside .hallucinate that points OUTSIDE the dir", async () => {
     const { rolesDir, outsideDir } = await makeTmpRepo();
     const secretPath = nodePath.join(outsideDir, "id_rsa");
     await fsp.writeFile(secretPath, "TOP-SECRET-KEY-MATERIAL", "utf-8");

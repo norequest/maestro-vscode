@@ -57,8 +57,8 @@ describe("Orchestrator.hydrate", () => {
 
   it("restores workspace from workspacePath/workspaceBranch when absent on the snapshot", () => {
     const orch = new Orchestrator({ maxParallelAgents: 3 }, new FakeWorkspaceProvider());
-    orch.hydrate([{ agent: mkAgent({ id: "a5", state: "done" }), workspacePath: "/repo/.conductor/wt/a5", workspaceBranch: "agent/x" }]);
-    expect(orch.getAgent("a5")?.workspace).toEqual({ agentId: "a5", path: "/repo/.conductor/wt/a5", branch: "agent/x" });
+    orch.hydrate([{ agent: mkAgent({ id: "a5", state: "done" }), workspacePath: "/repo/.hallucinate/wt/a5", workspaceBranch: "agent/x" }]);
+    expect(orch.getAgent("a5")?.workspace).toEqual({ agentId: "a5", path: "/repo/.hallucinate/wt/a5", branch: "agent/x" });
   });
 
   it("hydrate([]) is a no-op", () => {

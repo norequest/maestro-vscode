@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAnatomyController, type AnatomyGateway } from "../src/anatomy-controller.js";
-import { countGrants } from "@maestro/core";
-import { skillNeedsGrant } from "@maestro/config";
-import type { Role } from "@maestro/core";
+import { countGrants } from "@hallucinate/core";
+import { skillNeedsGrant } from "@hallucinate/config";
+import type { Role } from "@hallucinate/core";
 import type { AnatomyVM } from "../src/anatomy-protocol.js";
 
 // ─── Fake gateway ─────────────────────────────────────────────────────────────

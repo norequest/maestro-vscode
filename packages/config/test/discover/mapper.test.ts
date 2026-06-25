@@ -78,7 +78,7 @@ describe("mapToRole: engine resolution", () => {
 
   it("NEVER produces an engine id outside KNOWN_ENGINE_IDS", () => {
     const kinds: DiscoveredItem["kind"][] = [
-      "claude-agent", "conductor-role", "copilot-agent", "copilot-chatmode",
+      "claude-agent", "hallucinate-role", "copilot-agent", "copilot-chatmode",
       "prompt", "claude-skill", "continue-agent", "cursor-rule",
       "instructions", "plugin-agent", "plugin-skill",
     ];

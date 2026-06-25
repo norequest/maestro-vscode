@@ -1,5 +1,5 @@
 {
-  "name": "@maestro/config",
+  "name": "@hallucinate/config",
   "version": "0.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -11,7 +11,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@maestro/core": "workspace:*",
+    "@hallucinate/core": "workspace:*",
     "yaml": "^2.4.0"
   },
   "devDependencies": {

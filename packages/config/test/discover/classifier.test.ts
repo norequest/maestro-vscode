@@ -7,8 +7,8 @@ describe("classify", () => {
     expect(classify("claude-agent")).toBe("verified");
   });
 
-  it("returns verified for conductor-role", () => {
-    expect(classify("conductor-role")).toBe("verified");
+  it("returns verified for hallucinate-role", () => {
+    expect(classify("hallucinate-role")).toBe("verified");
   });
 
   it("returns verified for copilot-agent", () => {
@@ -50,7 +50,7 @@ describe("classify", () => {
   it("verified is ONLY returned for the five HIGH kinds", () => {
     const allKinds: SourceKind[] = [
       "claude-agent",
-      "conductor-role",
+      "hallucinate-role",
       "copilot-agent",
       "copilot-chatmode",
       "plugin-agent",
@@ -63,7 +63,7 @@ describe("classify", () => {
     ];
     const verifiedKinds = allKinds.filter((k) => classify(k) === "verified");
     expect(verifiedKinds.sort()).toEqual(
-      ["claude-agent", "conductor-role", "copilot-agent", "copilot-chatmode", "plugin-agent"].sort(),
+      ["claude-agent", "hallucinate-role", "copilot-agent", "copilot-chatmode", "plugin-agent"].sort(),
     );
   });
 });

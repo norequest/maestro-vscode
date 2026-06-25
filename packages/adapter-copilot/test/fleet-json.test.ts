@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AgentEvent } from "@maestro/core";
+import type { AgentEvent } from "@hallucinate/core";
 import { FleetLineParser, parseFleetLine } from "../src/fleet-json.js";
 
 /** Map a list of raw JSONL lines through ONE stateful parser, dropping the null
@@ -73,7 +73,7 @@ describe("FleetLineParser", () => {
     });
   });
 
-  it("maps assistant.message WITHOUT a parent to top-level conductor output", () => {
+  it("maps assistant.message WITHOUT a parent to top-level lead output", () => {
     const line = envelope("assistant.message", { text: "I will delegate to two scribes." });
     expect(parseFleetLine(line)).toEqual({
       kind: "output",
@@ -81,10 +81,10 @@ describe("FleetLineParser", () => {
     });
   });
 
-  it("treats a top-level message carrying ONLY parentId as conductor output (the founder bug)", () => {
-    // `parentId` is the assistant TURN id, present on the conductor's own
+  it("treats a top-level message carrying ONLY parentId as lead output (the founder bug)", () => {
+    // `parentId` is the assistant TURN id, present on the lead's own
     // narration. It must NOT be mistaken for a sub-agent parent: this is the
-    // exact bug that mislabeled the conductor's top-level message as a child.
+    // exact bug that mislabeled the lead's top-level message as a child.
     const line = envelope("assistant.message", {
       text: "Planning the fleet.",
       parentId: "turn-7",
@@ -95,7 +95,7 @@ describe("FleetLineParser", () => {
   it("attributes sub-agent output using the real shapes (parentToolCallId + top-level agentId)", () => {
     // Real run: subagent.started carries data.toolCallId AND a top-level agentId
     // equal to it; the sub-agent's own message carries data.parentToolCallId ==
-    // that id (and a top-level agentId); the orchestrator's message carries
+    // that id (and a top-level agentId); the lead's message carries
     // neither. Drive the whole sequence through one stateful parser.
     const started = JSON.stringify({
       type: "subagent.started",
@@ -121,7 +121,7 @@ describe("FleetLineParser", () => {
 
   it("degrades output for an UNKNOWN parent callId to top-level output", () => {
     // A parentToolCallId for a sub-agent that never started must not conjure a
-    // phantom child; it falls back to top-level conductor output.
+    // phantom child; it falls back to top-level lead output.
     const line = envelope("assistant.message", {
       text: "orphaned chunk",
       parentToolCallId: "call-never-started",
@@ -146,7 +146,7 @@ describe("FleetLineParser", () => {
     });
   });
 
-  it("renders a top-level task tool.execution_start as a conductor delegate line", () => {
+  it("renders a top-level task tool.execution_start as a lead delegate line", () => {
     const line = envelope("tool.execution_start", {
       toolName: "task",
       arguments: { description: "write the intro", prompt: "..." },
@@ -198,7 +198,7 @@ describe("FleetLineParser", () => {
 
   it("parses a realistic two-scribe transcript into the expected event sequence", () => {
     const transcript = [
-      // Conductor narrates and delegates.
+      // Lead narrates and delegates.
       envelope("assistant.message", { text: "Planning a two-scribe fleet." }),
       envelope("tool.execution_start", {
         toolName: "task",

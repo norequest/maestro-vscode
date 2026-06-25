@@ -12,11 +12,11 @@ import { FsPersistenceBackend } from "../src/persistence-fs.js";
 describe("FsPersistenceBackend (real fs)", () => {
   let repoRoot: string;
   let backend: FsPersistenceBackend;
-  // `.conductor/.runtime` is the on-disk layout the backend uses under repoRoot.
-  const runtimeDir = (root: string): string => join(root, ".conductor", ".runtime");
+  // `.hallucinate/.runtime` is the on-disk layout the backend uses under repoRoot.
+  const runtimeDir = (root: string): string => join(root, ".hallucinate", ".runtime");
 
   beforeEach(async () => {
-    repoRoot = await mkdtemp(join(tmpdir(), "maestro-fs-persist-"));
+    repoRoot = await mkdtemp(join(tmpdir(), "hallucinate-fs-persist-"));
     backend = new FsPersistenceBackend(repoRoot);
   });
 
@@ -36,7 +36,7 @@ describe("FsPersistenceBackend (real fs)", () => {
   });
 
   describe("append", () => {
-    it("lazily creates the .conductor/.runtime dir and file on first write", async () => {
+    it("lazily creates the .hallucinate/.runtime dir and file on first write", async () => {
       // The runtime dir does not exist until the first append.
       await expect(readFile(join(runtimeDir(repoRoot), "a1.jsonl"), "utf8")).rejects.toMatchObject({
         code: "ENOENT",

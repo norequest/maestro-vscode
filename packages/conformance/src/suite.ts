@@ -5,8 +5,8 @@ import {
   isTerminalState,
   composePreamble,
   renderToolsForPreamble,
-} from "@maestro/core";
-import type { EngineAdapter, Role, AgentEvent, SoulDoc } from "@maestro/core";
+} from "@hallucinate/core";
+import type { EngineAdapter, Role, AgentEvent, SoulDoc } from "@hallucinate/core";
 
 /**
  * A factory the per-adapter conformance test provides. It returns a fresh

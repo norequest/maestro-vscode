@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderCardHTML, renderBoard, renderDrawer } from "../src/render.js";
-import type { CardVM, CockpitState, DelegationVM } from "@maestro/cockpit";
+import type { CardVM, CockpitState, DelegationVM } from "@hallucinate/cockpit";
 
 function card(over: Partial<CardVM> = {}): CardVM {
   return {
@@ -172,7 +172,7 @@ describe("renderBoard", () => {
   });
   it("renders the board header and status bar, and NO redundant editor-tab strip", () => {
     const html = renderBoard({ cards: [card({ id: "w1", lane: "working" })], delegations: [] });
-    // The top tab strip (Maestro/Library/Skills/Discover) was redundant with the
+    // The top tab strip (Hallucinate/Library/Skills/Discover) was redundant with the
     // header Library button and is gone; the header is the single control surface.
     expect(html).not.toContain('class="tabstrip"');
     expect(html).toContain('class="board-header"');
@@ -237,7 +237,7 @@ describe("renderBoard", () => {
     expect(html).toMatch(/sb-awaiting">1 awaiting review/);
   });
 
-  // ─── Lead-orchestrated teams: pending delegation proposals ─────────────────
+  // ─── Lead-coordinated teams: pending delegation proposals ─────────────────
 
   it("renders no delegation block when there are no pending delegations", () => {
     const html = renderBoard(board({ cards: [card({ id: "w1", lane: "working" })] }));
@@ -339,11 +339,11 @@ describe("renderBoard", () => {
 
   // ─── Nested sub-agents (visual hierarchy in a lane) ────────────────────────
 
-  it("nests children under their conductor: kids render AFTER the lead, each is-child, lead carries the count", () => {
+  it("nests children under their lead: kids render AFTER the lead, each is-child, lead carries the count", () => {
     const html = renderBoard(
       board({
         cards: [
-          card({ id: "lead1", roleName: "Conductor", lane: "working" }),
+          card({ id: "lead1", roleName: "Lead", lane: "working" }),
           card({ id: "kid1", roleName: "Coder", lane: "working", parentId: "lead1" }),
           card({ id: "kid2", roleName: "Tester", lane: "working", parentId: "lead1" }),
         ],
@@ -352,11 +352,11 @@ describe("renderBoard", () => {
     const lead = html.indexOf('data-id="lead1"');
     const kid1 = html.indexOf('data-id="kid1"');
     const kid2 = html.indexOf('data-id="kid2"');
-    // Both children render AFTER their conductor (nested under it).
+    // Both children render AFTER their lead (nested under it).
     expect(lead).toBeGreaterThanOrEqual(0);
     expect(kid1).toBeGreaterThan(lead);
     expect(kid2).toBeGreaterThan(lead);
-    // Each child card carries the is-child class; the conductor does not.
+    // Each child card carries the is-child class; the lead does not.
     // Slice each card's <section ...> opening tag (from the prior '<section'
     // up to the first '>' after its data-id) so the assertion targets that one
     // card's classes, not a neighbour's.
@@ -365,16 +365,16 @@ describe("renderBoard", () => {
     expect(openTag(lead)).not.toContain("is-child");
     expect(openTag(kid1)).toContain("is-child");
     expect(openTag(kid2)).toContain("is-child");
-    // The conductor advertises its 2 sub-agents (plural).
+    // The lead advertises its 2 sub-agents (plural).
     expect(html).toContain('class="subagents"');
     expect(html).toContain("2 sub-agents");
   });
 
-  it("uses the singular 'sub-agent' affordance when a conductor has exactly one child", () => {
+  it("uses the singular 'sub-agent' affordance when a lead has exactly one child", () => {
     const html = renderBoard(
       board({
         cards: [
-          card({ id: "lead1", roleName: "Conductor", lane: "working" }),
+          card({ id: "lead1", roleName: "Lead", lane: "working" }),
           card({ id: "kid1", roleName: "Coder", lane: "working", parentId: "lead1" }),
         ],
       }),
@@ -392,8 +392,8 @@ describe("renderBoard", () => {
     const html = renderBoard(
       board({
         cards: [
-          // Conductor sits in Working; its child is over in Needs-you.
-          card({ id: "lead1", roleName: "Conductor", lane: "working" }),
+          // Lead sits in Working; its child is over in Needs-you.
+          card({ id: "lead1", roleName: "Lead", lane: "working" }),
           card({ id: "kid1", roleName: "Coder", lane: "needsYou", state: "awaiting-approval", attention: true, parentId: "lead1" }),
         ],
       }),
@@ -404,8 +404,8 @@ describe("renderBoard", () => {
     // It renders flat (no is-child) because its parent is not in the same lane.
     const kid1Open = html.slice(html.lastIndexOf("<section", kid1), html.indexOf(">", kid1));
     expect(kid1Open).not.toContain("is-child");
-    // It still shows the faint "via Conductor" provenance marker.
-    expect(html).toContain("via Conductor");
+    // It still shows the faint "via Lead" provenance marker.
+    expect(html).toContain("via Lead");
   });
 
   // ─── Read-only virtual (fleet) sub-agents ──────────────────────────────────
@@ -434,11 +434,11 @@ describe("renderBoard", () => {
     expect(html).not.toContain("read-only sub-agent");
   });
 
-  it("a virtual working card keeps the is-child nesting under its conductor", () => {
+  it("a virtual working card keeps the is-child nesting under its lead", () => {
     const html = renderBoard(
       board({
         cards: [
-          card({ id: "lead1", roleName: "Conductor", lane: "working" }),
+          card({ id: "lead1", roleName: "Lead", lane: "working" }),
           card({ id: "sub1", roleName: "Coder", lane: "working", parentId: "lead1", virtual: true }),
         ],
       }),
@@ -446,7 +446,7 @@ describe("renderBoard", () => {
     const sub = html.indexOf('data-id="sub1"');
     const openTag = html.slice(html.lastIndexOf("<section", sub), html.indexOf(">", sub));
     expect(openTag).toContain("is-child");
-    // The conductor still advertises its sub-agent.
+    // The lead still advertises its sub-agent.
     expect(html).toContain("1 sub-agent");
   });
 });

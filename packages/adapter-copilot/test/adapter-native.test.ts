@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role, Task, Workspace } from "@maestro/core";
+import type { Role, Task, Workspace } from "@hallucinate/core";
 import { CopilotAdapter } from "../src/adapter.js";
 import type { AgentProfileWriter } from "../src/agent-profile.js";
 import { makeFakeSpawn } from "./fake-spawn.js";

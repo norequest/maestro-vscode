@@ -11,7 +11,7 @@ function git(cwd: string, ...args: string[]): string {
 
 let repo: string;
 beforeEach(() => {
-  repo = mkdtempSync(join(tmpdir(), "maestro-ws-"));
+  repo = mkdtempSync(join(tmpdir(), "hallucinate-ws-"));
   // Pin the initial branch name so the test is hermetic regardless of
   // the user's global init.defaultBranch setting (or lack thereof).
   git(repo, "init", "-q", "-b", "main");
@@ -45,7 +45,7 @@ describe("GitWorkspaceManager (real git)", () => {
 
   // Issue 7 (WS5): git quotes/C-escapes paths with spaces or non-ASCII bytes by
   // default. diff() must use -z (NUL-delimited) so the real filename reaches the
-  // conductor's review surface intact, not a quoted/escaped mangling.
+  // lead's review surface intact, not a quoted/escaped mangling.
   it("diff returns spaced and non-ASCII (Georgian) filenames intact, not quoted/escaped", async () => {
     const m = new GitWorkspaceManager({ repoRoot: repo });
     const ws = await m.create("a1");
@@ -86,7 +86,7 @@ describe("GitWorkspaceManager (real git)", () => {
     expect(result.status).toBe("conflict");
     if (result.status === "conflict") expect(result.files).toContain("file.txt");
     // repo has no merge in progress after abort (MERGE_HEAD must not exist).
-    // Note: the .conductor/ directory may remain as an untracked entry in the
+    // Note: the .hallucinate/ directory may remain as an untracked entry in the
     // working tree; that is normal and harmless. We filter it out and assert
     // there are no staged/conflict lines (lines NOT starting with "??").
     const porcelain = git(repo, "status", "--porcelain")

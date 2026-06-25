@@ -64,11 +64,11 @@ export async function discoverWorkspace(root: string, fs: FsScanner): Promise<Di
   // --- .claude/skills/<subdir>/SKILL.md -> claude-skill ---
   await scanSkillDirs(nodePath.join(root, ".claude", "skills"));
 
-  // --- .conductor/roles/*.yaml -> conductor-role ---
+  // --- .hallucinate/roles/*.yaml -> hallucinate-role ---
   await scanDir(
-    nodePath.join(root, ".conductor", "roles"),
+    nodePath.join(root, ".hallucinate", "roles"),
     ".yaml",
-    "conductor-role",
+    "hallucinate-role",
   );
 
   // --- .continue/agents/*.yaml -> continue-agent ---
@@ -114,8 +114,8 @@ export async function discoverWorkspace(root: string, fs: FsScanner): Promise<Di
   const mcp = await readMcpInventory(root, fs).catch(() => ({ servers: [] }));
 
   // Dedup agents as the LAST step before returning. The same logical agent can
-  // exist as both a canonical .conductor/roles/*.yaml role and a
-  // .github/agents/*.agent.md Copilot mirror that Maestro itself writes, so
+  // exist as both a canonical .hallucinate/roles/*.yaml role and a
+  // .github/agents/*.agent.md Copilot mirror that Hallucinate itself writes, so
   // without this collapse the same agent would appear twice in the Discover view.
   // Only items are deduped; mcp and skipped are returned untouched.
   return { items: dedupeDiscoveredAgents(items), mcp, skipped };

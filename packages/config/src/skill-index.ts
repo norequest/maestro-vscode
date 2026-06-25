@@ -1,4 +1,4 @@
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import type { SkillManifest } from "./skill-types.js";
 
 /** A queryable reverse index from skill name to the roles that declare it. */

@@ -1,4 +1,4 @@
-import type { Role } from "@maestro/core";
+import type { Role } from "@hallucinate/core";
 import { validateRole } from "../validator.js";
 import { KNOWN_ENGINE_IDS } from "../types.js";
 import type { DiscoveredItem } from "./types.js";
@@ -84,7 +84,7 @@ function sourceStem(source: string): string {
  * Resolve the engine id from a DiscoveredItem.
  *
  * Rules (in order):
- * 1. conductor-role already has a known engine id in its engineHint: use it directly.
+ * 1. hallucinate-role already has a known engine id in its engineHint: use it directly.
  * 2. engineHint starts with "copilot", source is under .github/, or kind is plugin-agent: -> "copilot"
  * 3. Everything else (claude*, gemini*, acp-leaning hints, continue, cursor): -> "acp"
  * 4. Unknown/missing: -> "acp" (safe default)
@@ -92,8 +92,8 @@ function sourceStem(source: string): string {
  * INVARIANT: the returned id is always in KNOWN_ENGINE_IDS.
  */
 function resolveEngine(item: DiscoveredItem): string {
-  // conductor roles carry a valid engine id in their hint.
-  if (item.kind === "conductor-role" && item.engineHint && KNOWN_ENGINE_IDS.has(item.engineHint)) {
+  // native roles carry a valid engine id in their hint.
+  if (item.kind === "hallucinate-role" && item.engineHint && KNOWN_ENGINE_IDS.has(item.engineHint)) {
     return item.engineHint;
   }
 

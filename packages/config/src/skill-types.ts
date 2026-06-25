@@ -1,6 +1,6 @@
 /** A parsed skill manifest derived from a SKILL.md frontmatter block. */
 export interface SkillManifest {
-  /** The skill name. Must match the directory name under .github/skills/ (or legacy .conductor/skills/). */
+  /** The skill name. Must match the directory name under .github/skills/ (or legacy .hallucinate/skills/). */
   name: string;
   /** Human-readable description of what this skill does. */
   description: string;

@@ -16,7 +16,7 @@ const GROUP_META: Record<
   { pathHint: string; subtitle: string }
 > = {
   "in-repo": {
-    pathHint: ".claude/agents · .conductor/roles · AGENTS.md · copilot-instructions",
+    pathHint: ".claude/agents · .hallucinate/roles · AGENTS.md · copilot-instructions",
     subtitle: "Definitions committed in your workspace",
   },
   plugins: {
@@ -203,7 +203,7 @@ export function renderDiscoverTab(vm: DiscoverVM): string {
   // Title block (Manrope 700) + subtitle.
   const titleBlock = `<div class="discover-titlebox">
     <div class="discover-title">Discover agents</div>
-    <div class="discover-subtitle">Ready-made agents Maestro found. Adopt them, or run one now.</div>
+    <div class="discover-subtitle">Ready-made agents Hallucinate found. Adopt them, or run one now.</div>
   </div>`;
 
   // Filter chips, with live counts per the prototype ("All N", "In this repo N",

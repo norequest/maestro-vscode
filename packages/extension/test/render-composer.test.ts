@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderComposerHTML } from "../src/render-composer.js";
-import { composerOptions } from "@maestro/cockpit";
+import { composerOptions } from "@hallucinate/cockpit";
 
 const opts = composerOptions(
   [{ name: "Test Author", instructions: "<b>write</b> tests", engine: { id: "copilot" }, autonomy: "auto-approve-safe" }],

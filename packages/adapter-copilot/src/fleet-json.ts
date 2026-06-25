@@ -1,8 +1,8 @@
 /**
  * Parser for Copilot's `/fleet ... --output-format json` stream.
  *
- * In fleet mode Maestro spawns ONE `copilot` session for the conductor and
- * drives it with a `/fleet ...` prompt. Copilot's built-in orchestrator runs the
+ * In fleet mode Hallucinate spawns ONE `copilot` session for the lead and
+ * drives it with a `/fleet ...` prompt. Copilot's built-in dispatcher runs the
  * named custom agents (e.g. scribe-alpha, scribe-beta) as IN-SESSION sub-agents
  * and reports their lifecycle on the JSONL stream (one JSON object per line,
  * envelope `{ "type": "<name>", "data": { ... } }`). This module maps one parsed
@@ -15,7 +15,7 @@
  * discriminator for "this output belongs to a sub-agent" is the presence of
  * `data.parentToolCallId` (or, equivalently, a top-level `agentId`) whose value
  * is a KNOWN sub-agent callId. It is NEVER `data.parentId`: that is the
- * assistant TURN id and is present on the conductor's OWN top-level narration.
+ * assistant TURN id and is present on the lead's OWN top-level narration.
  *
  * Verified schema (from a real fleet run, copilot v1.0.65):
  *   - subagent.started -> data: { toolCallId, agentName, agentDisplayName, agentDescription, model };
@@ -23,23 +23,23 @@
  *   - subagent.completed -> data: { toolCallId, agentName, agentDisplayName, model }
  *   - session.background_tasks_changed -> fleet task-state churn (ignored)
  *   - tool.execution_start -> data: { toolName, arguments, toolCallId, parentToolCallId? };
- *       (toolName === "task" at top level is the orchestrator delegating)
+ *       (toolName === "task" at top level is the dispatcher delegating)
  *   - tool.execution_partial_result / tool.execution_complete -> tool lifecycle (skipped)
  *   - assistant.message_delta / assistant.message -> assistant text; a frame
  *       PRODUCED BY a sub-agent carries `data.parentToolCallId` (== the
- *       sub-agent's toolCallId) AND a top-level `agentId`; a TOP-LEVEL conductor
+ *       sub-agent's toolCallId) AND a top-level `agentId`; a TOP-LEVEL lead
  *       frame carries NEITHER (only a generic `parentId`, which we must ignore).
  *   - result -> data: { sessionId, exitCode, usage: { ..., codeChanges: { filesModified } } }
  */
 
-import type { AgentEvent } from "@maestro/core";
+import type { AgentEvent } from "@hallucinate/core";
 
 /** Prefix marking a rendered tool/action line, matching {@link renderJsonLine}. */
 const TOOL_PREFIX = "▸";
 
 /**
  * Stateful per-session parser for the fleet JSONL stream. Instantiate ONE per
- * conductor session and feed it every complete (spinner-cleaned) stdout line via
+ * lead session and feed it every complete (spinner-cleaned) stdout line via
  * {@link parse}; it remembers which toolCallIds belong to sub-agents so that
  * later output is attributed correctly. {@link parse} maps one line to a single
  * {@link AgentEvent}, or `null` when the line carries no signal (background-task
@@ -77,7 +77,7 @@ export class FleetLineParser {
     // The sub-agent correlation key: a sub-agent frame carries
     // `data.parentToolCallId` (preferred) or, equivalently, a TOP-LEVEL
     // `agentId`. Crucially NOT `data.parentId` (the assistant turn id, present on
-    // the conductor's own top-level narration too).
+    // the lead's own top-level narration too).
     const parentCallId = (): string | undefined =>
       str(data["parentToolCallId"]) ?? str(parsed["agentId"]);
 
@@ -113,8 +113,8 @@ export class FleetLineParser {
         const toolName = str(field("toolName")) ?? "tool";
         const parent = parentCallId();
         const args = isRecord(field("arguments")) ? (field("arguments") as Record<string, unknown>) : {};
-        // The orchestrator delegating (top level, toolName "task"): surface the
-        // delegation description as conductor narration. subagent.started carries
+        // The dispatcher delegating (top level, toolName "task"): surface the
+        // delegation description as lead narration. subagent.started carries
         // the same delegation, so we keep this terse and non-duplicative.
         if (!parent && toolName === "task") {
           const description = str(args["description"]) ?? "";
@@ -140,8 +140,8 @@ export class FleetLineParser {
         if (exitCode !== undefined && exitCode !== 0) {
           return { kind: "error", message: `fleet run exited with code ${exitCode}` };
         }
-        // Do NOT synthesize a Diff: the orchestrator computes the real git diff
-        // from the conductor's worktree. Summarize files-modified when present.
+        // Do NOT synthesize a Diff: the dispatcher computes the real git diff
+        // from the lead's worktree. Summarize files-modified when present.
         return { kind: "done", summary: resultSummary(field("usage")) };
       }
 
@@ -152,7 +152,7 @@ export class FleetLineParser {
 
   /**
    * Attribute a piece of text to a sub-agent when `parent` is a KNOWN sub-agent
-   * callId, otherwise to the top-level conductor. Output for an unknown parent
+   * callId, otherwise to the top-level lead. Output for an unknown parent
    * (never `start`ed) degrades to top-level `output` rather than a phantom child.
    */
   private attribute(parent: string | undefined, text: string): AgentEvent {

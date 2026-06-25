@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { renderReview } from "../src/review-render.js";
-import type { CardVM } from "@maestro/cockpit";
+import type { CardVM } from "@hallucinate/cockpit";
 import type { ParsedDiff } from "../src/diff-parse.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -62,12 +62,12 @@ describe("renderReview — clean path", () => {
     expect(html).toContain("Add login route");
   });
 
-  it("header renders a Back-to-board button so the conductor is never stranded", () => {
+  it("header renders a Back-to-board button so the user is never stranded", () => {
     // Regression: the full review replaces the whole board, so it MUST carry its
     // own escape. The webview wires data-action="review-close" to backToBoard().
     const html = renderReview(card(), parsed());
     expect(html).toContain('data-action="review-close"');
-    expect(html).toContain("Conducting Board");
+    expect(html).toContain("Board");
     expect(html).toContain('class="rv-back"');
   });
 

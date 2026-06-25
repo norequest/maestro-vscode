@@ -3,7 +3,7 @@ import type { Confidence, SourceKind } from "./types.js";
 /**
  * Classify a source kind into a confidence tier.
  *
- * - verified: claude-agent, conductor-role, copilot-agent, copilot-chatmode, plugin-agent
+ * - verified: claude-agent, hallucinate-role, copilot-agent, copilot-chatmode, plugin-agent
  * - likely:   prompt, claude-skill, continue-agent, cursor-rule, plugin-skill
  * - instructions: instructions
  *
@@ -14,7 +14,7 @@ export function classify(kind: SourceKind): Confidence {
   switch (kind) {
     case "claude-agent":
       return "verified";
-    case "conductor-role":
+    case "hallucinate-role":
       return "verified";
     case "copilot-agent":
       return "verified";

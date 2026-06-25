@@ -24,7 +24,7 @@ export class FakeWorkspaceProvider implements WorkspaceProvider {
     this.created.push(agentId);
     return Promise.resolve({
       agentId,
-      path: `/tmp/maestro/${agentId}`,
+      path: `/tmp/hallucinate/${agentId}`,
       branch: `agent/${agentId}`,
     });
   }
@@ -41,7 +41,7 @@ export class FakeWorkspaceProvider implements WorkspaceProvider {
  * WorkspaceProvider (e.g. FakeWorkspaceProvider) keeps working unchanged.
  */
 export interface WorkspaceManager extends WorkspaceProvider {
-  /** Diff of the agent's worktree vs its base; the conductor's review surface. */
+  /** Diff of the agent's worktree vs its base; the lead's review surface. */
   diff(agentId: string): Promise<Diff>;
   /** Merge the agent's branch into the base. Reports clean | conflict. */
   merge(agentId: string): Promise<MergeResult>;
@@ -62,7 +62,7 @@ export interface WorkspaceManager extends WorkspaceProvider {
   adopt?(agentId: string, workspace: Workspace): Promise<void>;
   /**
    * Materialize the agent's resolved skills into its worktree (e.g. one
-   * .conductor/skills/<name>/SKILL.md per ref) so the running engine can
+   * .hallucinate/skills/<name>/SKILL.md per ref) so the running engine can
    * discover and load them on demand. Optional: implementations predating this
    * are tolerated via the guarded optional call in the orchestrator.
    */
@@ -111,7 +111,7 @@ export class FakeWorkspaceManager implements WorkspaceManager {
 
   create(agentId: string): Promise<Workspace> {
     this.created.push(agentId);
-    return Promise.resolve({ agentId, path: `/tmp/maestro/${agentId}`, branch: `agent/${agentId}` });
+    return Promise.resolve({ agentId, path: `/tmp/hallucinate/${agentId}`, branch: `agent/${agentId}` });
   }
   cleanup(agentId: string): Promise<void> {
     this.cleaned.push(agentId);

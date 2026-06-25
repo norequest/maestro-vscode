@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loadConductorDir, DEFAULT_CONFIG, type FsReader } from "../src/loader.js";
+import { loadHallucinateDir, DEFAULT_CONFIG, type FsReader } from "../src/loader.js";
 
 function makeFakeFs(files: Record<string, string>): FsReader {
   return {
@@ -37,9 +37,9 @@ function makeFakeFs(files: Record<string, string>): FsReader {
 }
 
 const ROOT = "/repo";
-const ROLES_DIR = `${ROOT}/.conductor/roles`;
-const TEAMS_DIR = `${ROOT}/.conductor/teams`;
-const CONFIG_PATH = `${ROOT}/.conductor/config.yaml`;
+const ROLES_DIR = `${ROOT}/.hallucinate/roles`;
+const TEAMS_DIR = `${ROOT}/.hallucinate/teams`;
+const CONFIG_PATH = `${ROOT}/.hallucinate/config.yaml`;
 
 const IMPLEMENTER_YAML = `
 name: Implementer
@@ -59,10 +59,10 @@ const CONFIG_YAML = `
 maxParallelAgents: 5
 `.trim();
 
-describe("loadConductorDir", () => {
-  it("returns defaults when .conductor/ does not exist", async () => {
+describe("loadHallucinateDir", () => {
+  it("returns defaults when .hallucinate/ does not exist", async () => {
     const fs = makeFakeFs({});
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.roles).toHaveLength(0);
     expect(result.teams).toHaveLength(0);
     expect(result.config).toEqual(DEFAULT_CONFIG);
@@ -72,9 +72,9 @@ describe("loadConductorDir", () => {
   it("loads a valid role file", async () => {
     const fs = makeFakeFs({
       [`${ROLES_DIR}/implementer.yaml`]: IMPLEMENTER_YAML,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.roles).toHaveLength(1);
     expect(result.roles[0]?.name).toBe("Implementer");
     expect(result.errors).toHaveLength(0);
@@ -84,9 +84,9 @@ describe("loadConductorDir", () => {
     const fs = makeFakeFs({
       [`${ROLES_DIR}/implementer.yaml`]: IMPLEMENTER_YAML,
       [`${TEAMS_DIR}/feature.yaml`]: TEAM_YAML,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.teams).toHaveLength(1);
     expect(result.teams[0]?.name).toBe("Feature Team");
     expect(result.teams[0]?.roles).toHaveLength(1);
@@ -95,9 +95,9 @@ describe("loadConductorDir", () => {
   it("loads orchestrator config", async () => {
     const fs = makeFakeFs({
       [`${CONFIG_PATH}`]: CONFIG_YAML,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.config.maxParallelAgents).toBe(5);
   });
 
@@ -112,9 +112,9 @@ defaults:
 `.trim();
     const fs = makeFakeFs({
       [`${CONFIG_PATH}`]: configWithDefaults,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.config.defaults).toEqual({
       instructions: "Standing rule.",
       skills: [],
@@ -131,9 +131,9 @@ defaults:
 `.trim();
     const fs = makeFakeFs({
       [`${CONFIG_PATH}`]: configWithDefaults,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     const allWarnings = result.warnings.flatMap((w) => w.warnings);
     expect(allWarnings.some((w) => w.field === "defaults.leadSkills" && w.message.includes("ghost-skill"))).toBe(true);
     expect(result.errors).toHaveLength(0);
@@ -154,10 +154,10 @@ Body.
 `;
     const fs = makeFakeFs({
       [`${CONFIG_PATH}`]: configWithDefaults,
-      [`${ROOT}/.conductor/skills/task-coordination-strategies/SKILL.md`]: skillMd,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate/skills/task-coordination-strategies/SKILL.md`]: skillMd,
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     const skillWarnings = result.warnings
       .flatMap((w) => w.warnings)
       .filter((w) => w.field === "defaults.skills" || w.field === "defaults.leadSkills");
@@ -167,9 +167,9 @@ Body.
   it("collects errors on invalid YAML without throwing", async () => {
     const fs = makeFakeFs({
       [`${ROLES_DIR}/broken.yaml`]: "name: [unclosed",
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.errors).toHaveLength(1);
     expect(result.errors[0]?.source).toContain("broken.yaml");
     expect(result.roles).toHaveLength(0);
@@ -178,9 +178,9 @@ Body.
   it("collects errors on structurally invalid role without throwing", async () => {
     const fs = makeFakeFs({
       [`${ROLES_DIR}/bad-role.yaml`]: "instructions: no name\nengine:\n  id: copilot\nautonomomy: manual",
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.roles).toHaveLength(0);
   });
@@ -197,10 +197,10 @@ soul: reviewer
 
     const fs = makeFakeFs({
       [`${ROLES_DIR}/reviewer.yaml`]: roleWithSoulYaml,
-      [`${ROOT}/.conductor/souls/reviewer.md`]: "## Identity\nI am a reviewer.\n",
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate/souls/reviewer.md`]: "## Identity\nI am a reviewer.\n",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.roles).toHaveLength(1);
     // No soul-related warning when file is present
     const soulWarnings = result.warnings.flatMap((w) => w.warnings).filter((w) => w.field === "soul");
@@ -220,9 +220,9 @@ soul: missing-soul
 
     const fs = makeFakeFs({
       [`${ROLES_DIR}/reviewer.yaml`]: roleWithSoulYaml,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     // The role should still be loaded
     expect(result.roles).toHaveLength(1);
     // A warning about the missing soul should exist
@@ -244,9 +244,9 @@ autonomy: manual
     const fs = makeFakeFs({
       [`${ROLES_DIR}/implementer.yaml`]: IMPLEMENTER_YAML,
       [`${ROLES_DIR}/reviewer.yaml`]: reviewerYaml,
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
     });
-    const result = await loadConductorDir(ROOT, fs);
+    const result = await loadHallucinateDir(ROOT, fs);
     expect(result.roles).toHaveLength(2);
     expect(result.roles.map((r) => r.name)).toContain("Implementer");
     expect(result.roles.map((r) => r.name)).toContain("Reviewer");

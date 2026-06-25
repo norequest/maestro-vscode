@@ -1,7 +1,7 @@
 import * as nodePath from "node:path";
 import { parseRoleYaml, parseTeamYaml, parseConfigYaml } from "./parser.js";
-import type { Role, Team } from "@maestro/core";
-import type { ValidationWarning, MaestroConfig } from "./types.js";
+import type { Role, Team } from "@hallucinate/core";
+import type { ValidationWarning, HallucinateConfig } from "./types.js";
 import { loadSoul } from "./souls.js";
 import { loadSkills } from "./skill-loader.js";
 
@@ -20,21 +20,21 @@ export interface FsReader {
 export interface LoadResult {
   roles: Role[];
   teams: Team[];
-  config: MaestroConfig;
+  config: HallucinateConfig;
   warnings: Array<{ source: string; warnings: ValidationWarning[] }>;
   errors: Array<{ source: string; errors: string[] }>;
 }
 
-export const DEFAULT_CONFIG: MaestroConfig = { maxParallelAgents: 3 };
+export const DEFAULT_CONFIG: HallucinateConfig = { maxParallelAgents: 3 };
 
-export async function loadConductorDir(
+export async function loadHallucinateDir(
   workspaceRoot: string,
   fs: FsReader,
 ): Promise<LoadResult> {
-  const conductorDir = nodePath.join(workspaceRoot, ".conductor");
-  const rolesDir = nodePath.join(conductorDir, "roles");
-  const teamsDir = nodePath.join(conductorDir, "teams");
-  const configPath = nodePath.join(conductorDir, "config.yaml");
+  const hallucinateDir = nodePath.join(workspaceRoot, ".hallucinate");
+  const rolesDir = nodePath.join(hallucinateDir, "roles");
+  const teamsDir = nodePath.join(hallucinateDir, "teams");
+  const configPath = nodePath.join(hallucinateDir, "config.yaml");
 
   const result: LoadResult = {
     roles: [],
@@ -44,7 +44,7 @@ export async function loadConductorDir(
     errors: [],
   };
 
-  if (!(await fs.exists(conductorDir))) {
+  if (!(await fs.exists(hallucinateDir))) {
     return result;
   }
 
@@ -120,24 +120,24 @@ export async function loadConductorDir(
   if (await fs.exists(configPath)) {
     try {
       const text = await fs.readFile(configPath);
-      const parsed = parseConfigYaml(text, ".conductor/config.yaml", knownSkills);
+      const parsed = parseConfigYaml(text, ".hallucinate/config.yaml", knownSkills);
       if (parsed.config.ok) {
         result.config = parsed.config.value;
         if (parsed.config.warnings.length > 0) {
           result.warnings.push({
-            source: ".conductor/config.yaml",
+            source: ".hallucinate/config.yaml",
             warnings: parsed.config.warnings,
           });
         }
       } else {
         result.errors.push({
-          source: ".conductor/config.yaml",
+          source: ".hallucinate/config.yaml",
           errors: parsed.config.errors,
         });
       }
     } catch (err) {
       result.errors.push({
-        source: ".conductor/config.yaml",
+        source: ".hallucinate/config.yaml",
         errors: [`Failed to read config: ${String(err)}`],
       });
     }
@@ -147,24 +147,24 @@ export async function loadConductorDir(
 }
 
 /** Marker directory that bounds every file the node-backed reader may touch. */
-const CONDUCTOR_DIR_NAME = ".conductor";
+const HALLUCINATE_DIR_NAME = ".hallucinate";
 
 /**
- * Returns the nearest `.conductor` ancestor of `target` (inclusive), or null if
- * `target` is not inside a `.conductor` directory. This is the containment
+ * Returns the nearest `.hallucinate` ancestor of `target` (inclusive), or null if
+ * `target` is not inside a `.hallucinate` directory. This is the containment
  * boundary the node-backed reader enforces (Issue 27 / S8).
  */
-function conductorBoundary(nodePathMod: typeof import("node:path"), target: string): string | null {
+function hallucinateBoundary(nodePathMod: typeof import("node:path"), target: string): string | null {
   const resolved = nodePathMod.resolve(target);
   const segments = resolved.split(nodePathMod.sep);
-  const idx = segments.lastIndexOf(CONDUCTOR_DIR_NAME);
+  const idx = segments.lastIndexOf(HALLUCINATE_DIR_NAME);
   if (idx === -1) return null;
   return segments.slice(0, idx + 1).join(nodePathMod.sep);
 }
 
 /**
  * True when `candidate`, once realpath-resolved, stays within `boundary`
- * (also realpath-resolved). Used to reject symlinks in `.conductor/` that
+ * (also realpath-resolved). Used to reject symlinks in `.hallucinate/` that
  * escape the directory and would otherwise be an arbitrary file-read primitive.
  */
 async function isContained(
@@ -184,10 +184,10 @@ async function isContained(
  * A real FsReader backed by node:fs/promises.
  * Import lazily in extension code so the module remains testable.
  *
- * Security (Issue 27 / S8): reads are confined to the `.conductor` directory
+ * Security (Issue 27 / S8): reads are confined to the `.hallucinate` directory
  * that contains the target path. Before reading, the target's realpath is
- * resolved and asserted to stay within the realpath of that `.conductor`
- * boundary, so a symlink such as `.conductor/roles/x.yaml -> /etc/passwd` is
+ * resolved and asserted to stay within the realpath of that `.hallucinate`
+ * boundary, so a symlink such as `.hallucinate/roles/x.yaml -> /etc/passwd` is
  * refused rather than followed. Directory listings skip symlinked entries so a
  * symlinked `.yaml` is never handed back to the loader.
  */
@@ -197,12 +197,12 @@ export async function makeNodeFsReader(): Promise<FsReader> {
 
   return {
     async readFile(p: string): Promise<string> {
-      const boundary = conductorBoundary(path, p);
+      const boundary = hallucinateBoundary(path, p);
       if (boundary !== null) {
         const contained = await isContained(fs, path, p, boundary).catch(() => false);
         if (!contained) {
           throw new Error(
-            `Refusing to read "${p}": it resolves outside the ${CONDUCTOR_DIR_NAME} directory (possible symlink escape).`,
+            `Refusing to read "${p}": it resolves outside the ${HALLUCINATE_DIR_NAME} directory (possible symlink escape).`,
           );
         }
       }
@@ -224,7 +224,7 @@ export async function makeNodeFsReader(): Promise<FsReader> {
     async listDirs(dir: string): Promise<string[]> {
       try {
         const entries = await fs.readdir(dir, { withFileTypes: true });
-        // Skip symlinks: a symlinked subdir could escape the .conductor boundary
+        // Skip symlinks: a symlinked subdir could escape the .hallucinate boundary
         // (Issue 27 / S8). isDirectory() is already false for them, but be explicit.
         return entries
           .filter((e) => !e.isSymbolicLink() && e.isDirectory())

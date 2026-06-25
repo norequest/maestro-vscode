@@ -1,6 +1,6 @@
-import type { Role, Team, ToolGrant, AgentDefaults } from "@maestro/core";
-import { AUTONOMY_VALUES } from "@maestro/core";
-import type { ValidationResult, ValidationWarning, MaestroConfig } from "./types.js";
+import type { Role, Team, ToolGrant, AgentDefaults } from "@hallucinate/core";
+import { AUTONOMY_VALUES } from "@hallucinate/core";
+import type { ValidationResult, ValidationWarning, HallucinateConfig } from "./types.js";
 import { KNOWN_ENGINE_IDS } from "./types.js";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -160,7 +160,7 @@ export function validateRole(raw: unknown): ValidationResult<Role> {
     errors.push("role.engine must be an object with an id field");
   } else {
     // Invariant: an adapter's command / binary must NEVER be sourced from
-    // .conductor/ config. Only the fixed, registered adapters (KNOWN_ENGINE_IDS)
+    // .hallucinate/ config. Only the fixed, registered adapters (KNOWN_ENGINE_IDS)
     // are ever spawned. engine.id selects among those adapters by name; it does
     // not supply an executable path. An unknown engine.id is therefore an ERROR
     // (not a warning): a role naming an engine we cannot run must be rejected
@@ -430,7 +430,7 @@ function parseDefaults(
 }
 
 /**
- * Validate the orchestrator config (`.conductor/config.yaml`).
+ * Validate the orchestrator config (`.hallucinate/config.yaml`).
  *
  * `knownSkills`, when provided, is the set of skill names that loaded
  * successfully. Default skill names (in `defaults.skills` / `defaults.leadSkills`)
@@ -442,7 +442,7 @@ function parseDefaults(
 export function validateOrchestratorConfig(
   raw: unknown,
   knownSkills?: ReadonlySet<string>,
-): ValidationResult<MaestroConfig> {
+): ValidationResult<HallucinateConfig> {
   const errors: string[] = [];
   const warnings: ValidationWarning[] = [];
 

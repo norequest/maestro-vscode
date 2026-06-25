@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { FsReader } from "@maestro/config";
+import type { FsReader } from "@hallucinate/config";
 import { loadComposerData, isKnownEngineId } from "../src/composer-data.js";
 
-// Mirrors the makeFakeFs pattern used in @maestro/config/test/loader.test.ts.
+// Mirrors the makeFakeFs pattern used in @hallucinate/config/test/loader.test.ts.
 function makeFakeFs(files: Record<string, string>): FsReader {
   return {
     async readFile(p: string): Promise<string> {
@@ -39,8 +39,8 @@ function makeFakeFs(files: Record<string, string>): FsReader {
 }
 
 const ROOT = "/repo";
-const ROLES_DIR = `${ROOT}/.conductor/roles`;
-const TEAMS_DIR = `${ROOT}/.conductor/teams`;
+const ROLES_DIR = `${ROOT}/.hallucinate/roles`;
+const TEAMS_DIR = `${ROOT}/.hallucinate/teams`;
 
 const IMPLEMENTER_YAML = `
 name: Implementer
@@ -67,7 +67,7 @@ autonomy: manual
 describe("loadComposerData", () => {
   it("maps loaded roles and teams through", async () => {
     const fs = makeFakeFs({
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
       [`${ROLES_DIR}/implementer.yaml`]: IMPLEMENTER_YAML,
       [`${TEAMS_DIR}/alpha.yaml`]: TEAM_YAML,
     });
@@ -77,7 +77,7 @@ describe("loadComposerData", () => {
     expect(data.errors).toEqual([]);
   });
 
-  it("returns empty roles/teams with no errors when .conductor/ does not exist", async () => {
+  it("returns empty roles/teams with no errors when .hallucinate/ does not exist", async () => {
     const fs = makeFakeFs({});
     const data = await loadComposerData(ROOT, fs);
     expect(data.roles).toHaveLength(0);
@@ -87,7 +87,7 @@ describe("loadComposerData", () => {
 
   it("surfaces config errors for a structurally invalid role", async () => {
     const fs = makeFakeFs({
-      [`${ROOT}/.conductor`]: "",
+      [`${ROOT}/.hallucinate`]: "",
       [`${ROLES_DIR}/bad-role.yaml`]: BAD_ROLE_YAML,
     });
     const data = await loadComposerData(ROOT, fs);

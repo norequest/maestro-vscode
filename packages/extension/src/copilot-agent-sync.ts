@@ -1,12 +1,12 @@
-import type { Role, SkillRef, SoulDoc } from "@maestro/core";
-import { buildAgentProfile, slugForRole, writeRepoAgentFile } from "@maestro/adapter-copilot";
-import { loadConductorDir, loadSkills, loadSoul, makeNodeFsReader } from "@maestro/config";
+import type { Role, SkillRef, SoulDoc } from "@hallucinate/core";
+import { buildAgentProfile, slugForRole, writeRepoAgentFile } from "@hallucinate/adapter-copilot";
+import { loadHallucinateDir, loadSkills, loadSoul, makeNodeFsReader } from "@hallucinate/config";
 
 /** A reader as produced by makeNodeFsReader(); kept loose to avoid coupling. */
 type FsReader = Awaited<ReturnType<typeof makeNodeFsReader>>;
 
 /**
- * Resolve a role's soul document and attached skills from .conductor/.
+ * Resolve a role's soul document and attached skills from .hallucinate/.
  * Extracted so the orchestrator's preamble resolver and the .github/agents
  * sync share ONE definition of "how a role's persona is assembled". Best-effort:
  * a missing/unreadable soul or skills file degrades to omitting that part.
@@ -39,7 +39,7 @@ export async function resolveRolePreamble(
 }
 
 /**
- * Materialize a saved Maestro role as a repo-level Copilot custom agent at
+ * Materialize a saved Hallucinate role as a repo-level Copilot custom agent at
  * `.github/agents/<slug>.agent.md`, so it appears in the VS Code Copilot Chat
  * picker (after a window reload) and the CLI WITHOUT having to dispatch it.
  *
@@ -57,7 +57,7 @@ export async function syncRepoCopilotAgent(
 ): Promise<{ created: boolean } | null> {
   try {
     const reader = await makeNodeFsReader();
-    const loaded = await loadConductorDir(repoRoot, reader).catch(() => null);
+    const loaded = await loadHallucinateDir(repoRoot, reader).catch(() => null);
     const role = loaded?.roles.find((r) => r.name === roleName);
     if (!role || role.engine.id !== "copilot") return null;
     const { soulDoc, skills } = await resolveRolePreamble(repoRoot, role, reader);

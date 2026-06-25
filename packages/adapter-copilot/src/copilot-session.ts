@@ -1,5 +1,5 @@
-import type { AgentEvent, AgentSession, ApprovalDecision } from "@maestro/core";
-import { EventQueue } from "@maestro/core";
+import type { AgentEvent, AgentSession, ApprovalDecision } from "@hallucinate/core";
+import { EventQueue } from "@hallucinate/core";
 import { cleanOutput, type OutputFormat } from "./args.js";
 import { FleetLineParser } from "./fleet-json.js";
 import { renderJsonLine } from "./json-output.js";
@@ -32,7 +32,7 @@ export class CopilotSession implements AgentSession {
   private terminalEmitted = false;
   /** In fleet mode, ONE stateful parser for the whole session: it tracks which
    *  toolCallIds belong to sub-agents so later output is attributed correctly
-   *  (the conductor's own narration stays top-level). */
+   *  (the lead's own narration stays top-level). */
   private readonly fleetParser = new FleetLineParser();
 
   constructor(

@@ -1,4 +1,4 @@
-import type { ToolGrant } from "@maestro/core";
+import type { ToolGrant } from "@hallucinate/core";
 
 /** What a skill needs that its role's grant does not cover. */
 export interface GrantGap {

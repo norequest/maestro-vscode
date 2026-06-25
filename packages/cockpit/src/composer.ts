@@ -1,4 +1,4 @@
-import type { Role, Team } from "@maestro/core";
+import type { Role, Team } from "@hallucinate/core";
 import type { WebviewToHost } from "./protocol.js";
 
 export const ENGINE_FAMILIES: ReadonlyArray<{ id: string; label: string; models: readonly string[] }> = [

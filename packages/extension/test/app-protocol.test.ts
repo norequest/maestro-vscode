@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isWebviewMessage } from "@maestro/cockpit";
+import { isWebviewMessage } from "@hallucinate/cockpit";
 import { isLibraryMessage } from "../src/library-protocol.js";
 import { isAnatomyMessage } from "../src/anatomy-protocol.js";
 import { isAppMessage, type HostToApp, type OpenTaskComposerMessage } from "../src/app-protocol.js";

@@ -7,7 +7,7 @@ import { writeRepoAgentFile } from "../src/agent-profile.js";
 describe("writeRepoAgentFile", () => {
   let root: string;
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), "maestro-repo-agent-"));
+    root = mkdtempSync(join(tmpdir(), "hallucinate-repo-agent-"));
   });
   afterEach(() => {
     rmSync(root, { recursive: true, force: true });

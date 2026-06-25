@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role, Task } from "@maestro/core";
+import type { Role, Task } from "@hallucinate/core";
 import {
   type AgentProfileWriter,
   buildAgentProfile,
@@ -22,7 +22,7 @@ describe("slugForRole", () => {
     expect(slugForRole("  Security Expert!! ")).toBe("security-expert");
   });
   it("falls back when the name has no slug-able characters", () => {
-    expect(slugForRole("***")).toBe("maestro-agent");
+    expect(slugForRole("***")).toBe("hallucinate-agent");
   });
 });
 

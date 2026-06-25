@@ -125,14 +125,14 @@ describe("Orchestrator resume (sendBack) for a stopped agent", () => {
 
     const resumed = orch.sendBack(id, "");
     expect(["preparing", "working"]).toContain(resumed.state);
-    // A bare resume must NOT append a "Conductor feedback:" line.
+    // A bare resume must NOT append a "Lead feedback:" line.
     expect(resumed.task.description).toBe(before);
-    expect(resumed.task.description).not.toContain("Conductor feedback");
+    expect(resumed.task.description).not.toContain("Lead feedback");
   });
 
   it("send-back with feedback on a stopped agent appends the note", async () => {
     const { orch, id } = await makeStoppedAgent();
     const resumed = orch.sendBack(id, "try the other API");
-    expect(resumed.task.description).toContain("Conductor feedback: try the other API");
+    expect(resumed.task.description).toContain("Lead feedback: try the other API");
   });
 });

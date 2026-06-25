@@ -1,20 +1,20 @@
 import type { SkillManifest } from "./skill-types.js";
 
 /**
- * Three on-demand SKILL.md files adapted for Maestro from
+ * Three on-demand SKILL.md files adapted for Hallucinate from
  * github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md at the repo root
  * for the upstream copyright and full license text.
  *
- * Maestro reality these rewrites target: agents are isolated git-worktree
+ * Hallucinate reality these rewrites target: agents are isolated git-worktree
  * subprocesses. They cannot message each other, broadcast, or request
  * shutdown; there is no team config file or message bus. ALL coordination
- * flows through the conductor (the lead agent) and the human in the UI. The
- * conductor delegates by emitting fenced ```delegate``` blocks (role:/task:
+ * flows through the lead agent and the human in the UI. The
+ * lead delegates by emitting fenced ```delegate``` blocks (role:/task:
  * lines) that the human approves, or auto-approves for vetted roles. A
  * delegated teammate runs once in its own worktree and returns a diff the
- * conductor reviews and merges.
+ * lead reviews and merges.
  *
- * Every upstream primitive Maestro lacks has been stripped or rewritten:
+ * Every upstream primitive Hallucinate lacks has been stripped or rewritten:
  * SendMessage/broadcast/shutdown_request, ~/.claude/teams/<name>/config.json,
  * tmux/iterm2 display modes, TaskCreate/TaskUpdate addBlockedBy task graphs,
  * and subagent_type selection. No em dash appears in any name, description, or
@@ -25,7 +25,7 @@ import type { SkillManifest } from "./skill-types.js";
 type VendoredSkill = { manifest: SkillManifest; body: string };
 
 /**
- * Reframes upstream task-coordination-strategies for Maestro. The conductor
+ * Reframes upstream task-coordination-strategies for Hallucinate. The lead
  * has no TaskCreate/blockedBy graph: it does prerequisite and glue work
  * itself, then delegates the independent parts as fenced delegate blocks.
  */
@@ -40,8 +40,8 @@ export const TASK_COORDINATION_STRATEGIES_SKILL: VendoredSkill = {
 Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
 How to decompose a task into units you can hand to teammates that run in
-isolation and compose cleanly. In Maestro there is no task graph and no
-dependency-edge API. You, the conductor, do the prerequisite and glue work yourself,
+isolation and compose cleanly. In Hallucinate there is no task graph and no
+dependency-edge API. You, the lead, do the prerequisite and glue work yourself,
 then delegate the independent parts. Each independent unit becomes one fenced
 \`\`\`delegate\`\`\` block with a \`role:\` and a \`task:\`. A teammate runs once in
 its own git worktree and returns a diff you review and merge. It cannot message
@@ -180,7 +180,7 @@ coupled part yourself first and fan out what remains.
 };
 
 /**
- * Reframes upstream team-composition-patterns for Maestro. "Which specialists
+ * Reframes upstream team-composition-patterns for Hallucinate. "Which specialists
  * to load" means which roles from the invoked team's roster to delegate to.
  * Drops subagent_type, display modes, and Claude-Code agent-type names.
  */
@@ -188,16 +188,16 @@ export const TEAM_COMPOSITION_PATTERNS_SKILL: VendoredSkill = {
   manifest: {
     name: "team-composition-patterns",
     description:
-      "Load when deciding how many teammates to delegate to and which roles to draw from the invoked team's roster. Use when sizing a team, picking the smallest set of roles that covers a task, or shaping a team in .conductor/teams.",
+      "Load when deciding how many teammates to delegate to and which roles to draw from the invoked team's roster. Use when sizing a team, picking the smallest set of roles that covers a task, or shaping a team in .hallucinate/teams.",
   },
   body: `# Team Composition Patterns
 
 Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
-How to size a team and pick which roles to delegate to. In Maestro a team is a
-roster of roles defined in \`.conductor/roles\` and grouped in
-\`.conductor/teams\`. The conductor is ALWAYS the coordinator: there is no
-separate lead to spawn, and teammates cannot coordinate with each other. Choosing
+How to size a team and pick which roles to delegate to. In Hallucinate a team is a
+roster of roles defined in \`.hallucinate/roles\` and grouped in
+\`.hallucinate/teams\`. The lead is ALWAYS the coordinator: there is no
+separate coordinator to spawn, and teammates cannot coordinate with each other. Choosing
 which specialists to use means choosing which roles from the invoked team's
 roster to send delegate blocks to.
 
@@ -205,7 +205,7 @@ roster to send delegate blocks to.
 
 - Deciding how many teammates to delegate to for a task.
 - Choosing which roles from the roster cover the task's dimensions.
-- Shaping a reusable team (a role roster) in \`.conductor/teams\`.
+- Shaping a reusable team (a role roster) in \`.hallucinate/teams\`.
 - Trimming a team that grew too large to coordinate.
 
 ## Team sizing heuristics
@@ -224,9 +224,9 @@ genuinely uncovered.
 
 ## Example team shapes
 
-These are example role rosters you can define in \`.conductor/teams\`, grouping
-roles from \`.conductor/roles\`. They are shapes, not built-ins: name the roles
-to match your project, and remember the conductor coordinates all of them.
+These are example role rosters you can define in \`.hallucinate/teams\`, grouping
+roles from \`.hallucinate/roles\`. They are shapes, not built-ins: name the roles
+to match your project, and remember the lead coordinates all of them.
 
 ### Review team
 
@@ -240,11 +240,11 @@ to match your project, and remember the conductor coordinates all of them.
 - Size: 3 investigator roles.
 - Roles: three investigators, each handed a different hypothesis.
 - Use when: a bug has multiple plausible root causes. Pin one full hypothesis
-  into each delegate block; the conductor compares the returned findings.
+  into each delegate block; the lead compares the returned findings.
 
 ### Feature team
 
-- Size: 2 to 3 implementer roles (the conductor coordinates, no separate lead).
+- Size: 2 to 3 implementer roles (the lead coordinates, no separate lead role).
 - Roles: implementers, each owning a disjoint set of files.
 - Use when: a feature decomposes into parallel work streams with clean file
   ownership.
@@ -253,7 +253,7 @@ to match your project, and remember the conductor coordinates all of them.
 
 - Size: 3 implementer roles.
 - Roles: a frontend implementer, a backend implementer, a test implementer.
-- Use when: a feature spans frontend, backend, and test layers. The conductor
+- Use when: a feature spans frontend, backend, and test layers. The lead
   does any shared-types groundwork first, then fans out the three layers.
 
 ### Security team
@@ -267,14 +267,14 @@ to match your project, and remember the conductor coordinates all of them.
 
 - Size: 2 to 3 implementer roles plus a reviewer role.
 - Roles: implementers each owning a migration stream, plus a reviewer that
-  verifies the migrated code. The conductor merges the streams, then delegates
+  verifies the migrated code. The lead merges the streams, then delegates
   the verification pass over the merged result.
 - Use when: a large codebase migration (framework upgrade, language port, API
   version bump) needs parallel work with correctness verification.
 
 ## Composing a team well
 
-1. The conductor is the coordinator. There is no lead role to add; you hold the
+1. The lead is the coordinator. There is no separate lead role to add; you hold the
    roster, approve each delegate block, and integrate every returned diff.
 2. Pick roles by the dimensions the task needs, not by what the roster happens
    to contain. A role you do not need is overhead.
@@ -307,9 +307,9 @@ There is no prior conversation for it to read.
 /**
  * The big rewrite. Upstream team-communication-protocols assumed a message bus
  * (message/broadcast/shutdown_request), a team config file, and runtime
- * hand-offs. Maestro has none of that: the protocol becomes complete-context
+ * hand-offs. Hallucinate has none of that: the protocol becomes complete-context
  * delegate blocks, no mid-flight hand-offs, pinned shared interfaces, blockers
- * surfaced to the human, and integration owned by the conductor.
+ * surfaced to the human, and integration owned by the lead.
  */
 export const TEAM_COMMUNICATION_PROTOCOLS_SKILL: VendoredSkill = {
   manifest: {
@@ -321,13 +321,13 @@ export const TEAM_COMMUNICATION_PROTOCOLS_SKILL: VendoredSkill = {
 
 Adapted from github.com/wshobson/agents (MIT). See THIRD-PARTY-NOTICES.md.
 
-How teammates coordinate in Maestro, given that they cannot. Each teammate is an
+How teammates coordinate in Hallucinate, given that they cannot. Each teammate is an
 isolated git-worktree subprocess. There is no message bus, no send-to-all, no
 remote shutdown, and no team config file. A teammate cannot message a peer,
 cannot message you, and cannot see another teammate's work. It runs once on the
 words in its delegate block and returns a diff. Coordination is therefore not
 runtime messaging: it is what you write into each block, and what you, the
-conductor, do with the diffs that come back.
+lead, do with the diffs that come back.
 
 ## When to use this
 
@@ -369,11 +369,11 @@ publish an interface for the other to discover; it cannot.
 
 A teammate that hits a blocker cannot ask a peer or you for help mid-run. It
 returns what it has, and the blocker surfaces to the human in the UI. The fix is
-to re-delegate with the missing context added. Maestro re-launches a sent-back
+to re-delegate with the missing context added. Hallucinate re-launches a sent-back
 teammate in the SAME worktree, so its earlier work is preserved: you add the
 context it lacked and send it back, rather than starting over.
 
-### 5. Integration is the conductor's job
+### 5. Integration is the lead's job
 
 Teammates never integrate with each other. Each returns a diff against its own
 worktree. You review each diff, resolve any overlap, and merge them into the
@@ -390,13 +390,13 @@ context.
 
 ## Anti-patterns
 
-| Anti-pattern                              | Why it fails in Maestro                                  | Do instead                                                       |
+| Anti-pattern                              | Why it fails in Hallucinate                                  | Do instead                                                       |
 | ----------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
 | Assuming a teammate can see another's work | Worktrees are isolated; it sees only its own block       | Paste any shared context or interface into every block          |
 | Designing a relay or mid-flight hand-off   | A teammate runs once; there is no pause or pick-up        | Split into independent units; do prerequisites yourself first   |
 | Splitting work that needs tight back-and-forth | No back-and-forth exists between teammates            | Keep it one block, or do that coupled part yourself             |
 | Omitting context, expecting a question     | A teammate cannot ask; it just runs on what it has        | Front-load every requirement and constraint into the block      |
-| Expecting teammates to integrate together  | They cannot reach each other's worktrees                 | The conductor reviews and merges every diff                     |
+| Expecting teammates to integrate together  | They cannot reach each other's worktrees                 | The lead reviews and merges every diff                          |
 | Leaving a shared interface undecided       | Neither teammate can settle it at runtime                | Decide the contract yourself, pin the exact text in both blocks |
 
 ## Troubleshooting
@@ -404,7 +404,7 @@ context.
 A teammate came back without finishing.
 It likely lacked context or hit a blocker, and it cannot ask. Read its diff and
 notes, identify the missing piece, add it to the task, and send the teammate
-back. Maestro re-launches it in the same worktree, so its progress is kept.
+back. Hallucinate re-launches it in the same worktree, so its progress is kept.
 
 Two returned diffs conflict on the same lines.
 The split was not clean. Re-cut the work so each teammate owns disjoint files,

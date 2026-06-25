@@ -1,4 +1,4 @@
-import type { Capabilities } from "@maestro/core";
+import type { Capabilities } from "@hallucinate/core";
 
 export const ACP_CAPABILITIES: Capabilities = {
   streaming: true,

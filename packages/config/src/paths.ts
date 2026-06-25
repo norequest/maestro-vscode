@@ -1,9 +1,9 @@
 /**
- * Shared path segments for where Maestro reads and writes skills.
+ * Shared path segments for where Hallucinate reads and writes skills.
  *
- * The skills home moved from `.conductor/skills/` to `.github/skills/` (the
+ * The skills home moved from `.hallucinate/skills/` to `.github/skills/` (the
  * folder VS Code and Copilot read natively). Roles, teams, and config.yaml
- * stay under `.conductor/`. Defining the segments here keeps the location in
+ * stay under `.hallucinate/`. Defining the segments here keeps the location in
  * one place, so every module joins the same path.
  */
 
@@ -11,4 +11,4 @@
 export const SKILLS_DIR_SEGMENTS = [".github", "skills"] as const;
 
 /** Legacy skills home, still READ for back-compat (never written anymore). */
-export const LEGACY_SKILLS_DIR_SEGMENTS = [".conductor", "skills"] as const;
+export const LEGACY_SKILLS_DIR_SEGMENTS = [".hallucinate", "skills"] as const;
