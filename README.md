@@ -16,6 +16,16 @@ Hallucinate dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/AC
 <p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/demo.gif" width="820" alt="Hallucinate: run a team of AI coding agents in VS Code" /></p>
 <p align="center"><a href="https://raw.githubusercontent.com/norequest/hallucinate/main/media/hallucinate-dev.mp4">Download the full-quality video (MP4)</a></p>
 
+## Why Hallucinate?
+
+Running more than one AI coding agent at once usually breaks down for three reasons. Hallucinate is built to fix each one.
+
+- **Agents collide in your working tree.** Two agents editing the same repo overwrite each other's work. Hallucinate gives every agent its own `git worktree` on its own branch, so you can run several in parallel and none of them touch another's files.
+- **Most agent tools want their own API key.** That means a second bill and another secret to rotate. Hallucinate drives a CLI you already use (GitHub Copilot, Gemini), so it runs on your existing subscription and never sees a key.
+- **You cannot blind-trust the output.** Agents hallucinate. Here a finished agent is a diff you read first, then Merge, Discard, send back with feedback, or open a PR. Nothing lands on your branch without your review.
+
+If you have ever wanted to fan out three or four agents on separate tasks and review each result like a stack of pull requests, that is the workflow this is for.
+
 ## Features
 
 - Model-agnostic. The coordination brain is engine-neutral; engines plug in behind one small adapter.
