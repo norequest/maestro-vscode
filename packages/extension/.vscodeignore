@@ -8,6 +8,7 @@ build.mjs
 tsconfig.json
 vitest.config.ts
 **/*.map
+**/*.vsix
 node_modules/**
 resources/**
 .github/**
