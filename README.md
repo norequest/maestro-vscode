@@ -1,10 +1,8 @@
 # Hallucinate
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://vsmarketplacebadges.dev/version/norequest.hallucinate-agents.svg?label=Marketplace&color=2ea043" alt="Marketplace version" /></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://vsmarketplacebadges.dev/installs-short/norequest.hallucinate-agents.svg?label=installs&color=2ea043" alt="Installs" /></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://vsmarketplacebadges.dev/downloads-short/norequest.hallucinate-agents.svg?label=downloads&color=2ea043" alt="Downloads" /></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents&ssr=false#review-details"><img src="https://vsmarketplacebadges.dev/rating-short/norequest.hallucinate-agents.svg?label=rating&color=2ea043" alt="Rating" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://img.shields.io/badge/VS%20Marketplace-v0.1.10-2ea043?logo=visualstudiocode&logoColor=white" alt="VS Marketplace version" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://img.shields.io/badge/Install-VS%20Code-2ea043?logo=visualstudiocode&logoColor=white" alt="Install in VS Code" /></a>
 </p>
 
 Run a team of AI coding agents in isolated git worktrees, without leaving VS Code.
