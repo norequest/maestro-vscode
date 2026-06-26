@@ -329,6 +329,18 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 .card .elapsed { color:#5e5e66; margin-left:auto; font-size:10.5px; font-family:'JetBrains Mono',monospace; flex:0 0 auto; white-space:nowrap; }
 .card .anatomy { color:var(--text-tertiary); font-size:11px; line-height:1.4; }
 
+/* Live-activity tail (M10 Phase B): the last up to 3 streamed lines on a working
+   card, a faint mono preview so a busy agent reads at a glance what it is doing
+   without opening the inspector. Subtle per TOKENS.md (ghost text); each line is
+   clipped to one row so the block stays calm and never grows the card. */
+.card-tail {
+  display:flex; flex-direction:column; gap:1px;
+  overflow:hidden; min-width:0;
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; line-height:1.5;
+  color:#6c6c74;
+}
+.card-tail .tail-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
 /* Inline "needs you" question block (prototype line 153) */
 .card-question {
   background:rgba(226,179,90,.1); border:1px solid rgba(226,179,90,.28); border-radius:7px;

@@ -12,6 +12,12 @@ export interface CardVM {
   state: AgentState;
   /** Capped, accumulated `output` text the engine streamed. */
   output: string;
+  /**
+   * The last up to 3 non-empty lines of `output`, derived in the reducer for
+   * the live activity preview on the card. Bounded by construction (at most 3
+   * lines); empty when there is no output yet.
+   */
+  tail?: string[];
   summary?: string;
   diff?: Diff;
   diffError?: string;

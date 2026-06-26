@@ -35,6 +35,7 @@ function cardFromAgent(agent: Agent, prevOutput: string, prevStartedAt: number |
     engineId: agent.role.engine.id,
     state: agent.state,
     output: prevOutput,
+    tail: tailOf(prevOutput),
     summary: agent.summary,
     diff: agent.diff,
     diffError: agent.diffError,
@@ -62,6 +63,17 @@ function cardFromAgent(agent: Agent, prevOutput: string, prevStartedAt: number |
 function appendOutput(prev: string, text: string): string {
   const next = prev + text;
   return next.length > OUTPUT_CAP ? next.slice(next.length - OUTPUT_CAP) : next;
+}
+
+/**
+ * Pure: the last up to 3 non-empty (non-whitespace-only) lines of `output`,
+ * for the card's live activity preview. Bounded by construction (<=3); empty
+ * when there is no output yet. Derives from the already-capped `output`, so it
+ * stays consistent with OUTPUT_CAP automatically.
+ */
+function tailOf(output: string): string[] {
+  const lines = output.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  return lines.slice(-3);
 }
 
 /** Pure: fold one orchestrator event into a new model (never mutates the input). */
@@ -96,7 +108,8 @@ export function reduce(model: CockpitModel, event: OrchestratorEvent): CockpitMo
     case "agent-event": {
       const prev = cards.get(event.agentId);
       if (prev && event.event.kind === "output") {
-        cards.set(event.agentId, { ...prev, output: appendOutput(prev.output, event.event.text) });
+        const output = appendOutput(prev.output, event.event.text);
+        cards.set(event.agentId, { ...prev, output, tail: tailOf(output) });
       }
       break;
     }

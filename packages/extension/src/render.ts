@@ -155,6 +155,25 @@ function conflictBlock(card: CardVM): string {
 }
 
 /**
+ * The faint "live activity" preview on a WORKING card: the last up to 3 non-empty
+ * lines the engine streamed (CardVM.tail, derived in the reducer), rendered as a
+ * subtle mono block so a busy agent shows what it is doing at a glance without
+ * opening the inspector. Shown ONLY on working-lane cards with a non-empty tail;
+ * non-working states and an empty/undefined tail render nothing (no empty block).
+ * The tail is engine-supplied text, so every line is escaped; it is also capped
+ * at 3 lines here as a defence-in-depth, even though the contract already bounds
+ * it to at most 3.
+ */
+function tailBlock(card: CardVM): string {
+  if (card.lane !== "working" || !card.tail?.length) return "";
+  const lines = card.tail
+    .slice(0, 3)
+    .map((line) => `<span class="tail-line">${escapeHtml(line)}</span>`)
+    .join("");
+  return `<div class="card-tail" aria-hidden="true">${lines}</div>`;
+}
+
+/**
  * On-card "Review →" button for reviewable cards (prototype lines 157-159 /
  * 185-187). Emits the existing `open-review` action with the agent id; the
  * delegated click handler returns early on `[data-action]`, so this does not
@@ -232,6 +251,7 @@ export function renderCardHTML(card: CardVM, cards: CardVM[] = [], opts: { child
   <div class="task">${escapeHtml(card.taskDescription)}</div>
   ${questionBlock(card)}
   ${conflictBlock(card)}
+  ${tailBlock(card)}
   ${diffStat(card)}
   ${anatomy(card)}
   ${cardFooter(card)}
