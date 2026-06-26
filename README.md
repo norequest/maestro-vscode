@@ -1,5 +1,12 @@
 # Hallucinate
 
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://vsmarketplacebadges.dev/version/norequest.hallucinate-agents.svg?label=Marketplace&color=2ea043" alt="Marketplace version" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://vsmarketplacebadges.dev/installs-short/norequest.hallucinate-agents.svg?label=installs&color=2ea043" alt="Installs" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents"><img src="https://vsmarketplacebadges.dev/downloads-short/norequest.hallucinate-agents.svg?label=downloads&color=2ea043" alt="Downloads" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=norequest.hallucinate-agents&ssr=false#review-details"><img src="https://vsmarketplacebadges.dev/rating-short/norequest.hallucinate-agents.svg?label=rating&color=2ea043" alt="Rating" /></a>
+</p>
+
 Run a team of AI coding agents in isolated git worktrees, without leaving VS Code.
 
 Hallucinate dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/ACP), watches them stream on one board, and lets you review each agent's diff before anything merges. Because it drives each engine's CLI, it reuses that tool's existing login. No API key.
