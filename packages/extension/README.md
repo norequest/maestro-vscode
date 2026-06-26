@@ -4,7 +4,7 @@ Run a team of AI coding agents in isolated git worktrees, without leaving VS Cod
 
 > Beta (pre-release). Extension v0.1.10. Built and tested: 8 packages, 1609 tests.
 
-<p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/demo.gif" width="420" alt="Hallucinate: run a team of AI coding agents in VS Code" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/demo.gif" width="760" alt="Hallucinate: run a team of AI coding agents in VS Code" /></p>
 <p align="center"><a href="https://raw.githubusercontent.com/norequest/hallucinate/main/media/hallucinate-dev.mp4">Download the full-quality video (MP4)</a></p>
 
 ## What it is

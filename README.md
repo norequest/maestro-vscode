@@ -8,7 +8,7 @@ Hallucinate dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/AC
 
 ## Demo
 
-<p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/demo.gif" width="440" alt="Hallucinate: run a team of AI coding agents in VS Code" /></p>
+<p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/demo.gif" width="820" alt="Hallucinate: run a team of AI coding agents in VS Code" /></p>
 <p align="center"><a href="https://raw.githubusercontent.com/norequest/hallucinate/main/media/hallucinate-dev.mp4">Download the full-quality video (MP4)</a></p>
 
 ## Features
