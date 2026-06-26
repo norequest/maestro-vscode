@@ -37,6 +37,8 @@ Hallucinate dispatches agents to your own engine CLIs (GitHub Copilot, Gemini/AC
 
 ## Quick start
 
+<p align="center"><img src="https://raw.githubusercontent.com/norequest/hallucinate/main/media/marketplace-listing.png" width="820" alt="Hallucinate · AI Agent Teams on the VS Code Marketplace" /></p>
+
 1. Install from the VS Code Marketplace (search "Hallucinate · AI Agent Teams" in the Extensions view, or run the command). This is an early beta build:
    ```bash
    code --install-extension norequest.hallucinate-agents
