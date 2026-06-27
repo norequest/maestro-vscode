@@ -146,7 +146,7 @@ export function createLibrary(
   onSnapshot: (snap: LibrarySnapshot) => void
 ): LibraryHandle {
   let state: LibraryState = {
-    tab: "agents",
+    tab: "teams",
     skills: [],
     roles: [],
     teams: [],
@@ -160,7 +160,7 @@ export function createLibrary(
   async function handle(msg: LibraryToHost): Promise<void> {
     switch (msg.type) {
       case "open-library": {
-        await reload("agents");
+        await reload("teams");
         return;
       }
 

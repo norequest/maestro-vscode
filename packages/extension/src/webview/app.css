@@ -1296,9 +1296,15 @@ button[data-action="stop"]:focus, button[data-action="stop"]:focus-visible {
 .lib-shell-title { font-family:var(--font-display); font-weight:800; font-size:18px; color:var(--text-primary); letter-spacing:-0.01em; }
 .lib-shell-subtitle { font-size:11.5px; color:var(--text-quiet); margin-top:2px; }
 .lib-shell-nav { display:flex; align-items:center; gap:14px; }
-.lib-shell-close { display:flex; align-items:center; gap:7px; background:none; cursor:pointer; color:var(--text-tertiary); font-family:var(--font-body); font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:7px; border:1px solid #2e2e34; transition:color 130ms ease,border-color 130ms ease; }
-.lib-shell-close:hover { color:#d6d6da; border-color:#3a3a42; }
-.lib-shell-close-x { font-size:14px; line-height:1; }
+/* A quiet, borderless ghost close: it sits beside the underline tabs, so a boxed
+   pill read heavier than them and competed for the eye. Now it is a muted control
+   that only lifts a faint rounded background on hover/focus, with the x as the
+   hero. */
+.lib-shell-close { display:flex; align-items:center; gap:6px; background:none; cursor:pointer; color:var(--text-tertiary); font-family:var(--font-body); font-size:12.5px; font-weight:600; padding:6px 10px; border-radius:8px; border:none; transition:color 130ms ease,background 130ms ease; }
+.lib-shell-close:hover { color:var(--text-primary); background:rgba(255,255,255,0.055); }
+.lib-shell-close:focus-visible { outline:none; color:var(--text-primary); background:rgba(255,255,255,0.055); box-shadow:0 0 0 1px var(--border-default); }
+.lib-shell-close-x { font-size:16px; line-height:1; opacity:.85; }
+.lib-shell-close:hover .lib-shell-close-x { opacity:1; }
 
 /* ─── Library tab bar (active-underline) ──────────────────────────────────────
    Uses `.lib-tab` (NOT the board drawer's `.tab`) so the two never collide when
