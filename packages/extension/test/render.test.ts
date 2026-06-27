@@ -567,6 +567,20 @@ describe("renderDrawer", () => {
     const html = renderDrawer({ cards: [card({ id: "a1", output: "<img src=x onerror=alert(1)>" })], focusedId: "a1", delegations: [] });
     expect(html).not.toContain("<img src=x"); expect(html).toContain("&lt;img");
   });
+  it("renders the Output in a <pre class=\"output\"> (the CSS-hooked class is load-bearing)", () => {
+    const html = renderDrawer({ cards: [card({ id: "a1", output: "hello" })], focusedId: "a1", delegations: [] });
+    expect(html).toContain('<pre class="output">');
+  });
+  it("preserves a real newline in the Output (relies on white-space:pre-wrap, not <br>)", () => {
+    const html = renderDrawer({ cards: [card({ id: "a1", output: "line1\nline2" })], focusedId: "a1", delegations: [] });
+    // The real newline survives into the <pre>; no <br> substitution.
+    expect(html).toContain("line1\nline2");
+  });
+  it("round-trips a long unbreakable base64-like token intact inside the Output <pre>", () => {
+    const blob = "A".repeat(500) + "abcDEF0123456789+/".repeat(100); // ~2300 chars, only [A-Za-z0-9+/]
+    const html = renderDrawer({ cards: [card({ id: "a1", output: blob })], focusedId: "a1", delegations: [] });
+    expect(html).toContain(`<pre class="output">${blob}</pre>`);
+  });
   it("renders an editable TASK section with an input pre-filled with the task", () => {
     const html = renderDrawer({ cards: [card({ id: "a1", taskDescription: "wire the router" })], focusedId: "a1", delegations: [] });
     expect(html).toContain('class="drawer-task"');

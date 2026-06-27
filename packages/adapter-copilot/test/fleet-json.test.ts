@@ -191,9 +191,38 @@ describe("FleetLineParser", () => {
     expect(parseFleetLine(malformed)).toEqual({ kind: "output", text: malformed });
   });
 
-  it("falls back to a raw output event for an unmodeled JSON type", () => {
+  it("drops an unmodeled JSON envelope that carries no human text", () => {
+    // A recognized-shape envelope (string `type`) we do not model and which has
+    // no content/text/delta must be DROPPED, never dumped raw — raw envelopes can
+    // leak base64 + metadata into the Output tab.
     const line = envelope("telemetry.heartbeat", { n: 7 });
-    expect(parseFleetLine(line)).toEqual({ kind: "output", text: line });
+    expect(parseFleetLine(line)).toBeNull();
+  });
+
+  it("surfaces assistant.thinking narration as clean output, dropping the base64 signature + envelope", () => {
+    // The thinking frame's readable narration lives in data.content; the base64
+    // `signature` and the envelope metadata must NEVER reach the card output.
+    const content = "The user wants to see git changes.\n\nLet me start by showing git status.";
+    expect(content).toContain("\n"); // the \n is a real newline that survives the JSON round-trip
+    const line = JSON.stringify({
+      type: "assistant.thinking",
+      data: { signature: "AAABBBbase64CCC==", content },
+      id: "809f",
+      timestamp: "t",
+      parentId: "p",
+      ephemeral: true,
+    });
+    const event = parseFleetLine(line);
+    expect(event).toEqual({ kind: "output", text: content });
+    const text = event && event.kind === "output" ? event.text : "";
+    for (const banned of ["signature", "AAABBBbase64CCC", "parentId", "ephemeral", "timestamp", "assistant.thinking"]) {
+      expect(text).not.toContain(banned);
+    }
+  });
+
+  it("drops an assistant.turn_end envelope (pure metadata, no user text)", () => {
+    const line = JSON.stringify({ type: "assistant.turn_end", data: { turnId: "1" }, id: "e", parentId: "p" });
+    expect(parseFleetLine(line)).toBeNull();
   });
 
   it("parses a realistic two-scribe transcript into the expected event sequence", () => {

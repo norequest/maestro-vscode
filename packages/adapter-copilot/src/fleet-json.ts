@@ -109,6 +109,12 @@ export class FleetLineParser {
         return this.attribute(parentCallId(), text);
       }
 
+      // Turn lifecycle envelopes carry no user-facing text (turn_end is pure
+      // metadata; turn_start is a marker). Drop them so they never leak.
+      case "assistant.turn_start":
+      case "assistant.turn_end":
+        return null;
+
       case "tool.execution_start": {
         const toolName = str(field("toolName")) ?? "tool";
         const parent = parentCallId();
@@ -145,8 +151,19 @@ export class FleetLineParser {
         return { kind: "done", summary: resultSummary(field("usage")) };
       }
 
-      default:
-        return rawOutput(line); // recognized JSON object, unmodeled type -> raw fallback
+      default: {
+        // A recognized-shape envelope: a well-formed JSON object whose `type` is
+        // a string we do not model (e.g. assistant.thinking, or any future
+        // frame). NEVER dump it raw — it can carry a base64 `signature` plus
+        // envelope metadata (parentId, timestamp, ephemeral, ...). Surface ONLY
+        // the readable human narration: we read content/text/delta, so a base64
+        // signature is dropped by construction. If there is no such text, drop
+        // the envelope entirely. The two pre-switch `rawOutput` fallbacks (not
+        // valid JSON; valid JSON that is not an object) already cover every line
+        // that could be a plain banner, and neither can carry a base64 envelope.
+        const text = messageText(field("content") ?? field("text") ?? field("delta"));
+        return text === undefined ? null : this.attribute(parentCallId(), text);
+      }
     }
   }
 
