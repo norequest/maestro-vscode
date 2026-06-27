@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentEvent } from "@hallucinate/core";
-import { CopilotSession } from "../src/copilot-session.js";
+import { COPILOT_KILL_GRACE_MS, CopilotSession } from "../src/copilot-session.js";
 import { FakeChild } from "./fake-spawn.js";
 
 async function collect(events: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
@@ -244,5 +244,48 @@ describe("CopilotSession", () => {
     expect(message).toContain(tail);
     // The early filler must have been dropped to keep the buffer bounded.
     expect(message.length).toBeLessThan(9000);
+  });
+});
+
+// M3: stop() must escalate to SIGKILL if the child ignores SIGTERM, so a stuck
+// copilot cannot keep mutating the worktree the user is about to merge/discard.
+describe("CopilotSession stop() SIGKILL escalation", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("escalates to SIGKILL when the child ignores SIGTERM past the grace window", () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    session.stop();
+    expect(child.killSignals).toEqual(["SIGTERM"]);
+    // Child never emits close; advance past the grace window.
+    vi.advanceTimersByTime(COPILOT_KILL_GRACE_MS);
+    expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("does NOT escalate when the child exits within the grace window", () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    session.stop();
+    expect(child.killSignals).toEqual(["SIGTERM"]);
+    child.close(0); // exits promptly in response to SIGTERM
+    vi.advanceTimersByTime(COPILOT_KILL_GRACE_MS * 2);
+    expect(child.killSignals).toEqual(["SIGTERM"]); // no SIGKILL
+  });
+
+  it("does not escalate after a child that had already exited is stopped", () => {
+    const child = new FakeChild();
+    const session = new CopilotSession(child);
+    session.start();
+    child.close(0);
+    session.stop(); // settled already, so this is a no-op
+    vi.advanceTimersByTime(COPILOT_KILL_GRACE_MS * 2);
+    expect(child.killSignals).toEqual([]);
   });
 });

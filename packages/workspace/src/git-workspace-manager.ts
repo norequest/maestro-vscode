@@ -488,11 +488,70 @@ export class GitWorkspaceManager implements WorkspaceManager {
   private async teardown(agentId: string, deleteBranch: boolean): Promise<void> {
     const rec = this.records.get(agentId);
     if (!rec) return;
-    await this.runner(["worktree", "remove", "--force", rec.path], { cwd: this.repoRoot });
-    if (deleteBranch) {
-      await this.runner(["branch", "-D", rec.branch], { cwd: this.repoRoot });
+    // REQUIRED: remove the worktree. The non-throwing runner is used here, so its
+    // exit code MUST be checked by hand (unlike git(), which throws). A GENUINE
+    // failed remove (a still-running child holding the worktree, a lock, or a
+    // permission error) must NOT be swallowed: throw so discard()/cleanup()/
+    // releaseWorktree() reject and the orchestrator's merge-cleanup-failed safety
+    // net can fire. The record is left in place (we have not reached the delete
+    // below), so the agent stays known and retryCleanup/finishConflictResolution
+    // can re-run.
+    //
+    // The ONE benign case is a worktree that is ALREADY gone: a prior teardown
+    // removed it (then threw later, e.g. at branch -D on a transient lock), or an
+    // external `git worktree prune` cleared the admin entry. A removed worktree is
+    // the desired end state, so we tolerate "is not a working tree" and CONTINUE
+    // (branch -D / prune / delete the record) rather than throwing forever and
+    // stranding the agent on every retry.
+    const removed = await this.runner(["worktree", "remove", "--force", rec.path], { cwd: this.repoRoot });
+    if (removed.exitCode !== 0 && !GitWorkspaceManager.isWorktreeAlreadyGone(removed.stderr)) {
+      throw new Error(
+        `git worktree remove --force ${rec.path} failed (${removed.exitCode}): ${removed.stderr.trim()}`,
+      );
     }
-    await this.runner(["worktree", "prune"], { cwd: this.repoRoot });
+    // REQUIRED when deleting: drop the local branch. A genuine failure (e.g. the
+    // branch is checked out elsewhere, or an index lock) must throw and keep the
+    // record, exactly like the remove above. The ONE benign case is a branch that
+    // is already gone (never created, or removed by a prior teardown): that is a
+    // no-op for discard/cleanup, so it is tolerated and does not strand the agent.
+    if (deleteBranch) {
+      const branchDel = await this.runner(["branch", "-D", rec.branch], { cwd: this.repoRoot });
+      if (branchDel.exitCode !== 0 && !GitWorkspaceManager.isBranchAlreadyGone(branchDel.stderr)) {
+        throw new Error(
+          `git branch -D ${rec.branch} failed (${branchDel.exitCode}): ${branchDel.stderr.trim()}`,
+        );
+      }
+    }
+    // Housekeeping: prune stale worktree registrations. The worktree itself is
+    // already removed by this point, so a prune fault does not strand the record;
+    // surface it as a warning (matching bestEffortAbort's style) rather than
+    // silently ignoring it, then proceed to delete the now-clean record.
+    const pruned = await this.runner(["worktree", "prune"], { cwd: this.repoRoot });
+    if (pruned.exitCode !== 0) {
+      console.warn(`git worktree prune failed (${pruned.exitCode}): ${pruned.stderr.trim()}`);
+    }
     this.records.delete(agentId);
+  }
+
+  /**
+   * True when `git branch -D` failed only because the branch does not exist (it
+   * was never created, or a previous teardown already removed it). That is a
+   * benign no-op for cleanup/discard, so it must not strand the record. Any other
+   * failure (e.g. the branch is checked out, an index lock) is real and surfaces.
+   */
+  private static isBranchAlreadyGone(stderr: string): boolean {
+    return /not found|does not exist|doesn't exist/i.test(stderr);
+  }
+
+  /**
+   * True when `git worktree remove` failed only because the worktree is already
+   * gone (a prior teardown removed it, or an external `git worktree prune` cleared
+   * the admin entry). Removal is the desired end state, so this is benign:
+   * teardown should CONTINUE (delete the branch, prune, drop the record) rather
+   * than throw and permanently strand the agent on a retry. Any other failure (a
+   * lock, a permission error) is real and surfaces.
+   */
+  private static isWorktreeAlreadyGone(stderr: string): boolean {
+    return /is not a working tree|No such file|not a valid path/i.test(stderr);
   }
 }

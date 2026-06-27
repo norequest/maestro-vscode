@@ -1,18 +1,26 @@
-import { describe, expect, it } from "vitest";
-import { ProcessAcpTransport } from "../src/transport.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ACP_KILL_GRACE_MS, ProcessAcpTransport } from "../src/transport.js";
 import type { AcpChildHandle } from "../src/transport.js";
 import type { AcpMessage } from "../src/types.js";
 
 /** A controllable fake of a Node child process satisfying AcpChildHandle. */
 class FakeChild implements AcpChildHandle {
   private dataListener?: (chunk: Buffer | string) => void;
+  private stderrListener?: (chunk: Buffer | string) => void;
   private closeListener?: (code: number | null) => void;
   private errorListener?: (err: Error) => void;
   killed = false;
+  /** Every signal passed to kill(), in order, so an escalation is observable. */
+  readonly killSignals: NodeJS.Signals[] = [];
   readonly written: string[] = [];
   readonly stdout = {
     on: (_event: "data", listener: (chunk: Buffer | string) => void): void => {
       this.dataListener = listener;
+    },
+  };
+  readonly stderr = {
+    on: (_event: "data", listener: (chunk: Buffer | string) => void): void => {
+      this.stderrListener = listener;
     },
   };
   readonly stdin = {
@@ -27,11 +35,15 @@ class FakeChild implements AcpChildHandle {
     if (event === "close") this.closeListener = listener;
     else this.errorListener = listener;
   }
-  kill(): void {
+  kill(signal?: NodeJS.Signals): void {
     this.killed = true;
+    if (signal) this.killSignals.push(signal);
   }
   emit(chunk: string): void {
     this.dataListener?.(chunk);
+  }
+  emitErr(chunk: Buffer | string): void {
+    this.stderrListener?.(chunk);
   }
   close(code: number | null): void {
     this.closeListener?.(code);
@@ -141,5 +153,120 @@ describe("ProcessAcpTransport NDJSON buffering", () => {
     expect(child.written[0]!.endsWith("\n")).toBe(true);
     transport.terminate();
     expect(child.killed).toBe(true);
+  });
+});
+
+// H2: the child's stderr is piped, so it MUST be drained or a chatty engine
+// (e.g. gemini --acp) eventually fills the ~64 KB OS pipe buffer, blocks on its
+// next stderr write, stops writing stdout, and the transport never closes.
+describe("ProcessAcpTransport stderr draining", () => {
+  it("drains a large multi-chunk stderr stream without blocking and surfaces its tail on a non-zero exit", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    // Many chunks, far more than any OS pipe buffer would hold. A real child
+    // would have blocked long ago if nobody were reading; the fake just proves
+    // every chunk is consumed without the transport stalling.
+    for (let i = 0; i < 5000; i++) child.emitErr(`stderr line ${i}\n`);
+    const tail = "FINAL_DIAGNOSTIC: gemini crashed";
+    child.emitErr(tail + "\n");
+    child.close(7);
+    const msgs = await collected;
+    const last = msgs.at(-1)!;
+    expect(last.method).toBe("error");
+    const message = (last.params as { message: string }).message;
+    expect(message).toContain("code 7");
+    expect(message).toContain(tail);
+  });
+
+  it("bounds the captured stderr to roughly the last 8 KB", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    const filler = "x".repeat(9000); // exceeds the 8 KB cap
+    const tail = "REAL_TAIL_MARKER";
+    child.emitErr(filler + tail);
+    child.close(1);
+    const message = ((await collected).at(-1)!.params as { message: string }).message;
+    expect(message).toContain(tail);
+    // The early filler must have been dropped to keep the buffer bounded.
+    expect(message.length).toBeLessThan(9000);
+  });
+
+  it("includes the stderr tail in the synthetic error on a spawn/runtime error", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    child.emitErr("permission denied opening pty\n");
+    child.fail(new Error("spawn EACCES"));
+    const message = ((await collected).at(-1)!.params as { message: string }).message;
+    expect(message).toContain("spawn EACCES");
+    expect(message).toContain("permission denied opening pty");
+  });
+
+  it("decodes Buffer stderr chunks (not just strings)", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    child.emitErr(Buffer.from("boom from a buffer", "utf8"));
+    child.close(1);
+    const message = ((await collected).at(-1)!.params as { message: string }).message;
+    expect(message).toContain("boom from a buffer");
+  });
+
+  it("leaves stdout parsing and clean-exit handling unchanged while stderr flows", async () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    const collected = collect(transport);
+    const a = JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: {} });
+    const b = JSON.stringify({ jsonrpc: "2.0", method: "turn/complete", params: { summary: "ok" } });
+    child.emitErr("warning: noisy diagnostics\n");
+    child.emit(a + "\n");
+    child.emitErr("more noise\n");
+    child.emit(b + "\n");
+    child.close(0);
+    const msgs = await collected;
+    // No synthetic error on a clean exit, and both stdout frames still parsed.
+    expect(msgs.map((m) => m.method)).toEqual(["session/update", "turn/complete"]);
+  });
+});
+
+// M3: terminate() must escalate to SIGKILL if the child ignores SIGTERM, so a
+// stuck engine cannot keep mutating the worktree the user is about to merge.
+describe("ProcessAcpTransport terminate() SIGKILL escalation", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("escalates to SIGKILL when the child ignores SIGTERM past the grace window", () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    transport.terminate();
+    expect(child.killSignals).toEqual(["SIGTERM"]);
+    // Child never emits close; advance past the grace window.
+    vi.advanceTimersByTime(ACP_KILL_GRACE_MS);
+    expect(child.killSignals).toEqual(["SIGTERM", "SIGKILL"]);
+  });
+
+  it("does NOT escalate when the child exits within the grace window", () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    transport.terminate();
+    expect(child.killSignals).toEqual(["SIGTERM"]);
+    child.close(0); // exits promptly in response to SIGTERM
+    vi.advanceTimersByTime(ACP_KILL_GRACE_MS * 2);
+    expect(child.killSignals).toEqual(["SIGTERM"]); // no SIGKILL
+  });
+
+  it("does not escalate after a child that had already exited is terminated", () => {
+    const child = new FakeChild();
+    const transport = new ProcessAcpTransport(child);
+    child.close(0);
+    transport.terminate(); // settled already, so this is a no-op
+    vi.advanceTimersByTime(ACP_KILL_GRACE_MS * 2);
+    expect(child.killSignals).toEqual([]);
   });
 });

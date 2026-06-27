@@ -22,6 +22,7 @@ import type { Autonomy } from "@hallucinate/core";
 import { renderBoard, renderDrawer, renderAttentionBar } from "../render.js";
 import { renderHistory } from "../render-history.js";
 import { nextAttentionIndex } from "../attention-cycle.js";
+import { nextIndexForRender, historyChanged, historySignature } from "../render-gate.js";
 import { renderComposerHTML } from "../render-composer.js";
 import {
   renderLibraryHeader,
@@ -79,10 +80,19 @@ let lastComposerOptions: ComposerOptions | undefined;
 // drawer the user explicitly closed (so the next state tick does not re-open it).
 let drawerTab = "instructions";
 let closedDrawerId: string | null = null;
-// Attention bar: which queue item the bar currently shows. Reset to 0 on every
-// fresh board render (renderBoard always emits the bar at index 0), then advanced
-// by the auto-advance ticker (tickAttention) which re-renders ONLY the bar.
+// Attention bar: which queue item the bar currently shows. Advanced by the
+// auto-advance ticker (tickAttention) which re-renders ONLY the bar. PRESERVED
+// across board re-renders while the queue is unchanged (lastAttentionSig), so a
+// streaming agent's output ticks do not snap it back to index 0 (regression A).
 let attentionIndex = 0;
+// Signature of the attention queue the bar's index was last rendered for. A
+// matching signature on the next board render means the queue is unchanged, so
+// attentionIndex is kept (clamped); a differing one resets it to 0.
+let lastAttentionSig: string | undefined;
+// Signature of the in-session history the History view was last rendered for.
+// Lets the live `state` listener skip rebuilding the timeline on output ticks
+// (which record no history entry), preserving keyboard focus (regression B).
+let lastHistorySig: string | undefined;
 // Board layout: the Floor (size+warmth tiles) is the default; the status bar's
 // "Group by status" toggle flips this to the lane columns. Webview-local only
 // (no host round-trip), so a layout choice survives every `state` re-render.
@@ -153,12 +163,24 @@ function render(): void {
 
 function renderBoardView(): void {
   if (!root) return;
-  // A fresh state re-renders the bar at its most-urgent item, so reset the
-  // ticker's index to match renderBoard's hardcoded index 0.
-  attentionIndex = 0;
+  // renderBoard hardcodes the attention bar at index 0, but a streaming agent
+  // posts `state` continuously, so resetting the ticker's index here would snap
+  // the bar back to item 1 on every output tick and the auto-advance would never
+  // run (regression A). Preserve the index while the attention queue is unchanged
+  // (matching signature, clamped to length); only a real queue change resets it.
+  const attentionQueue = lastCockpit.attention ?? [];
+  const nextAttention = nextIndexForRender(attentionIndex, lastAttentionSig, attentionQueue);
+  attentionIndex = nextAttention.index;
+  lastAttentionSig = nextAttention.signature;
   // The board shell (tab strip + header + empty lanes + status bar) always
   // renders so "+ New agent" stays reachable even with zero agents.
   root.innerHTML = `${renderBoard(lastCockpit, { groupByStatus })}${renderDrawer(lastCockpit)}`;
+  // renderBoard emitted the bar at index 0; swap in the preserved index when it
+  // is non-zero (same bar-only re-render tickAttention does, no full re-render).
+  if (attentionIndex !== 0) {
+    const bar = root.querySelector<HTMLElement>(".attention-bar");
+    if (bar) bar.outerHTML = renderAttentionBar(attentionQueue, attentionIndex);
+  }
   tickElapsed();
   // The drawer is re-rendered from state every tick (a streaming agent posts
   // `state` continuously). Re-apply the user's client-only drawer choices so a
@@ -335,6 +357,10 @@ function renderHistoryView(): void {
   if (!root) return;
   const bodyScroll = root.querySelector<HTMLElement>(".history-body")?.scrollTop ?? 0;
   root.innerHTML = renderHistory(lastCockpit);
+  // Record what we just rendered so the live `state` listener can skip redundant
+  // re-renders (regression B): an output tick adds no history entry, so an
+  // unchanged signature means there is nothing new to show and focus is kept.
+  lastHistorySig = historySignature(lastCockpit.history ?? []);
   // Format the captured timestamps (render stays pure; formatting is DOM glue).
   root.querySelectorAll<HTMLElement>(".history-time[data-at]").forEach((el) => {
     const ms = Number(el.dataset["at"]);
@@ -748,9 +774,17 @@ window.addEventListener("message", (e: MessageEvent<HostToApp>) => {
   switch (data.type) {
     case "state":
       lastCockpit = data.state;
-      // The History view is derived from lastCockpit too, so keep it live: a new
-      // event streaming in re-renders the timeline while History is open.
-      if (view === "board" || view === "history") render();
+      // Keep the live views fresh as events stream in, but skip redundant work.
+      // The board always re-renders (cards/floor/drawer move with the stream),
+      // with the attention index preserved inside renderBoardView (regression A).
+      // The History view re-renders ONLY when the timeline actually changed: an
+      // output tick records no history entry, so rebuilding the list would throw
+      // keyboard focus off the focused entry on every tick (regression B).
+      if (view === "board") {
+        render();
+      } else if (view === "history" && historyChanged(lastHistorySig, lastCockpit.history ?? [])) {
+        render();
+      }
       break;
     case "composer-options":
       // Opening the dispatch modal is a board affordance; jump to the board.

@@ -16,6 +16,8 @@ export class FakeChild implements ChildHandle {
   readonly stdout = new FakeStream();
   readonly stderr = new FakeStream();
   killed = false;
+  /** Every signal passed to kill(), in order, so an escalation is observable. */
+  readonly killSignals: NodeJS.Signals[] = [];
   private closeListener?: (code: number | null) => void;
   private errorListener?: (err: Error) => void;
 
@@ -23,8 +25,9 @@ export class FakeChild implements ChildHandle {
     if (event === "close") this.closeListener = listener;
     else this.errorListener = listener;
   }
-  kill(): void {
+  kill(signal?: NodeJS.Signals): void {
     this.killed = true;
+    if (signal) this.killSignals.push(signal);
   }
 
   // Test drivers:

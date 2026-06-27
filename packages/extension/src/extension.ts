@@ -83,6 +83,15 @@ const NO_FOLDER_MESSAGE =
   "Hallucinate needs an open folder (a git repo) to run agents. Open a folder, then try again.";
 
 /**
+ * The live session's orchestrator, exposed at module scope ONLY so deactivate()
+ * (which has no access to the activate() closure) can kill in-flight engine
+ * children on teardown. Set in setupSession; cleared is unnecessary because a new
+ * activation re-runs setupSession. The context.subscriptions disposable is the
+ * primary teardown path; this reference is the belt-and-suspenders for deactivate.
+ */
+let activeOrchestrator: Orchestrator | undefined;
+
+/**
  * The folder-dependent wiring built by {@link setupSession}. Command handlers
  * close over a single `Session | undefined` so they keep working whether or
  * not a folder is open: with no folder the handlers warn instead of throwing.
@@ -172,6 +181,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const sessionTag = Date.now().toString(36);
     let agentSeq = 0;
     const orch = new Orchestrator(orchConfig, workspaces, () => `agent-${sessionTag}-${++agentSeq}`);
+    // Kill every in-flight engine child (copilot/gemini) when the extension is
+    // torn down (window reload, disable, quit) so they are not orphaned, still
+    // burning tokens and still mutating worktrees. VS Code disposes
+    // context.subscriptions AND calls deactivate() on teardown; this disposable is
+    // the primary path. stopAll() is best-effort and synchronous, fitting the
+    // limited time VS Code allows on shutdown. Also publish the orchestrator at
+    // module scope so deactivate() can reach it as a fallback.
+    activeOrchestrator = orch;
+    context.subscriptions.push({ dispose: () => orch.stopAll() });
     // Native custom-agent mode: materialize each role into a Copilot
     // `.agent.md` and spawn `copilot --agent <slug>` so Copilot recognizes a
     // real named custom agent (not a raw-text prompt). See agent-profile.ts.
@@ -985,5 +1003,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate(): void {
-  // no-op; subscriptions dispose the cockpit
+  // Best-effort kill of any in-flight engine children so a window reload / disable
+  // / quit does not orphan copilot/gemini (still burning tokens, still mutating
+  // worktrees). The context.subscriptions disposable registered in setupSession is
+  // the primary path; this is the belt-and-suspenders for hosts that call
+  // deactivate() before (or instead of) clearing subscriptions. Synchronous and
+  // error-swallowing because teardown must never throw and VS Code gives limited
+  // time on deactivate.
+  try {
+    activeOrchestrator?.stopAll();
+  } catch {
+    // ignore: teardown must never throw
+  }
 }
