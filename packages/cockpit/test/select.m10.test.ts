@@ -3,6 +3,12 @@ import type { Agent, OrchestratorEvent } from "@hallucinate/core";
 import type { TileSize, TileWarmth } from "../src/protocol.js";
 import { initialModel, reduce } from "../src/reducer.js";
 import { selectAttention, selectFloor, selectHistory, selectState, selectTeams } from "../src/select.js";
+import { teamHue } from "../src/crest.js";
+
+/** A role override with a distinct name + engine, to prove header fields come from the LEAD card. */
+function role(name: string, engineId: string): Agent["role"] {
+  return { name, instructions: "", engine: { id: engineId }, autonomy: "auto-approve-safe" };
+}
 
 function agent(id: string, state: Agent["state"], over: Partial<Agent> = {}): Agent {
   return {
@@ -95,14 +101,25 @@ describe("selectAttention (M10 attention queue)", () => {
 });
 
 describe("selectTeams (M10 Phase D: lead-grouped teams)", () => {
-  it("groups a lead's children into one id-sorted group", () => {
+  it("groups a lead's children into one id-sorted group, with header fields", () => {
     let m = initialModel();
     m = reduce(m, added(agent("lead", "working")));
     // Add the children out of id order to prove memberIds gets sorted.
     m = reduce(m, added(agent("c2", "working", { parentId: "lead" })));
     m = reduce(m, added(agent("c1", "working", { parentId: "lead" })));
 
-    expect(selectTeams(m)).toEqual([{ leadId: "lead", memberIds: ["c1", "c2"] }]);
+    // All three working (count > 1) collapses to the "all working" rollup; tone is live.
+    expect(selectTeams(m)).toEqual([
+      {
+        leadId: "lead",
+        memberIds: ["c1", "c2"],
+        leadRoleName: "Implementer",
+        leadEngineId: "copilot",
+        statusLabel: "all working",
+        tone: "live",
+        hue: teamHue("lead"),
+      },
+    ]);
   });
 
   it("forms no group for a child whose parent is not on the board", () => {
@@ -125,9 +142,78 @@ describe("selectTeams (M10 Phase D: lead-grouped teams)", () => {
     m = reduce(m, added(agent("a1", "working", { parentId: "alpha" })));
 
     expect(selectTeams(m)).toEqual([
-      { leadId: "alpha", memberIds: ["a1"] },
-      { leadId: "beta", memberIds: ["b1", "b2"] },
+      {
+        leadId: "alpha",
+        memberIds: ["a1"],
+        leadRoleName: "Implementer",
+        leadEngineId: "copilot",
+        statusLabel: "all working",
+        tone: "live",
+        hue: teamHue("alpha"),
+      },
+      {
+        leadId: "beta",
+        memberIds: ["b1", "b2"],
+        leadRoleName: "Implementer",
+        leadEngineId: "copilot",
+        statusLabel: "all working",
+        tone: "live",
+        hue: teamHue("beta"),
+      },
     ]);
+  });
+
+  it("takes leadRoleName/leadEngineId from the LEAD card, not the children", () => {
+    let m = initialModel();
+    m = reduce(m, added(agent("lead", "working", { role: role("Lead", "copilot-fleet") })));
+    m = reduce(m, added(agent("c1", "working", { parentId: "lead", role: role("Implementer", "copilot") })));
+
+    const [g] = selectTeams(m);
+    expect(g!.leadRoleName).toBe("Lead");
+    expect(g!.leadEngineId).toBe("copilot-fleet");
+  });
+
+  it("rolls statusLabel up to the single bucket when all share it (3 ready to review)", () => {
+    let m = initialModel();
+    m = reduce(m, added(agent("lead", "done")));
+    m = reduce(m, added(agent("c1", "done", { parentId: "lead" })));
+    m = reduce(m, added(agent("c2", "done", { parentId: "lead" })));
+
+    const [g] = selectTeams(m);
+    expect(g!.statusLabel).toBe("3 ready to review");
+    expect(g!.tone).toBe("warm");
+  });
+
+  it("rolls statusLabel up to the top two buckets by urgency, ' · ' joined", () => {
+    let m = initialModel();
+    m = reduce(m, added(agent("lead", "working")));
+    m = reduce(m, added(agent("c1", "done", { parentId: "lead" })));
+    m = reduce(m, added(agent("c2", "working", { parentId: "lead" })));
+
+    const [g] = selectTeams(m);
+    // ready (1) outranks working (2) in the rollup order.
+    expect(g!.statusLabel).toBe("1 ready to review · 2 working");
+    expect(g!.tone).toBe("warm"); // done(warm) is more urgent than working(live)
+  });
+
+  it("collapses to 'all working' only when every member works and there is more than one", () => {
+    let m = initialModel();
+    m = reduce(m, added(agent("lead", "working")));
+    m = reduce(m, added(agent("c1", "working", { parentId: "lead" })));
+
+    const [g] = selectTeams(m);
+    expect(g!.statusLabel).toBe("all working");
+    expect(g!.tone).toBe("live");
+  });
+
+  it("derives tone as the most-urgent warmth across lead and members (conflict -> hot)", () => {
+    let m = initialModel();
+    m = reduce(m, added(agent("lead", "working")));
+    m = reduce(m, added(agent("c1", "conflict", { parentId: "lead" })));
+
+    const [g] = selectTeams(m);
+    expect(g!.tone).toBe("hot");
+    expect(g!.statusLabel).toBe("1 needs you · 1 working");
   });
 
   it("does not mutate the input model or its cards Map", () => {

@@ -180,8 +180,8 @@ describe("renderBoard", () => {
     expect(html).toContain("New task");
     expect(html).toContain('data-action="new-task"');
     expect(html).toContain('class="status-bar"');
-    // Status bar derives "N running" from the working count.
-    expect(html).toMatch(/sb-running">1 running/);
+    // Status bar derives "N running" from the working count (passive readout dot).
+    expect(html).toMatch(/sb-running"><span class="sb-dot"><\/span>1 running/);
   });
   it("opens the Library from the single header button (no duplicate nav)", () => {
     const html = renderBoard({ cards: [], delegations: [] });
@@ -235,8 +235,8 @@ describe("renderBoard", () => {
   it("status bar shows a branch icon before main and the running/awaiting counts", () => {
     const html = renderBoard({ cards: [card({ lane: "working" }), card({ lane: "needsYou", state: "done", attention: true })], delegations: [] });
     expect(html).toContain('class="sb-branch-icon"');
-    expect(html).toMatch(/sb-running">1 running/);
-    expect(html).toMatch(/sb-awaiting">1 awaiting review/);
+    expect(html).toMatch(/sb-running"><span class="sb-dot"><\/span>1 running/);
+    expect(html).toMatch(/sb-awaiting"><span class="sb-dot"><\/span>1 awaiting review/);
   });
 
   // ─── Lead-coordinated teams: pending delegation proposals ─────────────────
@@ -578,6 +578,46 @@ describe("renderDrawer", () => {
     const html = renderDrawer({ cards: [card({ id: "a1", taskDescription: '"><img src=x>' })], focusedId: "a1", delegations: [] });
     expect(html).not.toContain('value=""><img src=x>');
     expect(html).toContain("&lt;img");
+  });
+  it("a virtual sub-agent with a heading-like task renders a NON-editable TASK with a Delegated-by placeholder", () => {
+    const html = renderDrawer({
+      cards: [
+        card({ id: "lead1", roleName: "Fleet Lead", lane: "working" }),
+        card({ id: "sub1", roleName: "Coder", parentId: "lead1", taskDescription: "# Instructions", virtual: true }),
+      ],
+      focusedId: "sub1",
+      delegations: [],
+    });
+    // Read-only sub-agents get no editable task input/handler.
+    expect(html).not.toContain('data-action="edit-task"');
+    expect(html).not.toContain('class="drawer-task-input"');
+    // The heading-like task is replaced by a clear stand-in naming the lead role.
+    expect(html).toContain("Delegated by Fleet Lead");
+    expect(html).not.toContain("# Instructions");
+  });
+  it("a virtual sub-agent with no parent falls back to 'Delegated by lead'", () => {
+    const html = renderDrawer({
+      cards: [card({ id: "sub1", roleName: "Coder", taskDescription: "", virtual: true })],
+      focusedId: "sub1",
+      delegations: [],
+    });
+    expect(html).not.toContain('data-action="edit-task"');
+    expect(html).toContain("Delegated by lead");
+  });
+  it("a virtual sub-agent with a real (non-heading) task shows it statically, never as an editable input", () => {
+    const html = renderDrawer({
+      cards: [card({ id: "sub1", roleName: "Coder", taskDescription: "wire the parser", virtual: true })],
+      focusedId: "sub1",
+      delegations: [],
+    });
+    expect(html).not.toContain('data-action="edit-task"');
+    expect(html).not.toContain('class="drawer-task-input"');
+    expect(html).toContain("wire the parser");
+  });
+  it("a NON-virtual card still renders the editable TASK input (the static treatment is virtual-only)", () => {
+    const html = renderDrawer({ cards: [card({ id: "a1", taskDescription: "wire the router" })], focusedId: "a1", delegations: [] });
+    expect(html).toContain('data-action="edit-task"');
+    expect(html).toContain('class="drawer-task-input"');
   });
   it("working footer offers a Pause toggle, Stop, and (when steerable) Steer", () => {
     const html = renderDrawer({ cards: [card({ id: "a1", state: "working", engineCapabilities: steerable })], focusedId: "a1", delegations: [] });

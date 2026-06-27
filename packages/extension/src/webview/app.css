@@ -343,26 +343,63 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
   padding:18px 22px;
   display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
   grid-auto-rows:min-content; gap:14px; align-content:start;
-  /* Positioning context for the absolute lead->child connector overlay. */
-  position:relative;
 }
 /* Overrides .floor's display:grid; an empty board has no tiles to flow. */
 .floor-empty { display:block; }
-/* Tiles sit ABOVE the connector overlay so the lines read as quiet ties behind
-   the cards, not loud strokes over them. */
-.floor-tile { min-width:0; display:flex; position:relative; z-index:1; }
+.floor-tile { min-width:0; display:flex; position:relative; }
 
-/* Lead->child connector overlay (M10 Phase E): an absolutely-positioned svg the
-   webview draws faint paths into at runtime, anchored to the (relative) .floor
-   and kept BEHIND the tiles. Emitted only when at least one team exists. */
-.floor-connectors {
-  position:absolute; inset:0; width:100%; height:100%;
-  pointer-events:none; overflow:visible; z-index:0;
+/* ── Team tray ──────────────────────────────────────────────────────────────
+   A lead and its delegated children read as ONE enclosed unit: a full-width
+   recessed band spanning the Floor grid, with a header (lead role, engine +
+   agent count, and a right-pushed status pill) over a nested mini-grid. The
+   header status dot colour comes from the team's tone; a quiet --team-hue accent
+   gives the team a stable identity without competing with status. */
+.floor-team {
+  grid-column:1 / -1;
+  background:var(--bg-inset);
+  /* A clearer containment read so the team unit separates from the board: a
+     defined border plus a faint drop shadow lifting the band off the canvas. */
+  border:1px solid var(--border-default);
+  border-radius:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.22);
+  padding:12px 14px;
+  display:flex; flex-direction:column; gap:12px;
 }
-.floor-connectors .connector {
-  fill:none; stroke:var(--border-hover); stroke-width:1.5;
-  stroke-dasharray:3 4; opacity:.55;
+.ft-header { display:flex; align-items:center; gap:9px; min-width:0; }
+/* A small four-bar glyph echoing the brand launch mark. Quiet, decorative. */
+.ft-bars { display:inline-flex; align-items:flex-end; gap:2px; height:11px; flex:0 0 auto; }
+.ft-bars i { width:2px; background:hsl(var(--team-hue, 268) 45% 60%); opacity:.65; border-radius:1px; }
+.ft-bars i:nth-child(1) { height:5px; }
+.ft-bars i:nth-child(2) { height:9px; }
+.ft-bars i:nth-child(3) { height:7px; }
+.ft-bars i:nth-child(4) { height:11px; }
+.ft-name {
+  font-family:'Manrope',sans-serif; font-weight:700; font-size:13px;
+  /* A quiet team-identity tint (never a status signal: status lives on the dot). */
+  color:hsl(var(--team-hue, 268) 50% 78%);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
 }
+.ft-tag {
+  flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-size:10px;
+  color:var(--text-tertiary); white-space:nowrap;
+}
+.ft-status {
+  margin-left:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; color:var(--text-secondary); white-space:nowrap;
+}
+.ft-dot { width:7px; height:7px; border-radius:50%; background:var(--text-tertiary); flex:0 0 auto; }
+.floor-team.tone-hot  .ft-dot { background:var(--status-conflict); }
+.floor-team.tone-warm .ft-dot { background:var(--status-attention); }
+.floor-team.tone-live .ft-dot { background:var(--status-working); }
+/* tone-idle (and any unknown tone) keeps the muted default dot. */
+.ft-body {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+  grid-auto-rows:min-content; gap:10px;
+}
+/* The lead spans the full tray width, sitting above its children. */
+.ft-lead { grid-column:1 / -1; }
+/* Children read as delegated: a dashed rail and a touch quieter. */
+.ft-child > .card { border-left-style:dashed; opacity:.95; }
 .floor-tile > .card { flex:1; min-width:0; }
 /* A large tile spans two columns; the browser clamps the span when the board is
    too narrow to hold two columns, so this is harmless on a docked-inspector squeeze. */
@@ -378,6 +415,10 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 .floor-tile.warmth-idle > .card { opacity:0.82; }
 .floor-tile.is-child { margin-left:14px; }
 .floor-tile.is-child > .card { border-left-style:dashed; }
+/* Inside a team tray, members are laid out in their own .ft-body grid tracks, so
+   the lane-style 14px child indent would leave a stray offset; neutralize it so
+   members sit flush in their cells (.ft-child already supplies the dashed rail). */
+.floor-team .floor-tile.is-child { margin-left:0; }
 
 /* ─── Agent card (prototype lines 116-128) ──────────────────────────────────── */
 
@@ -672,25 +713,43 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
   display:flex; align-items:center; padding:0 12px; gap:16px;
   font-size:11px; color:var(--text-tertiary); font-family:'JetBrains Mono',monospace;
 }
-.status-bar .sb-branch { display:flex; align-items:center; gap:5px; }
+/* The branch chip and the two counters are passive READOUTS, not buttons: a
+   default cursor and no hover so a click never looks like it should do something.
+   The branch reads a touch dimmer; each counter gets a small leading status dot
+   (blue for running, amber for awaiting) reusing the header count language. */
+.status-bar .sb-branch { display:flex; align-items:center; gap:5px; cursor:default; color:var(--text-faint); }
 .status-bar .sb-branch-icon { flex:0 0 auto; }
+.status-bar .sb-running, .status-bar .sb-awaiting { display:inline-flex; align-items:center; gap:5px; cursor:default; }
+.status-bar .sb-dot { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+.status-bar .sb-running .sb-dot { background:var(--status-working); }
+.status-bar .sb-awaiting .sb-dot { background:var(--status-attention); }
 .status-bar .sb-awaiting { color:#caa869; }
 .status-bar .sb-version { margin-left:auto; }
 
-/* Board-layout toggle (M10 Phase D): a tidy two-tab segmented control in the
-   status bar flipping Floor <-> Group by status. The active tab reads as a quiet
-   raised chip; the others are faint text. Webview-local state, on-palette. */
-.board-layout-toggle { display:flex; gap:2px; align-items:center; }
+/* Board-layout toggle: a real segmented control flipping Floor <-> Status. A
+   recessed pill TRACK holds two tabs; the active tab is a clearly RAISED segment
+   (distinct bg + primary text + weight + a teal accent), and the move is animated
+   so toggling is felt. Webview-local state, on-palette. */
+.board-layout-toggle {
+  display:flex; gap:0; align-items:center;
+  background:var(--bg-inset); border:1px solid var(--border-subtle);
+  border-radius:7px; padding:2px;
+}
 .layout-tab {
   background:transparent; border:none; color:var(--text-tertiary);
   font:inherit; font-size:11px; cursor:pointer;
-  padding:2px 8px; border-radius:5px;
-  transition:color 120ms ease, background 120ms ease;
+  padding:2px 9px; border-radius:5px;
+  transition:color 120ms ease, background 120ms ease, box-shadow 120ms ease;
 }
-.layout-tab:hover { color:var(--text-secondary); }
-/* The active chip needs a luminance-independent signal (not just brighter text):
-   a heavier weight plus a visibly raised chip boundary against the status bar. */
-.layout-tab.active { color:var(--text-primary); background:#323238; font-weight:600; }
+/* Hover tints the inactive tab's BACKGROUND (not just text) so it reads live. */
+.layout-tab:hover { color:var(--text-secondary); background:rgba(255,255,255,0.04); }
+/* The active segment is raised: a distinct surface, primary text, heavier weight,
+   and a quiet teal accent line, so the selection is unmistakable. */
+.layout-tab.active {
+  color:var(--text-primary); background:var(--bg-raised); font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--border-default), inset 0 -2px 0 var(--green);
+}
+.layout-tab.active:hover { background:var(--bg-raised); }
 .layout-tab:focus, .layout-tab:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
 
 /* ─── Inspector (prototype lines 206-337) ───────────────────────────────────── */
@@ -759,6 +818,13 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
   box-sizing:border-box; transition:border-color 120ms ease;
 }
 .drawer-task-input:focus, .drawer-task-input:focus-visible { border-color:#41414a; }
+/* Read-only TASK line for a virtual (delegated) sub-agent: a static panel, not an
+   editable input, so the drawer reads as view-only. */
+.drawer-task-static {
+  width:100%; background:var(--bg-stage); border:1px solid #2a2a30; border-radius:7px;
+  color:#bcbcc4; font-size:12.5px; font-family:inherit; padding:9px 11px;
+  box-sizing:border-box; line-height:1.45;
+}
 
 .drawer .tabs { display:flex; border-bottom:1px solid #2a2a30; flex-shrink:0; padding:0 16px; }
 .drawer .tabs .tab {

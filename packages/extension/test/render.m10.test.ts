@@ -396,56 +396,179 @@ describe("renderCardHTML (M10 Phase E: momentum 'growing' pulse on the working c
   });
 });
 
-describe("renderFloor (M10 Phase E: lead->child connector markup hooks)", () => {
+describe("renderFloor (Team tray: a lead + its children read as one enclosed unit)", () => {
   /** One Floor tile (size+warmth over a card resolved by id). */
   function tile(over: Partial<FloorTileVM> = {}): FloorTileVM {
     return { id: "a1", size: "md", warmth: "live", child: false, ...over };
   }
 
-  it("stamps every tile with data-agent-id and emits the connector overlay svg when teams exist", () => {
-    const html = renderFloor({
-      cards: [card({ id: "a1", roleName: "Lead" }), card({ id: "a2", roleName: "Child", parentId: "a1" })],
+  /** A floor + teams fixture: one lead immediately followed by its two children. */
+  function trayState(): CockpitState {
+    return {
+      cards: [
+        card({ id: "lead1", roleName: "Fleet Lead", engineId: "copilot-fleet", lane: "working" }),
+        card({ id: "kid1", roleName: "Coder", parentId: "lead1", lane: "working" }),
+        card({ id: "kid2", roleName: "Reviewer", parentId: "lead1", lane: "working" }),
+      ],
       delegations: [],
-      floor: [tile({ id: "a1" }), tile({ id: "a2", child: true })],
-      teams: [{ leadId: "a1", memberIds: ["a2"] }],
-    });
-    // The overlay svg the webview draws connectors into (the FIRST child of .floor).
-    expect(html).toContain('<svg class="floor-connectors"');
-    // Every rendered tile carries its agent id so the webview can locate tiles.
-    expect(html).toContain('data-agent-id="a1"');
-    expect(html).toContain('data-agent-id="a2"');
+      floor: [tile({ id: "lead1" }), tile({ id: "kid1", child: true }), tile({ id: "kid2", child: true })],
+      teams: [
+        {
+          leadId: "lead1",
+          memberIds: ["kid1", "kid2"],
+          leadRoleName: "Fleet Lead",
+          leadEngineId: "copilot-fleet",
+          statusLabel: "2 working",
+          tone: "live",
+          hue: 200,
+        },
+      ],
+    };
+  }
+
+  it("wraps the lead and its children in exactly one .floor-team tray whose header shows role, engine + count, and status", () => {
+    const html = renderFloor(trayState());
+    expect((html.match(/<section class="floor-team/g) ?? []).length).toBe(1);
+    expect(html).toContain("Fleet Lead");
+    // engineId · (memberIds.length + 1) agents
+    expect(html).toContain("copilot-fleet · 3 agents");
+    expect(html).toContain("2 working");
   });
 
-  it("emits NO connector svg when teams is an empty array (tiles still carry data-agent-id)", () => {
+  it("marks the lead tile ft-lead and each child tile ft-child", () => {
+    const html = renderFloor(trayState());
+    expect(html).toMatch(/floor-tile[^"]*ft-lead/);
+    expect((html.match(/ft-child/g) ?? []).length).toBe(2);
+  });
+
+  it("renders each child card exactly once, inside .ft-body, never as a top-level sibling", () => {
+    const html = renderFloor(trayState());
+    expect((html.match(/data-id="kid1"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-id="kid2"/g) ?? []).length).toBe(1);
+    const bodyStart = html.indexOf('class="ft-body"');
+    expect(bodyStart).toBeGreaterThan(-1);
+    expect(html.indexOf('data-id="kid1"')).toBeGreaterThan(bodyStart);
+    expect(html.indexOf('data-id="kid2"')).toBeGreaterThan(bodyStart);
+  });
+
+  it("carries the tone class, the team hue, the lead id, and a labeled section", () => {
+    const html = renderFloor(trayState());
+    expect(html).toContain("floor-team tone-live");
+    expect(html).toContain("--team-hue:200");
+    expect(html).toContain('data-team-lead="lead1"');
+    expect(html).toContain('aria-label="Team Fleet Lead"');
+  });
+
+  it("renders a solo agent as a bare .floor-tile, never wrapped in a tray", () => {
     const html = renderFloor({
-      cards: [card({ id: "a1" })],
+      cards: [card({ id: "solo1", roleName: "Solo" })],
       delegations: [],
-      floor: [tile({ id: "a1" })],
+      floor: [tile({ id: "solo1" })],
       teams: [],
     });
-    expect(html).not.toContain("floor-connectors");
-    expect(html).toContain('data-agent-id="a1"');
+    expect(html).toContain('class="floor-tile');
+    expect(html).not.toContain("floor-team");
   });
 
-  it("emits NO connector svg when teams is omitted", () => {
-    const html = renderFloor({
-      cards: [card({ id: "a1" })],
-      delegations: [],
-      floor: [tile({ id: "a1" })],
-    });
-    expect(html).not.toContain("floor-connectors");
+  it("never emits a floor-connectors svg (the connector overlay is gone)", () => {
+    expect(renderFloor(trayState())).not.toContain("floor-connectors");
   });
 
-  it("leaves the empty-floor placeholder unchanged (no svg, no data-agent-id) even when teams exist", () => {
-    const html = renderFloor({
-      cards: [card({ id: "a1" })],
-      delegations: [],
-      floor: [],
-      teams: [{ leadId: "a1", memberIds: ["a2"] }],
-    });
+  it("escapes a hostile lead role name in both the tray name and the aria-label", () => {
+    const state = trayState();
+    state.cards[0]!.roleName = "<img src=x>";
+    state.teams![0]!.leadRoleName = "<img src=x>";
+    const html = renderFloor(state);
+    expect(html).not.toContain("<img src=x>");
+    expect(html).toContain("&lt;img src=x&gt;");
+    expect(html).toContain('aria-label="Team &lt;img src=x&gt;"');
+  });
+
+  it("still returns the quiet placeholder for an empty floor", () => {
+    const html = renderFloor({ cards: [card({ id: "a1" })], delegations: [], floor: [], teams: [] });
     expect(html).toContain('class="floor floor-empty"');
     expect(html).toContain("No agents yet");
-    expect(html).not.toContain("floor-connectors");
-    expect(html).not.toContain("data-agent-id");
+    expect(html).not.toContain("floor-team");
+  });
+
+  it("never drops a grandchild in a depth-2 team (lead -> kid -> grandkid): every card appears exactly once", () => {
+    // A depth-2 delegation: lead1 has kid1 as a member, and kid1 in turn has a
+    // (virtual) grandkid. kid1 renders as a LEAF inside lead1's tray, never as a
+    // tray of its own, so the grandchild must be picked up by the leftover sweep
+    // rather than vanishing (no tile, no data-id, unfocusable).
+    const html = renderFloor({
+      cards: [
+        card({ id: "lead1", roleName: "Lead", lane: "working" }),
+        card({ id: "kid1", roleName: "Kid", parentId: "lead1", lane: "working" }),
+        card({ id: "grandkid", roleName: "Grandkid", parentId: "kid1", virtual: true, lane: "working" }),
+      ],
+      delegations: [],
+      floor: [tile({ id: "lead1" }), tile({ id: "kid1", child: true }), tile({ id: "grandkid", child: true })],
+      teams: [
+        { leadId: "lead1", memberIds: ["kid1"], leadRoleName: "Lead", leadEngineId: "copilot-fleet", statusLabel: "1 working", tone: "live", hue: 200 },
+        { leadId: "kid1", memberIds: ["grandkid"], leadRoleName: "Kid", leadEngineId: "copilot-fleet", statusLabel: "1 working", tone: "live", hue: 90 },
+      ],
+    });
+    // Every card stays on the board EXACTLY once (renderFloor is a complete
+    // permutation of state.cards: nothing duplicated, nothing dropped).
+    expect((html.match(/data-id="grandkid"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-id="lead1"/g) ?? []).length).toBe(1);
+    expect((html.match(/data-id="kid1"/g) ?? []).length).toBe(1);
+  });
+
+  it("falls back to an off-status team hue (never a status colour) when hue is missing", () => {
+    const state = trayState();
+    delete state.teams![0]!.hue;
+    const html = renderFloor(state);
+    // A missing hue must not read as red(0)/blue/green status; it lands on a quiet
+    // identity hue instead.
+    expect(html).toContain("--team-hue:268");
+    expect(html).not.toContain("--team-hue:0");
+  });
+});
+
+describe("renderBoard status bar (footer: real toggle, passive readouts)", () => {
+  function tile(over: Partial<FloorTileVM> = {}): FloorTileVM {
+    return { id: "a1", size: "md", warmth: "live", child: false, ...over };
+  }
+  const state: CockpitState = {
+    cards: [card({ id: "a1", lane: "working" })],
+    delegations: [],
+    floor: [tile({ id: "a1" })],
+  };
+
+  it("marks only the active layout tab .active + aria-checked=true (Floor by default, Status when grouped)", () => {
+    const floorHtml = renderBoard(state);
+    expect(floorHtml).toMatch(/class="layout-tab active"[^>]*data-layout="floor"/);
+    expect(floorHtml).toMatch(/class="layout-tab"[^>]*data-layout="status"/);
+    const statusHtml = renderBoard(state, { groupByStatus: true });
+    expect(statusHtml).toMatch(/class="layout-tab active"[^>]*data-layout="status"/);
+    expect(statusHtml).toMatch(/class="layout-tab"[^>]*data-layout="floor"/);
+  });
+
+  it("renders the branch chip and both counters as NON-buttons (no data-action on any of the three)", () => {
+    const html = renderBoard(state);
+    const sb = html.slice(html.indexOf('class="status-bar"'));
+    expect(sb).toContain('class="sb-branch"');
+    expect(sb).not.toMatch(/sb-branch[^>]*data-action/);
+    expect(sb).not.toMatch(/sb-running[^>]*data-action/);
+    expect(sb).not.toMatch(/sb-awaiting[^>]*data-action/);
+  });
+
+  it("gives the running and awaiting counters a passive leading readout dot", () => {
+    const html = renderBoard(state);
+    expect(html).toMatch(/sb-running"><span class="sb-dot"/);
+    expect(html).toMatch(/sb-awaiting"><span class="sb-dot"/);
+  });
+
+  it("uses a roving tabindex: the active layout tab is tabindex=0, the inactive one tabindex=-1", () => {
+    const floorHtml = renderBoard(state); // Floor active
+    expect(floorHtml).toMatch(/tabindex="0"[^>]*data-layout="floor"/);
+    expect(floorHtml).toMatch(/tabindex="-1"[^>]*data-layout="status"/);
+    const statusHtml = renderBoard(state, { groupByStatus: true });
+    expect(statusHtml).toMatch(/tabindex="0"[^>]*data-layout="status"/);
+    expect(statusHtml).toMatch(/tabindex="-1"[^>]*data-layout="floor"/);
+    // The radiogroup pattern is kept; aria-pressed must remain absent.
+    expect(floorHtml).not.toContain("aria-pressed");
   });
 });

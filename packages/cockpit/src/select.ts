@@ -10,6 +10,7 @@ import type {
   TileWarmth,
 } from "./protocol.js";
 import type { CockpitModel } from "./reducer.js";
+import { teamHue } from "./crest.js";
 
 function compareCards(a: CardVM, b: CardVM): number {
   if (a.attention !== b.attention) return a.attention ? -1 : 1;
@@ -97,7 +98,20 @@ export function selectTeams(model: CockpitModel): TeamGroupVM[] {
   const groups: TeamGroupVM[] = [];
   for (const [leadId, memberIds] of membersByLead) {
     memberIds.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    groups.push({ leadId, memberIds });
+    // The lead is guaranteed present (the loop above only keeps members whose
+    // parent card is on the board), so resolving it is safe.
+    const leadCard = model.cards.get(leadId)!;
+    const memberCards = memberIds.map((id) => model.cards.get(id)!);
+    const states: AgentState[] = [leadCard.state, ...memberCards.map((c) => c.state)];
+    groups.push({
+      leadId,
+      memberIds,
+      leadRoleName: leadCard.roleName,
+      leadEngineId: leadCard.engineId,
+      statusLabel: teamStatusLabel(states),
+      tone: teamTone(states),
+      hue: teamHue(leadId),
+    });
   }
   groups.sort((a, b) => (a.leadId < b.leadId ? -1 : a.leadId > b.leadId ? 1 : 0));
   return groups;
@@ -123,6 +137,56 @@ const WARMTH_BY_STATE: Record<AgentState, TileWarmth> = {
   discarded: "idle",
   "pr-created": "idle",
 };
+
+/** Warmth urgency order (lower = more urgent), for rolling a team's tone up to its most-urgent member. */
+const TONE_RANK: Record<TileWarmth, number> = { hot: 0, warm: 1, live: 2, idle: 3 };
+
+/** A team-status bucket: how a member contributes to the tray's rolled-up one-liner. */
+type TeamBucket = "needsYou" | "ready" | "working" | "idle";
+
+/** Each agent state's team-status bucket (exhaustive Record, so a new AgentState is a compile error). */
+const BUCKET_BY_STATE: Record<AgentState, TeamBucket> = {
+  conflict: "needsYou",
+  error: "needsYou",
+  "merge-cleanup-failed": "needsYou",
+  "awaiting-approval": "needsYou",
+  detached: "needsYou",
+  done: "ready",
+  working: "working",
+  preparing: "working",
+  stopped: "idle",
+  merged: "idle",
+  discarded: "idle",
+  "pr-created": "idle",
+};
+
+/** Singular/plural label for each bucket count, e.g. 1 -> "needs you", 2 -> "need you". */
+const BUCKET_LABEL: Record<TeamBucket, [one: string, many: string]> = {
+  needsYou: ["needs you", "need you"],
+  ready: ["ready to review", "ready to review"],
+  working: ["working", "working"],
+  idle: ["idle", "idle"],
+};
+
+/** Most-urgent warmth across a set of states (defaults idle on empty). */
+function teamTone(states: AgentState[]): TileWarmth {
+  let best: TileWarmth = "idle";
+  for (const s of states) if (TONE_RANK[WARMTH_BY_STATE[s]] < TONE_RANK[best]) best = WARMTH_BY_STATE[s];
+  return best;
+}
+
+/** Compact rollup: top 2 non-zero buckets by urgency, " · " joined. No em dashes. */
+function teamStatusLabel(states: AgentState[]): string {
+  const counts: Record<TeamBucket, number> = { needsYou: 0, ready: 0, working: 0, idle: 0 };
+  for (const s of states) counts[BUCKET_BY_STATE[s]]++;
+  const order: TeamBucket[] = ["needsYou", "ready", "working", "idle"];
+  const parts = order
+    .filter((b) => counts[b] > 0)
+    .map((b) => `${counts[b]} ${BUCKET_LABEL[b][counts[b] === 1 ? 0 : 1]}`);
+  if (parts.length === 0) return "idle";
+  if (counts.working === states.length && states.length > 1) return "all working";
+  return parts.slice(0, 2).join(" · ");
+}
 
 /** A tile's size, a pure function of its warmth tier (hot/warm large, live medium, idle small). */
 const SIZE_BY_WARMTH: Record<TileWarmth, TileSize> = {

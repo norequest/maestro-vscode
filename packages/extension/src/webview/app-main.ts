@@ -46,7 +46,6 @@ import type { ReviewOpenOpts } from "../review-render.js";
 import type { DiscoveredItem, McpInventory } from "@hallucinate/config";
 import type { AppToHost, HostToApp, AppView } from "../app-protocol.js";
 import type { ToolGrant } from "@hallucinate/core";
-import { drawFloorConnectors } from "./floor-connectors.js";
 
 type ReadTool = "Read" | "Search";
 type WriteTool = "Edit" | "Run" | "Git";
@@ -94,8 +93,8 @@ let lastAttentionSig: string | undefined;
 // (which record no history entry), preserving keyboard focus (regression B).
 let lastHistorySig: string | undefined;
 // Board layout: the Floor (size+warmth tiles) is the default; the status bar's
-// "Group by status" toggle flips this to the lane columns. Webview-local only
-// (no host round-trip), so a layout choice survives every `state` re-render.
+// "Status" toggle flips this to the lane columns. Webview-local only (no host
+// round-trip), so a layout choice survives every `state` re-render.
 let groupByStatus = false;
 
 // Library.
@@ -194,37 +193,10 @@ function renderBoardView(): void {
     closedDrawerId = null;
   }
   applyDrawerTab(root);
-  redrawFloorConnectors();
   // Re-attach the composer overlay if it was open (innerHTML reset removes it,
   // but the overlay lives on document.body, not #root, so it survives — nothing
   // to do here; left as a note for clarity).
 }
-
-/**
- * Draw the Floor's lead->child team connectors over the floor grid. Floor layout
- * only: the connector overlay svg exists only on the Floor (not the status
- * lanes), so drawFloorConnectors no-ops when absent. The offsets it reads are
- * scroll-proof but layout-dependent, so this is re-run after every board render
- * AND on resize (the responsive grid re-flows). Thin DOM glue, like tickElapsed.
- */
-function redrawFloorConnectors(): void {
-  if (!root || groupByStatus) return;
-  const floorEl = root.querySelector<HTMLElement>(".floor");
-  if (floorEl) drawFloorConnectors(floorEl, lastCockpit.teams ?? []);
-}
-
-// Resize re-flows the responsive Floor grid, shifting tile offsets, so redraw the
-// connectors. Coalesce a burst of resize events into one requestAnimationFrame
-// (like tickElapsed, this only touches the svg overlay, never the whole board).
-let floorResizeFrame = 0;
-window.addEventListener("resize", () => {
-  if (view !== "board") return;
-  if (floorResizeFrame) return;
-  floorResizeFrame = requestAnimationFrame(() => {
-    floorResizeFrame = 0;
-    if (view === "board") redrawFloorConnectors();
-  });
-});
 
 /**
  * Re-apply the active drawer tab after a board re-render. renderDrawer always
@@ -963,6 +935,40 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+/**
+ * Flip the board layout between the Floor and the status lane columns (webview-
+ * local: no host round-trip). The already-active layout is a no-op; a REAL flip
+ * re-renders and plays the board enter animation so the change reads as
+ * deliberate. Shared by the status-bar toggle click and its arrow-key nav.
+ */
+function setBoardLayout(next: boolean): void {
+  if (next === groupByStatus) return;
+  groupByStatus = next;
+  render();
+  root?.querySelector<HTMLElement>(".floor, .lanes")?.classList.add("hallucinate-enter");
+}
+
+// Roving arrow-key navigation for the board-layout segmented control (a
+// radiogroup, board only). Left/Up select the first option (Floor), Right/Down
+// the second (Status); selection moves and focus follows it (the active tab
+// carries tabindex=0). Scoped to a focused toggle tab so it never hijacks other
+// arrow-key use on the board.
+document.addEventListener("keydown", (e) => {
+  if (view !== "board") return;
+  if (!(e.target instanceof HTMLElement)) return;
+  if (!e.target.closest(".board-layout-toggle")) return;
+  let next: boolean;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = true; // Status
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = false; // Floor
+  else return;
+  e.preventDefault();
+  setBoardLayout(next);
+  // Move focus onto the now-active tab (roving tabindex put tabindex=0 on it).
+  root
+    ?.querySelector<HTMLElement>(`.layout-tab[data-layout="${next ? "status" : "floor"}"]`)
+    ?.focus();
+});
+
 // ─── Click delegation (branches on `view` FIRST) ───────────────────────────────
 
 document.addEventListener("click", (e) => {
@@ -1119,17 +1125,14 @@ function handleBoardClick(target: HTMLElement): void {
     return;
   }
 
-  // Board-layout toggle (status bar): Floor vs "Group by status". Webview-local
-  // (no host message), and it carries NO data-id, so it is handled BEFORE the
-  // id-bound branch below (which early-returns on a missing data-id). Re-render
-  // only when the layout actually changes.
+  // Board-layout toggle (status bar): Floor vs Status. Webview-local (no host
+  // message), and it carries NO data-id, so it is handled BEFORE the id-bound
+  // branch below (which early-returns on a missing data-id). Re-render only when
+  // the layout actually changes, and play the board enter animation on the new
+  // layout so the flip reads as deliberate (the already-active tab is a no-op).
   const layoutBtn = target.closest<HTMLElement>('[data-action="set-board-layout"]');
   if (layoutBtn) {
-    const next = layoutBtn.dataset["layout"] === "status";
-    if (next !== groupByStatus) {
-      groupByStatus = next;
-      render();
-    }
+    setBoardLayout(layoutBtn.dataset["layout"] === "status");
     return;
   }
 

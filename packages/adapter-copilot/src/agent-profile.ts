@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Role, Task, ToolGrant } from "@hallucinate/core";
-import { composePreamble } from "@hallucinate/core";
+import { composePreamble, firstMeaningfulLine } from "@hallucinate/core";
 
 /**
  * Translate a Hallucinate Role into a GitHub Copilot CLI "custom agent" file
@@ -56,7 +56,9 @@ function yamlQuote(s: string): string {
 /** A one-line description from the role's instructions (first sentence), capped.
  *  `description` is required by Copilot, so this never returns empty. */
 function deriveDescription(role: Role): string {
-  const firstLine = role.instructions.split(/\n/)[0]?.trim() ?? "";
+  // The first MEANINGFUL line, skipping the conventional leading "# Instructions"
+  // heading so the description is the real one-liner, not the heading label.
+  const firstLine = firstMeaningfulLine(role.instructions);
   const firstSentence = firstLine.split(/(?<=[.!?])\s/)[0]?.trim() ?? firstLine;
   const text = (firstSentence || firstLine).trim();
   if (!text) return `Hallucinate agent ${role.name}`;

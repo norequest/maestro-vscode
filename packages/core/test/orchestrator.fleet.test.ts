@@ -172,6 +172,41 @@ describe("Orchestrator fleet sub-agents", () => {
     expect(child.state).toBe("done");
   });
 
+  it("sanitizes a heading-only reported description so the child task is not '# Instructions'", async () => {
+    // The engine echoes the teammate's `.agent.md` description, which can be a
+    // bare markdown heading line. The child's task must show the meaningful line.
+    const script: AgentEvent[] = [
+      {
+        kind: "subagent-started",
+        callId: "call-h",
+        name: "scribe-alpha",
+        description: "# Instructions\nYou own ALPHA.md in the repo root and nothing else.",
+      },
+      {
+        kind: "subagent-started",
+        callId: "call-b",
+        name: "scribe-beta",
+        description: "# Instructions",
+      },
+      { kind: "done", summary: "ok" },
+    ];
+    const orch = new Orchestrator({ maxParallelAgents: 2 }, new FakeWorkspaceProvider());
+    orch.registerRole(role);
+    orch.registerAdapter(new FakeEngineAdapter({ script }));
+
+    const lead = orch.spawn("Lead", "run a fleet");
+    await waitFor(orch, () => orch.getAgent(lead.id)?.state === "done");
+
+    const alpha = orch.getAgents().find((a) => a.role.name === "scribe-alpha")!;
+    const beta = orch.getAgents().find((a) => a.role.name === "scribe-beta")!;
+    // Leading heading stripped, meaningful line surfaced.
+    expect(alpha.task.description).toBe("You own ALPHA.md in the repo root and nothing else.");
+    expect(alpha.task.description).not.toBe("# Instructions");
+    // Heading-only description falls back to the name, never the raw heading.
+    expect(beta.task.description).toBe("scribe-beta");
+    expect(beta.task.description).not.toBe("# Instructions");
+  });
+
   it("ignores subagent-output/done for an unknown callId", async () => {
     const script: AgentEvent[] = [
       { kind: "subagent-output", callId: "ghost", text: "nobody listening" },

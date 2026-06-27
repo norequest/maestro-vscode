@@ -1,3 +1,4 @@
+import { firstMeaningfulLine } from "./text.js";
 import type { Role, Team } from "./types.js";
 
 /** A teammate the lead asked to bring in, parsed from a ```delegate block. */
@@ -56,7 +57,7 @@ export function parseDelegateDirectives(text: string): DelegateDirective[] {
 }
 
 function specialty(instructions: string): string {
-  const firstLine = instructions.split(/\r?\n/).map((l) => l.trim()).find((l) => l.length > 0) ?? "";
+  const firstLine = firstMeaningfulLine(instructions);
   return firstLine.length > 140 ? `${firstLine.slice(0, 137)}...` : firstLine;
 }
 

@@ -1,5 +1,6 @@
 import type { AgentSession, ApprovalDecision, EngineAdapter } from "./adapter.js";
 import { buildLeadBrief, parseDelegateDirectives } from "./delegation.js";
+import { firstMeaningfulLine } from "./text.js";
 import { Emitter } from "./emitter.js";
 import { isDiscardableState, isTerminalState } from "./events.js";
 import type {
@@ -502,9 +503,14 @@ export class Orchestrator {
       autonomy: "manual",
     };
     const id = this.idGen();
+    // Sanitize the reported description: the engine echoes the teammate's
+    // `.agent.md` description, which can be a bare markdown heading like
+    // "# Instructions". Strip leading heading/blank lines; fall back to the
+    // name when nothing meaningful remains, so a heading never becomes the task.
+    const meaningful = description ? firstMeaningfulLine(description) : "";
     const task: Task = {
       id: `task-${id}`,
-      description: description ?? name,
+      description: meaningful || name,
       roleName: name,
     };
     const child: Agent = {

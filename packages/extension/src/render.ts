@@ -1,5 +1,13 @@
-import type { CardVM, CockpitState, DelegationVM, Lane } from "@hallucinate/cockpit";
+import type {
+  CardVM,
+  CockpitState,
+  DelegationVM,
+  FloorTileVM,
+  Lane,
+  TeamGroupVM,
+} from "@hallucinate/cockpit";
 import { escapeHtml } from "./html.js";
+import { normalizeInstructions } from "./instructions-format.js";
 
 /**
  * One attention-queue item, derived structurally from the already-exported
@@ -335,29 +343,96 @@ function orderWithChildren(inCol: CardVM[]): Array<{ card: CardVM; child: boolea
  * card bodies. (In production `selectState` always populates it.)
  */
 export function renderFloor(state: CockpitState): string {
-  const byId = new Map(state.cards.map((c) => [c.id, c]));
   const tiles = state.floor ?? [];
   if (!tiles.length) {
     return `<div class="floor floor-empty"><div class="lane-empty">No agents yet</div></div>`;
   }
+  const byId = new Map(state.cards.map((c) => [c.id, c]));
+  const tileById = new Map(tiles.map((t) => [t.id, t]));
+  const teams = state.teams ?? [];
+  const teamByLead = new Map(teams.map((t) => [t.leadId, t]));
+  // Every id that belongs to SOME team as a member; those tiles render INSIDE
+  // their team tray, never as a top-level sibling.
+  const memberSet = new Set<string>();
+  for (const t of teams) for (const m of t.memberIds) memberSet.add(m);
+
+  // Track which tile ids have actually been emitted, so a leftover sweep can
+  // append any floor tile the team walk did not place. renderFloor must stay a
+  // COMPLETE permutation of state.floor: no card may vanish. The classic gap is a
+  // depth-2 delegation (lead -> kid -> grandkid): the kid renders as a LEAF in the
+  // lead's tray, never as a tray of its own, so its grandchild is in `memberSet`
+  // (skipped at top level) yet never emitted inside a tray. The sweep catches it.
+  const emitted = new Set<string>();
+  // One inner Floor tile: the size+warmth wrapper around the agent card. The
+  // nesting cue is the `.floor-tile.is-child` WRAPPER only; do NOT pass the lane
+  // `child` flag into the card (it would add the lane elbow/indent). `roleClass`
+  // marks a tile's place within its tray (`ft-lead` / `ft-child`) so the tray can
+  // span the lead and dim the children. `data-agent-id` + the inner `.card[data-id]`
+  // (click/focus contract) are preserved verbatim. Marks the id emitted on success.
+  const tileHTML = (tile: FloorTileVM, roleClass = ""): string => {
+    const card = byId.get(tile.id);
+    if (!card) return "";
+    emitted.add(tile.id);
+    const childClass = tile.child ? " is-child" : "";
+    return `<div class="floor-tile size-${tile.size} warmth-${tile.warmth}${childClass}${roleClass}" data-agent-id="${escapeHtml(tile.id)}">${renderCardHTML(card, state.cards, {})}</div>`;
+  };
+
   const body = tiles
     .map((tile) => {
-      const card = byId.get(tile.id);
-      if (!card) return "";
-      // The nesting cue is the `.floor-tile.is-child` WRAPPER only; do NOT pass
-      // the lane `child` flag into the card (it would add the lane elbow/indent).
-      const childClass = tile.child ? " is-child" : "";
-      // `data-agent-id` stamps the tile with its agent id so the webview can
-      // locate lead/child tiles by id and draw the connectors over them.
-      return `<div class="floor-tile size-${tile.size} warmth-${tile.warmth}${childClass}" data-agent-id="${escapeHtml(tile.id)}">${renderCardHTML(card, state.cards, {})}</div>`;
+      // A member tile is emitted inside its team tray (below) or by the sweep, not here.
+      if (memberSet.has(tile.id)) return "";
+      const team = teamByLead.get(tile.id);
+      if (!team) return tileHTML(tile); // a solo agent: a bare floor tile
+      // A team lead: a labeled tray ENCLOSING the lead tile + each member tile.
+      // If the lead card is missing, render no tray and leave its members for the
+      // sweep (they are real cards and must not vanish).
+      if (!byId.has(team.leadId)) return "";
+      const leadTile = tileHTML(tile, " ft-lead");
+      const childTiles = team.memberIds
+        .map((mid) => {
+          const mtile = tileById.get(mid);
+          return mtile ? tileHTML(mtile, " ft-child") : "";
+        })
+        .join("");
+      return teamTrayHTML(team, leadTile + childTiles);
     })
     .join("");
-  // When at least one lead->child team exists, emit an overlay svg as the FIRST
-  // child of the Floor for the webview to draw connectors into at runtime (it
-  // sits BEHIND the tiles, see app.css). No teams (undefined or empty) -> no svg.
-  const connectors =
-    (state.teams?.length ?? 0) > 0 ? `<svg class="floor-connectors" aria-hidden="true"></svg>` : "";
-  return `<div class="floor">${connectors}${body}</div>`;
+  // Leftover sweep (mirrors selectFloor's completeness guarantee): append any
+  // floor tile not yet emitted as a bare tile, in floor order, so nothing is lost.
+  const sweep = tiles
+    .filter((tile) => !emitted.has(tile.id))
+    .map((tile) => tileHTML(tile))
+    .join("");
+  return `<div class="floor">${body}${sweep}</div>`;
+}
+
+/**
+ * One team TRAY: a full-width band that visually encloses a lead and its
+ * children as a single unit. A header carries a bars glyph, the lead's role name,
+ * a faint `engineId · N agents` tag (N = members + the lead), and a right-pushed
+ * status pill whose dot colour comes from the team's `tone`. A subtle, quiet
+ * `--team-hue` accent gives the team a stable identity without competing with
+ * status. Every interpolated value is escaped.
+ */
+function teamTrayHTML(team: TeamGroupVM, tilesHTML: string): string {
+  const tone = team.tone ?? "idle";
+  // A missing hue falls back to a quiet off-status identity hue (268, violet), so
+  // it never reads as a status colour (0/red, ~210/blue, ~140/green). Kept in sync
+  // with the CSS `var(--team-hue, 268)` fallback.
+  const hue = team.hue ?? 268;
+  const leadRole = team.leadRoleName ?? "";
+  const agentCount = team.memberIds.length + 1;
+  const tag = `${team.leadEngineId ?? ""} · ${agentCount} agents`;
+  const status = team.statusLabel ?? "";
+  return `<section class="floor-team tone-${escapeHtml(tone)}" data-team-lead="${escapeHtml(team.leadId)}" style="--team-hue:${escapeHtml(String(hue))}" aria-label="Team ${escapeHtml(leadRole)}">
+    <header class="ft-header">
+      <span class="ft-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span class="ft-name">${escapeHtml(leadRole)}</span>
+      <span class="ft-tag">${escapeHtml(tag)}</span>
+      <span class="ft-status"><span class="ft-dot"></span>${escapeHtml(status)}</span>
+    </header>
+    <div class="ft-body">${tilesHTML}</div>
+  </section>`;
 }
 
 function columnSection(col: Column, cards: CardVM[]): string {
@@ -428,21 +503,28 @@ function laneCounts(cards: CardVM[]): LaneCounts {
 
 /**
  * The status bar (prototype lines 198-204): N running · M awaiting review, plus
- * the board-layout toggle (M10 Phase D). The toggle lets the operator flip
- * between the default Floor and the "Group by status" lane columns; the active
+ * the board-layout toggle (M10 Phase D). The toggle ("Floor" / "Status") lets the
+ * operator flip between the default Floor and the status lane columns; the active
  * tab is webview-local state passed in as `groupByStatus`. The two tabs are a
  * mutually-exclusive choice, so the group is a `radiogroup` of `radio` buttons
- * with `aria-checked` (not a button group with `aria-pressed`).
+ * with `aria-checked` + a roving tabindex (not a button group with `aria-pressed`).
  */
 function statusBar(state: CockpitState, groupByStatus = false): string {
   const counts = laneCounts(state.cards);
   const awaiting = counts.needsYou + counts.conflict;
-  const layoutToggle = `<span class="board-layout-toggle" role="radiogroup" aria-label="Board layout"><button class="layout-tab${!groupByStatus ? " active" : ""}" role="radio" aria-checked="${!groupByStatus}" data-action="set-board-layout" data-layout="floor" type="button">Floor</button><button class="layout-tab${groupByStatus ? " active" : ""}" role="radio" aria-checked="${groupByStatus}" data-action="set-board-layout" data-layout="status" type="button">Group by status</button></span>`;
+  // A real two-segment control: a radiogroup whose ACTIVE tab reads as a raised
+  // segment (see .layout-tab.active in app.css). Labels are "Floor" / "Status" so
+  // the pair reads as one segmented control.
+  const layoutToggle = `<span class="board-layout-toggle" role="radiogroup" aria-label="Board layout"><button class="layout-tab${!groupByStatus ? " active" : ""}" role="radio" aria-checked="${!groupByStatus}" tabindex="${!groupByStatus ? "0" : "-1"}" data-action="set-board-layout" data-layout="floor" type="button">Floor</button><button class="layout-tab${groupByStatus ? " active" : ""}" role="radio" aria-checked="${groupByStatus}" tabindex="${groupByStatus ? "0" : "-1"}" data-action="set-board-layout" data-layout="status" type="button">Status</button></span>`;
+  // The branch chip and the two counters are passive READOUTS, not buttons: they
+  // carry no data-action and read as plain status (the counters get a small
+  // leading dot, the branch a "Current repo branch" title), so a click never
+  // looks like it should do something.
   return `<div class="status-bar">
-    <span class="sb-branch"><svg class="sb-branch-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6.5" cy="6" r="2.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="7" r="2.5"/><path d="M6.5 8.5v7M9 7h4.5a3 3 0 013 3"/></svg>main</span>
+    <span class="sb-branch" title="Current repo branch"><svg class="sb-branch-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6.5" cy="6" r="2.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="7" r="2.5"/><path d="M6.5 8.5v7M9 7h4.5a3 3 0 013 3"/></svg>main</span>
     ${layoutToggle}
-    <span class="sb-running">${counts.working} running</span>
-    <span class="sb-awaiting">${awaiting} awaiting review</span>
+    <span class="sb-running"><span class="sb-dot"></span>${counts.working} running</span>
+    <span class="sb-awaiting"><span class="sb-dot"></span>${awaiting} awaiting review</span>
     <span class="sb-version">Hallucinate</span>
   </div>`;
 }
@@ -719,8 +801,25 @@ function detail(card: CardVM): string {
  * the input carries a placeholder `data-action="edit-task"` plus its `data-id`.
  * A future router pass wires it (markup + style only here).
  */
-function taskSection(card: CardVM): string {
+function taskSection(card: CardVM, cards: CardVM[] = []): string {
   const id = escapeHtml(card.id);
+  // A virtual (read-only) fleet sub-agent has no editable task: it inherits the
+  // lead's run. Render a STATIC task line. When the sub-agent's own task is empty
+  // or heading-like (a stray "# ..." block scalar leaking through), stand in a
+  // clear "Delegated by <lead>" instead, resolving the lead role from the parent
+  // card; fall back to "lead" when the parent is unknown.
+  if (card.virtual) {
+    const raw = card.taskDescription?.trim() ?? "";
+    const headingLike = raw === "" || raw.startsWith("#");
+    const lead = card.parentId
+      ? cards.find((c) => c.id === card.parentId)?.roleName ?? "lead"
+      : "lead";
+    const text = headingLike ? `Delegated by ${lead}` : card.taskDescription;
+    return `<section class="drawer-task">
+    <div class="drawer-task-label">TASK</div>
+    <div class="drawer-task-static">${escapeHtml(text)}</div>
+  </section>`;
+  }
   // TODO(next-pass): wire edit-task (reuse the steer/task mechanism, no new host message type).
   return `<section class="drawer-task">
     <div class="drawer-task-label">TASK</div>
@@ -790,7 +889,7 @@ function drawerFooter(card: CardVM): string {
  */
 function instructionsTab(card: CardVM): string {
   const body = card.instructions
-    ? `<pre class="instr-body">${escapeHtml(card.instructions)}</pre>`
+    ? `<pre class="instr-body">${escapeHtml(normalizeInstructions(card.instructions))}</pre>`
     : `<p class="instr-empty">No instructions.</p>`;
   return `<div class="tab-body" data-tab="instructions"><div class="tab-label">ROLE · role.md</div>${body}</div>`;
 }
@@ -845,7 +944,7 @@ export function renderDrawer(state: CockpitState): string {
     <button class="drawer-close" data-action="close-drawer" data-id="${id}">×</button>
   </header>
   ${goal}
-  ${taskSection(focused)}
+  ${taskSection(focused, state.cards)}
   ${tabs}
   <div class="drawer-body">
     ${instructionsTab(focused)}

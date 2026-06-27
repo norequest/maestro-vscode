@@ -155,14 +155,33 @@ export interface FloorTileVM {
  * One lead-coordinated team: a lead agent and the ids of its delegated children
  * (cards whose `parentId` is the lead). Id-based (cards resolved from
  * `CockpitState.cards`), so the grouping is lean. Produced by `selectTeams`,
- * which emits a group only for leads that actually have children. The Floor uses
- * it to nest children under leads; Phase E draws lead-to-child connectors over it.
+ * which emits a group only for leads that actually have children. The Floor
+ * renders each team as a labeled "tray" that visually encloses the lead and its
+ * children as one unit; the header fields below populate that tray's header.
+ *
+ * The header fields are OPTIONAL on the type so the contract can land before
+ * `selectTeams` populates them, but `selectTeams` sets all of them in practice;
+ * render treats a missing field defensively.
  */
 export interface TeamGroupVM {
   /** The lead agent id. */
   leadId: string;
   /** Child agent ids (parentId === leadId), in id order. */
   memberIds: string[];
+  /** The lead's role label, shown as the tray's title. */
+  leadRoleName?: string;
+  /** The lead's engine id (e.g. "copilot-fleet"), shown faint in the tray header. */
+  leadEngineId?: string;
+  /** Rolled-up one-line status across the lead and its members, e.g. "2 ready to review". */
+  statusLabel?: string;
+  /** Most-urgent warmth across the lead and its members; drives the header status dot. */
+  tone?: TileWarmth;
+  /**
+   * A stable hue (0-359) derived deterministically from `leadId`, for a subtle
+   * team-identity accent on the tray header. Same team always gets the same hue;
+   * it is an identity cue, never a status signal (status stays on `tone`).
+   */
+  hue?: number;
 }
 
 /**
@@ -203,8 +222,8 @@ export interface CockpitState {
   attention?: AttentionVM[];
   /**
    * The Floor layout: salience-ordered tiles (size + warmth) over `cards`, with
-   * children nested under leads. The default board layout; the "Group by status"
-   * toggle falls back to the lane columns. Omitted/empty before any agent exists.
+   * children nested under leads. The default board layout; the "Status" toggle
+   * falls back to the lane columns. Omitted/empty before any agent exists.
    */
   floor?: FloorTileVM[];
   /**
