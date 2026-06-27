@@ -1,0 +1,108 @@
+name: Publish Extension
+
+# Publishes the VS Code extension (packages/extension -> norequest.hallucinate-agents).
+#
+# Two ways to trigger:
+#   1. Push a tag "vX.Y.Z" (the release path). The tag MUST match
+#      packages/extension/package.json "version", or the run fails fast.
+#   2. Run manually from the Actions tab (workflow_dispatch). This publishes
+#      whatever version is currently in package.json, so bump it first.
+#
+# Required repo secret:
+#   VSCE_PAT  Azure DevOps Personal Access Token with Marketplace > Manage scope
+#             for the "norequest" publisher. (https://aka.ms/vscodepat)
+# Optional repo secret:
+#   OVSX_PAT  Open VSX access token, to also publish to open-vsx.org.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      openvsx:
+        description: "Also publish to Open VSX (needs OVSX_PAT secret)"
+        type: boolean
+        default: false
+
+# Never let two publishes race; do not cancel an in-flight publish.
+concurrency:
+  group: publish-extension
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the GitHub Release on a tag
+
+jobs:
+  publish:
+    name: Build, package, and publish
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fail early if VSCE_PAT is missing
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::error::VSCE_PAT secret is not set. Add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Verify tag matches extension version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          PKG_VERSION="$(node -p "require('./packages/extension/package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match packages/extension/package.json version ${PKG_VERSION}. Bump the version and re-tag."
+            exit 1
+          fi
+          echo "Releasing version ${PKG_VERSION}."
+
+      - name: Configure git identity
+        # The workspace package's integration tests drive real git.
+        run: |
+          git config --global user.email "ci@hallucinate.local"
+          git config --global user.name "Hallucinate CI"
+          git config --global init.defaultBranch main
+
+      - name: Verify (build, typecheck, test)
+        run: pnpm verify
+
+      - name: Package VSIX
+        run: pnpm --filter hallucinate-agents exec vsce package --no-dependencies -o "$GITHUB_WORKSPACE/hallucinate-agents.vsix"
+
+      - name: Publish to the VS Code Marketplace
+        run: pnpm --filter hallucinate-agents exec vsce publish --packagePath "$GITHUB_WORKSPACE/hallucinate-agents.vsix" -p "$VSCE_PAT"
+
+      - name: Publish to Open VSX
+        if: ${{ env.OVSX_PAT != '' && (github.event_name != 'workflow_dispatch' || inputs.openvsx) }}
+        run: pnpm --filter hallucinate-agents exec ovsx publish "$GITHUB_WORKSPACE/hallucinate-agents.vsix" -p "$OVSX_PAT"
+
+      - name: Upload the VSIX as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hallucinate-agents-vsix
+          path: hallucinate-agents.vsix
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" "$GITHUB_WORKSPACE/hallucinate-agents.vsix" --title "$GITHUB_REF_NAME" --generate-notes
