@@ -2,6 +2,13 @@
 
 All notable changes to the Hallucinate extension are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.12] - 2026-06-27
+
+### Fixed
+
+- Copilot fleet teams: the lead's Output tab now shows the assistant's readable narration instead of the raw JSON event stream. Base64 thinking signatures and envelope metadata are no longer leaked, and newlines render correctly.
+- The Output panel wraps and scrolls long unbreakable content (for example base64) instead of corrupting the inspector layout.
+
 ## [0.1.11] - 2026-06-27
 
 Board and library polish from a dogfooding pass.

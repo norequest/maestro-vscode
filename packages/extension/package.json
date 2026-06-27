@@ -2,7 +2,7 @@
   "name": "hallucinate-agents",
   "displayName": "Hallucinate · AI Agent Teams",
   "description": "Run a team of AI coding agents in isolated git worktrees.",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "icon": "media/icon.png",
   "license": "MIT",
   "publisher": "norequest",
