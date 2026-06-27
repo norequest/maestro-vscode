@@ -21,6 +21,7 @@ import { createLibrary } from "./library-controller.js";
 import { createAnatomyController } from "./anatomy-controller.js";
 import { buildDraftAnatomyVM } from "./anatomy-draft.js";
 import { makeAppRouter } from "./app-router.js";
+import { reviewSyncAction } from "./review-sync.js";
 import { registerHallucinateHomeView } from "./home-view.js";
 import { type WebviewToHost } from "@hallucinate/cockpit";
 import type { AppToHost } from "./app-protocol.js";
@@ -83,6 +84,15 @@ const NO_FOLDER_MESSAGE =
   "Hallucinate needs an open folder (a git repo) to run agents. Open a folder, then try again.";
 
 /**
+ * The live session's orchestrator, exposed at module scope ONLY so deactivate()
+ * (which has no access to the activate() closure) can kill in-flight engine
+ * children on teardown. Set in setupSession; cleared is unnecessary because a new
+ * activation re-runs setupSession. The context.subscriptions disposable is the
+ * primary teardown path; this reference is the belt-and-suspenders for deactivate.
+ */
+let activeOrchestrator: Orchestrator | undefined;
+
+/**
  * The folder-dependent wiring built by {@link setupSession}. Command handlers
  * close over a single `Session | undefined` so they keep working whether or
  * not a folder is open: with no folder the handlers warn instead of throwing.
@@ -121,6 +131,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Stage webview lives inside it so it shares the session lifecycle.
   let session: Session | undefined;
 
+  // A SYNCHRONOUS in-progress sentinel for setupSession. `session` is assigned only
+  // at the very END of the (async, multi-await) setup, so a bare `if (session)`
+  // guard cannot stop a SECOND setupSession call that arrives while the first is
+  // still mid-flight. This flag, flipped before the first await, does. Closure-scoped
+  // (like `session`) so it resets fresh per activation.
+  let settingUp = false;
+
   /**
    * Build all folder-dependent objects (workspaces, orchestrator, adapters,
    * cockpit, persistence) for the given repo root and store them in the
@@ -129,8 +146,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
    * activate-time call can both invoke it safely.
    */
   async function setupSession(repoRoot: string): Promise<void> {
-    if (session) return;
+    // Bail if a session already exists OR one is currently being built, so two
+    // near-simultaneous calls (two onDidChangeWorkspaceFolders events firing close
+    // together, or the activate-time call racing the listener) cannot BOTH pass the
+    // guard and spin up two Orchestrators / two Stage panels / duplicate adapters.
+    // The flag is set before the first await; try/finally clears it even if
+    // buildSession throws, so a failed setup never wedges the guard shut.
+    if (session || settingUp) return;
+    settingUp = true;
+    try {
+      await buildSession(repoRoot);
+    } finally {
+      settingUp = false;
+    }
+  }
 
+  // The actual folder-dependent wiring, guarded by setupSession above. A closure
+  // (not a top-level function) so it keeps sharing `session`, `context`, etc.
+  async function buildSession(repoRoot: string): Promise<void> {
     const eventLogger = new EventLogger(new FsPersistenceBackend(repoRoot));
 
     // Honor .hallucinate/config.yaml's maxParallelAgents. Best-effort: any load
@@ -172,6 +205,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const sessionTag = Date.now().toString(36);
     let agentSeq = 0;
     const orch = new Orchestrator(orchConfig, workspaces, () => `agent-${sessionTag}-${++agentSeq}`);
+    // Kill every in-flight engine child (copilot/gemini) when the extension is
+    // torn down (window reload, disable, quit) so they are not orphaned, still
+    // burning tokens and still mutating worktrees. VS Code disposes
+    // context.subscriptions AND calls deactivate() on teardown; this disposable is
+    // the primary path. stopAll() is best-effort and synchronous, fitting the
+    // limited time VS Code allows on shutdown. Also publish the orchestrator at
+    // module scope so deactivate() can reach it as a fallback.
+    activeOrchestrator = orch;
+    context.subscriptions.push({ dispose: () => orch.stopAll() });
     // Native custom-agent mode: materialize each role into a Copilot
     // `.agent.md` and spawn `copilot --agent <slug>` so Copilot recognizes a
     // real named custom agent (not a raw-text prompt). See agent-profile.ts.
@@ -241,10 +283,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           );
           return;
         }
-        for (const relPath of files) {
-          // Conflict markers live in the agent's worktree, not the main repo root.
-          const uri = vscode.Uri.joinPath(vscode.Uri.file(base), relPath);
-          await vscode.commands.executeCommand("vscode.open", uri);
+        try {
+          for (const relPath of files) {
+            // Conflict markers live in the agent's worktree, not the main repo root.
+            const uri = vscode.Uri.joinPath(vscode.Uri.file(base), relPath);
+            await vscode.commands.executeCommand("vscode.open", uri);
+          }
+        } catch (err) {
+          // The worktree path is known (we passed the guard above) but a file open
+          // failed, e.g. an orphaned hydrated agent whose worktree was not restored.
+          // handleMergeAction is invoked un-awaited from the cockpit, so a reject here
+          // would be an unhandled rejection; surface a toast instead.
+          void vscode.window.showErrorMessage(
+            `Hallucinate: could not open the conflict files (the agent's worktree may be unavailable): ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+          return;
         }
         void vscode.window.showInformationMessage(buildConflictResolveMessage(files));
       } else if (msg.type === "finish-merge") {
@@ -375,10 +430,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // the review stays live even when nothing is focused. The router only acts
         // on a review-state when it is showing the review view, so a stale re-post
         // while on the board is a harmless cache refresh.
-        if (lastReviewedId) {
+        const reviewAction = reviewSyncAction(lastReviewedId, state.cards);
+        if (reviewAction === "repost") {
           const card = state.cards.find((c) => c.id === lastReviewedId);
           if (card) stage.postReview(card, reviewOpts());
-          else lastReviewedId = undefined;
+        } else if (reviewAction === "navigate-board") {
+          // The reviewed card was resolved away (Discard removes it, a clean Merge
+          // into main removes it): the full-page review can no longer show
+          // anything, so navigate the webview back to the board. Without this the
+          // user was left frozen on the now-gone card and Discard looked dead.
+          lastReviewedId = undefined;
+          stage.navigate("board");
         }
       },
       (message) => void vscode.window.showErrorMessage(`Hallucinate: ${message}`),
@@ -422,13 +484,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           // Re-register each restored agent's worktree with the workspace
           // manager, which starts the session with an empty record map. Without
           // this, Merge/Diff/Discard on a hydrated agent throw "Unknown agent".
+          //
+          // A per-agent adopt failure used to be SILENT (console-only): the
+          // worktree was orphaned, but the card still looked actionable and a later
+          // Merge/Diff/Discard threw "Unknown agent". Collect the failed ids and
+          // surface ONE consolidated warning after the loop (not N modals) so the
+          // user knows which cards can no longer be acted on.
+          const orphanedIds: string[] = [];
           for (const agent of orch.getAgents()) {
             if (agent.workspace) {
               await workspaces.adopt(agent.id, agent.workspace).catch((error: unknown) => {
                 const m = error instanceof Error ? error.message : String(error);
                 console.error(`[Hallucinate] could not re-adopt worktree for ${agent.id}: ${m}`);
+                orphanedIds.push(agent.id);
               });
             }
+          }
+          if (orphanedIds.length > 0) {
+            void vscode.window.showWarningMessage(
+              `Hallucinate: could not restore the worktree for ${orphanedIds.length} restored ` +
+                `agent(s): ${orphanedIds.join(", ")}. Their cards cannot be merged or discarded; ` +
+                `any work remains on its git branch.`,
+            );
           }
         }
       } catch (error) {
@@ -774,7 +851,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
         void library.handle(msg);
       },
-      onDiscover: (msg) => void discoverCtrl.handle(msg),
+      onDiscover: (msg) => {
+        if (msg.type === "browse-source") {
+          // The Discover "Browse" button. Resolve the itemId through the
+          // controller's scan cache (so we never open an arbitrary path a
+          // stale/tampered webview posts), then open it with the OS default
+          // handler: a URL via parse, a local file/dir via file.
+          const resolved = discoverCtrl.resolveSource(msg.itemId);
+          if (!resolved) {
+            void vscode.window.showWarningMessage(
+              "Hallucinate: cannot browse this item; its source is not in the latest scan. Re-scan and try again.",
+            );
+            return;
+          }
+          const uri =
+            resolved.kind === "url"
+              ? vscode.Uri.parse(resolved.source)
+              : vscode.Uri.file(resolved.source);
+          // openExternal returns a thenable; handle the reject so a failed open
+          // surfaces a toast instead of an unhandled rejection (mirrors the
+          // resolve-conflict guard above).
+          void vscode.env.openExternal(uri).then(undefined, (err: unknown) => {
+            void vscode.window.showErrorMessage(
+              `Hallucinate: could not open ${resolved.source}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          });
+          return;
+        }
+        void discoverCtrl.handle(msg);
+      },
       onAnatomy: (msg) =>
         void (async () => {
           await anatomy.handle(msg);
@@ -985,5 +1090,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate(): void {
-  // no-op; subscriptions dispose the cockpit
+  // Best-effort kill of any in-flight engine children so a window reload / disable
+  // / quit does not orphan copilot/gemini (still burning tokens, still mutating
+  // worktrees). The context.subscriptions disposable registered in setupSession is
+  // the primary path; this is the belt-and-suspenders for hosts that call
+  // deactivate() before (or instead of) clearing subscriptions. Synchronous and
+  // error-swallowing because teardown must never throw and VS Code gives limited
+  // time on deactivate.
+  try {
+    activeOrchestrator?.stopAll();
+  } catch {
+    // ignore: teardown must never throw
+  }
 }

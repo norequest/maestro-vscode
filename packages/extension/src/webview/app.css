@@ -93,7 +93,7 @@
    silenced under reduced-motion: they convey liveness, not state, so stopping
    them costs no information. */
 @media (prefers-reduced-motion: reduce) {
-  .eq i, .tab-eq i, .bh-eq i, .drawer-eq i, .composer-eq i,
+  .eq i, .tab-eq i, .bh-eq i, .drawer-eq i, .composer-eq i, .card-momentum i,
   .lane-working .dot, .discover-scanning::before { animation: none !important; }
 }
 
@@ -110,6 +110,12 @@ body { background:var(--bg-stage); color:var(--text-primary); font-family:'Inter
    flex-row #root. Re-scoped from anatomy.css's bare `body` + `#root` rules. */
 body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 #root[data-view="anatomy"] { display:flex; flex-direction:row; flex:1; min-height:0; height:100%; overflow:hidden; }
+
+/* BOARD view: a flex row so the inspector docks beside the board instead of
+   floating over it. The board shell is `flex:1` and the inspector (`.drawer`,
+   rendered only when an agent is focused) is a fixed-width column to its right.
+   With no agent focused there is no `.drawer`, so the board fills the panel. */
+#root[data-view="board"] { display:flex; flex-direction:row; min-height:0; overflow:hidden; }
 
 /* ===========================================================================
    === BOARD === (from style.css)
@@ -135,7 +141,7 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 
 /* ─── Board shell: tab strip + board column ─────────────────────────────────── */
 
-.board-shell { display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg-stage); }
+.board-shell { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; height:100%; min-height:0; background:var(--bg-stage); }
 
 /* TAB STRIP (prototype lines 70-79) */
 .tabstrip {
@@ -177,7 +183,7 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 }
 .bh-left, .bh-right { display:flex; align-items:center; }
 .bh-left { gap:13px; }
-.bh-right { gap:16px; }
+.bh-right { gap:16px; flex-wrap:wrap; row-gap:6px; }
 .bh-title { font-family:'Manrope',sans-serif; font-weight:800; font-size:18px; letter-spacing:-0.01em; color:var(--text-primary); }
 .bh-sep { width:1px; height:18px; background:#2e2e34; display:inline-block; }
 .bh-meta { font-size:12.5px; color:#74747c; }
@@ -210,6 +216,65 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 }
 .bh-library:hover { background:#2c2c34; border-color:var(--border-hover); }
 .bh-library:focus, .bh-library:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* The [History] nav button: a quiet sibling of Library that opens the
+   full-page in-session activity timeline (M10 Phase F). */
+.bh-history {
+  display:flex; align-items:center; gap:7px;
+  background:#222228; border:1px solid var(--border-default); color:var(--text-secondary);
+  padding:6px 11px; border-radius:7px; font-size:12px; font-weight:600;
+  font-family:inherit; cursor:pointer;
+  transition:background 120ms ease, border-color 120ms ease;
+}
+.bh-history:hover { background:#2c2c34; border-color:var(--border-hover); }
+.bh-history:focus, .bh-history:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
+
+/* ─── Attention bar (M10 Phase C) ───────────────────────────────────────────────
+   A sticky strip between the board header and the lanes surfacing ONE urgent
+   item at a time (the webview ticker auto-advances it). Graphite surface with a
+   warm amber urgency accent; conflict/error flip the accent to red/salmon. Reuses
+   the existing data-action verbs, so no click-handler change. No new keyframes. */
+.attention-bar {
+  position:sticky; top:0; z-index:5;
+  flex:0 0 auto;
+  display:flex; align-items:center; gap:12px;
+  padding:9px 22px;
+  background:var(--bg-panel);
+  border-bottom:1px solid var(--border-subtle);
+  box-shadow:inset 3px 0 0 var(--amber);
+}
+.attention-bar.kind-conflict, .attention-bar.kind-error {
+  background:var(--bg-panel); border-bottom-color:var(--border-subtle); box-shadow:inset 3px 0 0 var(--red);
+}
+.attn-mark {
+  flex:0 0 auto; width:7px; height:7px; border-radius:50%;
+  background:var(--amber); box-shadow:0 0 0 3px rgba(226,169,60,0.18);
+}
+.attention-bar.kind-conflict .attn-mark, .attention-bar.kind-error .attn-mark {
+  background:var(--red); box-shadow:0 0 0 3px rgba(240,132,140,0.18);
+}
+.attn-label {
+  flex:1 1 auto; min-width:0;
+  display:flex; align-items:baseline; gap:8px;
+  background:transparent; border:none; padding:0; margin:0;
+  font-family:inherit; text-align:left; cursor:pointer; color:var(--text-secondary);
+}
+.attn-role { flex:0 0 auto; font-family:'Manrope',sans-serif; font-weight:700; font-size:12.5px; color:var(--text-primary); }
+.attn-text { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--text-secondary); }
+.attn-label:hover .attn-text { color:var(--text-primary); }
+.attn-count { flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-tertiary); }
+.attn-actions { flex:0 0 auto; display:flex; align-items:center; gap:7px; }
+.attn-act {
+  background:var(--bg-surface-low); border:1px solid var(--border-default); color:var(--text-secondary);
+  padding:5px 11px; border-radius:7px; font-size:11.5px; font-weight:600;
+  font-family:inherit; cursor:pointer; transition:var(--t-interactive);
+}
+.attn-act:hover { background:#2c2c34; border-color:var(--border-hover); color:var(--text-primary); }
+.attn-allow { background:var(--amber); border-color:var(--amber); color:var(--on-accent); }
+.attn-allow:hover { background:var(--amber-deep); border-color:var(--amber-deep); color:var(--on-accent); }
+.attn-deny:hover { color:var(--red); border-color:var(--red); }
+.attn-act:focus, .attn-act:focus-visible,
+.attn-label:focus, .attn-label:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
 
 /* ─── Lanes: three columns (prototype lines 104-195) ────────────────────────── */
 
@@ -266,6 +331,95 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
   text-align:center; color:#52525a; font-size:12px; padding:24px 8px; line-height:1.5;
 }
 
+/* ─── Floor: the default board layout (M10 Phase D) ──────────────────────────
+   A salience-ordered grid of agent cards. Each tile carries a size hook (lg/md/sm)
+   and a warmth hook (hot/warm/live/idle) from selectFloor; the warmth tints the
+   card's left accent and the size lets a hot lead claim two columns. The grid is
+   auto-fill so it reflows as the panel narrows (the host docks the inspector to
+   the right). Calm, on-palette: it reuses the status tokens and the same faint
+   glow rgba values as the attention bar / lane dots. */
+.floor {
+  flex:1; min-height:0; overflow-y:auto;
+  padding:18px 22px;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));
+  grid-auto-rows:min-content; gap:14px; align-content:start;
+}
+/* Overrides .floor's display:grid; an empty board has no tiles to flow. */
+.floor-empty { display:block; }
+.floor-tile { min-width:0; display:flex; position:relative; }
+
+/* ── Team tray ──────────────────────────────────────────────────────────────
+   A lead and its delegated children read as ONE enclosed unit: a full-width
+   recessed band spanning the Floor grid, with a header (lead role, engine +
+   agent count, and a right-pushed status pill) over a nested mini-grid. The
+   header status dot colour comes from the team's tone; a quiet --team-hue accent
+   gives the team a stable identity without competing with status. */
+.floor-team {
+  grid-column:1 / -1;
+  background:var(--bg-inset);
+  /* A clearer containment read so the team unit separates from the board: a
+     defined border plus a faint drop shadow lifting the band off the canvas. */
+  border:1px solid var(--border-default);
+  border-radius:10px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.22);
+  padding:12px 14px;
+  display:flex; flex-direction:column; gap:12px;
+}
+.ft-header { display:flex; align-items:center; gap:9px; min-width:0; }
+/* A small four-bar glyph echoing the brand launch mark. Quiet, decorative. */
+.ft-bars { display:inline-flex; align-items:flex-end; gap:2px; height:11px; flex:0 0 auto; }
+.ft-bars i { width:2px; background:hsl(var(--team-hue, 268) 45% 60%); opacity:.65; border-radius:1px; }
+.ft-bars i:nth-child(1) { height:5px; }
+.ft-bars i:nth-child(2) { height:9px; }
+.ft-bars i:nth-child(3) { height:7px; }
+.ft-bars i:nth-child(4) { height:11px; }
+.ft-name {
+  font-family:'Manrope',sans-serif; font-weight:700; font-size:13px;
+  /* A quiet team-identity tint (never a status signal: status lives on the dot). */
+  color:hsl(var(--team-hue, 268) 50% 78%);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+}
+.ft-tag {
+  flex:0 0 auto; font-family:'JetBrains Mono',monospace; font-size:10px;
+  color:var(--text-tertiary); white-space:nowrap;
+}
+.ft-status {
+  margin-left:auto; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; color:var(--text-secondary); white-space:nowrap;
+}
+.ft-dot { width:7px; height:7px; border-radius:50%; background:var(--text-tertiary); flex:0 0 auto; }
+.floor-team.tone-hot  .ft-dot { background:var(--status-conflict); }
+.floor-team.tone-warm .ft-dot { background:var(--status-attention); }
+.floor-team.tone-live .ft-dot { background:var(--status-working); }
+/* tone-idle (and any unknown tone) keeps the muted default dot. */
+.ft-body {
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+  grid-auto-rows:min-content; gap:10px;
+}
+/* The lead spans the full tray width, sitting above its children. */
+.ft-lead { grid-column:1 / -1; }
+/* Children read as delegated: a dashed rail and a touch quieter. */
+.ft-child > .card { border-left-style:dashed; opacity:.95; }
+.floor-tile > .card { flex:1; min-width:0; }
+/* A large tile spans two columns; the browser clamps the span when the board is
+   too narrow to hold two columns, so this is harmless on a docked-inspector squeeze. */
+.floor-tile.size-lg { grid-column:span 2; }
+.floor-tile.size-sm > .card { opacity:0.9; }
+.floor-tile.warmth-hot > .card { border-left-color:var(--status-conflict); box-shadow:0 0 0 1px rgba(240,132,140,0.12); }
+.floor-tile.warmth-warm > .card { border-left-color:var(--status-attention); }
+/* A done (ready-to-review) tile stays in the warm tier (size), but amber is the
+   system's "needs your input / blocked" signal, so keep done on its own green
+   identity. CSS-only accent override; the card already carries lane-done. */
+.floor-tile.warmth-warm > .card.lane-done { border-left-color:var(--status-done); }
+.floor-tile.warmth-live > .card { border-left-color:var(--status-working); }
+.floor-tile.warmth-idle > .card { opacity:0.82; }
+.floor-tile.is-child { margin-left:14px; }
+.floor-tile.is-child > .card { border-left-style:dashed; }
+/* Inside a team tray, members are laid out in their own .ft-body grid tracks, so
+   the lane-style 14px child indent would leave a stray offset; neutralize it so
+   members sit flush in their cells (.ft-child already supplies the dashed rail). */
+.floor-team .floor-tile.is-child { margin-left:0; }
+
 /* ─── Agent card (prototype lines 116-128) ──────────────────────────────────── */
 
 .card {
@@ -299,6 +453,10 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 .card-meta {
   display:flex; align-items:center; gap:8px; flex-wrap:nowrap;
   min-width:0; min-height:18px;
+  /* Defensive backstop: a tight lead-card row (engine + subagents + momentum +
+     elapsed) clips rather than overflowing the card; the momentum chip is the one
+     flexible item, so it sheds first. */
+  overflow:hidden;
 }
 .card .engine {
   background:var(--bg-raised); color:var(--text-secondary);
@@ -322,6 +480,46 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 .card .diffstat .nochange { color:var(--text-tertiary); }
 .card .elapsed { color:#5e5e66; margin-left:auto; font-size:10.5px; font-family:'JetBrains Mono',monospace; flex:0 0 auto; white-space:nowrap; }
 .card .anatomy { color:var(--text-tertiary); font-size:11px; line-height:1.4; }
+
+/* Live-activity tail (M10 Phase B): the last up to 3 streamed lines on a working
+   card, a faint mono preview so a busy agent reads at a glance what it is doing
+   without opening the inspector. Subtle per TOKENS.md (ghost text); each line is
+   clipped to one row so the block stays calm and never grows the card. */
+.card-tail {
+  display:flex; flex-direction:column; gap:1px;
+  overflow:hidden; min-width:0;
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; line-height:1.5;
+  color:#6c6c74;
+}
+.card-tail .tail-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Momentum "growing now" badge (M10 Phase E): a compact diff-growth chip in the
+   meta row, shown ONLY while a working card's diff is changing (the reducer clears
+   momentum when growth stops). It owns its OWN hue and waveform so it never reads
+   as ambient or finished:
+     - Colour is an ACTIVE teal (#5ecfb0), deliberately neither the done-lane /
+       diffstat-adds green (--status-done #7fd9a8) nor the eq-blue, so a chip on a
+       WORKING card cannot be misread as "done/merged" feedback. (>= 4.5:1 on the
+       graphite card bg.)
+     - The bar pulses on its OWN @keyframes momentum-pulse (a centred swell), not
+       the always-on .eq's eqbar, so "alive" and "growing now" stay distinct.
+   Shrink-safe: it sheds its label (ellipsis) under a tight lead-card meta row
+   rather than overflowing. Quiet, on-palette, never loud. */
+@keyframes momentum-pulse { 0%,100% { transform:scaleY(0.5) } 50% { transform:scaleY(1) } }
+.card-momentum {
+  flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  display:inline-flex; align-items:center; gap:3px; white-space:nowrap;
+  font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; letter-spacing:.02em;
+  color:#5ecfb0;
+  background:rgba(94,207,176,.1); border:1px solid rgba(94,207,176,.24);
+  border-radius:5px; padding:0 6px; line-height:1.6;
+}
+.card-momentum i {
+  flex:0 0 auto;
+  width:2px; height:9px; border-radius:1px;
+  background:#5ecfb0; transform-origin:bottom;
+  animation:momentum-pulse .4s ease-in-out infinite;
+}
 
 /* Inline "needs you" question block (prototype line 153) */
 .card-question {
@@ -508,30 +706,63 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
 /* ─── Status bar (prototype lines 198-204) ──────────────────────────────────── */
 
 .status-bar {
-  height:24px; flex:0 0 24px;
+  /* Bumped 24 -> 26px so the layout toggle's tabs (and their focus ring) sit
+     comfortably without crowding the bar. Still subtle. */
+  height:26px; flex:0 0 26px;
   background:#202024; border-top:1px solid var(--border-subtle);
   display:flex; align-items:center; padding:0 12px; gap:16px;
   font-size:11px; color:var(--text-tertiary); font-family:'JetBrains Mono',monospace;
 }
-.status-bar .sb-branch { display:flex; align-items:center; gap:5px; }
+/* The branch chip and the two counters are passive READOUTS, not buttons: a
+   default cursor and no hover so a click never looks like it should do something.
+   The branch reads a touch dimmer; each counter gets a small leading status dot
+   (blue for running, amber for awaiting) reusing the header count language. */
+.status-bar .sb-branch { display:flex; align-items:center; gap:5px; cursor:default; color:var(--text-faint); }
 .status-bar .sb-branch-icon { flex:0 0 auto; }
+.status-bar .sb-running, .status-bar .sb-awaiting { display:inline-flex; align-items:center; gap:5px; cursor:default; }
+.status-bar .sb-dot { width:6px; height:6px; border-radius:50%; flex:0 0 auto; }
+.status-bar .sb-running .sb-dot { background:var(--status-working); }
+.status-bar .sb-awaiting .sb-dot { background:var(--status-attention); }
 .status-bar .sb-awaiting { color:#caa869; }
 .status-bar .sb-version { margin-left:auto; }
 
-/* ─── Drawer (prototype lines 206-337) ──────────────────────────────────────── */
+/* Board-layout toggle: a real segmented control flipping Floor <-> Status. A
+   recessed pill TRACK holds two tabs; the active tab is a clearly RAISED segment
+   (distinct bg + primary text + weight + a teal accent), and the move is animated
+   so toggling is felt. Webview-local state, on-palette. */
+.board-layout-toggle {
+  display:flex; gap:0; align-items:center;
+  background:var(--bg-inset); border:1px solid var(--border-subtle);
+  border-radius:7px; padding:2px;
+}
+.layout-tab {
+  background:transparent; border:none; color:var(--text-tertiary);
+  font:inherit; font-size:11px; cursor:pointer;
+  padding:2px 9px; border-radius:5px;
+  transition:color 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+/* Hover tints the inactive tab's BACKGROUND (not just text) so it reads live. */
+.layout-tab:hover { color:var(--text-secondary); background:rgba(255,255,255,0.04); }
+/* The active segment is raised: a distinct surface, primary text, heavier weight,
+   and a quiet teal accent line, so the selection is unmistakable. */
+.layout-tab.active {
+  color:var(--text-primary); background:var(--bg-raised); font-weight:600;
+  box-shadow:inset 0 0 0 1px var(--border-default), inset 0 -2px 0 var(--green);
+}
+.layout-tab.active:hover { background:var(--bg-raised); }
+.layout-tab:focus, .layout-tab:focus-visible { outline:none; box-shadow:0 0 0 1px var(--status-working); }
 
-/* Scrim behind the drawer: dims the board so the half-covered lane cards read as
-   "behind", and a click closes the drawer (data-action matches the host handler).
-   z-index 50 sits under the drawer (51) but below composer (100) / task (120). */
-.drawer-scrim { position:fixed; inset:0; background:rgba(8,8,10,.5); z-index:50; }
+/* ─── Inspector (prototype lines 206-337) ───────────────────────────────────── */
 
+/* Non-modal, docked inspector: a side column beside the board (#root[data-view=
+   "board"] is a flex row, see top of file). The board keeps its full markup and
+   stays visible, so N agents can be watched while one is focused. No scrim, no
+   overlay: the close button (data-action="close-drawer") is the only close path.
+   A left border divides it from the board; no heavy overlay shadow. */
 .drawer {
-  position:fixed; top:0; right:0;
-  width:42%; max-width:560px; height:100%;
-  z-index:51;
+  flex:0 0 clamp(360px, 38%, 560px); min-width:0; height:100%;
   background:var(--bg-panel);
   border-left:1px solid var(--border-default);
-  box-shadow:-8px 0 24px rgba(0,0,0,.5);
   padding:0; overflow:hidden; box-sizing:border-box;
   display:flex; flex-direction:column;
 }
@@ -587,6 +818,13 @@ body:has(#root[data-view="anatomy"]) { height:100vh; display:flex; flex-directio
   box-sizing:border-box; transition:border-color 120ms ease;
 }
 .drawer-task-input:focus, .drawer-task-input:focus-visible { border-color:#41414a; }
+/* Read-only TASK line for a virtual (delegated) sub-agent: a static panel, not an
+   editable input, so the drawer reads as view-only. */
+.drawer-task-static {
+  width:100%; background:var(--bg-stage); border:1px solid #2a2a30; border-radius:7px;
+  color:#bcbcc4; font-size:12.5px; font-family:inherit; padding:9px 11px;
+  box-sizing:border-box; line-height:1.45;
+}
 
 .drawer .tabs { display:flex; border-bottom:1px solid #2a2a30; flex-shrink:0; padding:0 16px; }
 .drawer .tabs .tab {
@@ -1058,9 +1296,15 @@ button[data-action="stop"]:focus, button[data-action="stop"]:focus-visible {
 .lib-shell-title { font-family:var(--font-display); font-weight:800; font-size:18px; color:var(--text-primary); letter-spacing:-0.01em; }
 .lib-shell-subtitle { font-size:11.5px; color:var(--text-quiet); margin-top:2px; }
 .lib-shell-nav { display:flex; align-items:center; gap:14px; }
-.lib-shell-close { display:flex; align-items:center; gap:7px; background:none; cursor:pointer; color:var(--text-tertiary); font-family:var(--font-body); font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:7px; border:1px solid #2e2e34; transition:color 130ms ease,border-color 130ms ease; }
-.lib-shell-close:hover { color:#d6d6da; border-color:#3a3a42; }
-.lib-shell-close-x { font-size:14px; line-height:1; }
+/* A quiet, borderless ghost close: it sits beside the underline tabs, so a boxed
+   pill read heavier than them and competed for the eye. Now it is a muted control
+   that only lifts a faint rounded background on hover/focus, with the x as the
+   hero. */
+.lib-shell-close { display:flex; align-items:center; gap:6px; background:none; cursor:pointer; color:var(--text-tertiary); font-family:var(--font-body); font-size:12.5px; font-weight:600; padding:6px 10px; border-radius:8px; border:none; transition:color 130ms ease,background 130ms ease; }
+.lib-shell-close:hover { color:var(--text-primary); background:rgba(255,255,255,0.055); }
+.lib-shell-close:focus-visible { outline:none; color:var(--text-primary); background:rgba(255,255,255,0.055); box-shadow:0 0 0 1px var(--border-default); }
+.lib-shell-close-x { font-size:16px; line-height:1; opacity:.85; }
+.lib-shell-close:hover .lib-shell-close-x { opacity:1; }
 
 /* ─── Library tab bar (active-underline) ──────────────────────────────────────
    Uses `.lib-tab` (NOT the board drawer's `.tab`) so the two never collide when
@@ -1899,12 +2143,88 @@ button[data-action="stop"]:focus, button[data-action="stop"]:focus-visible {
 button:disabled, button[disabled] { cursor: not-allowed; opacity: .5; }
 
 /* ── Narrow dock breakpoint ───────────────────────────────────────────────────
-   When the panel is docked narrow, the drawer goes full-width (no scrim needed),
-   the three lane columns stack and scroll vertically, and the two-up grids
-   collapse to a single column so cards stay legible. */
+   Below this width there is no room for the board and a docked inspector side by
+   side, so the inspector takes over the panel full-width (still non-modal: no
+   scrim, the close button is the only close path). The three lane columns stack
+   and scroll vertically, and the two-up grids collapse to a single column. */
 @media (max-width: 560px) {
-  .drawer { width:100%; max-width:none; }
-  .drawer-scrim { display:none; }
+  .drawer {
+    position:fixed; top:0; right:0; z-index:51;
+    flex-basis:auto; width:100%; max-width:none; height:100%;
+  }
   .lanes { flex-direction:column; overflow-y:auto; }
   .skill-grid, .discover-group-cards { grid-template-columns:1fr; }
 }
+
+/* ===========================================================================
+   === HISTORY === (M10 Phase F: in-session activity history)
+   A full-page activity timeline opened from the board [History] button and
+   closed back to the board. Mirrors the review / anatomy full-page shells: a
+   sticky head (back + title) over a scrolling body of newest-first rows.
+   Graphite tokens only; per-kind dots reuse the status palette.
+   =========================================================================== */
+.history {
+  display:flex; flex-direction:column;
+  height:100%; min-height:0;
+  background:var(--bg-page); color:var(--text-primary);
+}
+.history-head {
+  flex:0 0 auto;
+  display:flex; align-items:center; gap:14px;
+  padding:18px 24px;
+  border-bottom:1px solid var(--border-faint);
+}
+.history-close {
+  display:flex; align-items:center; gap:7px;
+  background:none; cursor:pointer; color:var(--text-tertiary);
+  font-family:var(--font-body); font-size:12.5px; font-weight:600;
+  padding:7px 13px; border-radius:7px; border:1px solid #2e2e34;
+  transition:color 130ms ease, border-color 130ms ease;
+}
+.history-close:hover { color:#d6d6da; border-color:#3a3a42; }
+.history-close:focus-visible { outline:none; color:var(--text-primary); border-color:var(--blue); box-shadow:0 0 0 1px var(--blue); }
+.history-title {
+  margin:0;
+  font-family:var(--font-display); font-weight:800; font-size:18px;
+  color:var(--text-primary); letter-spacing:-0.01em;
+}
+
+.history-body { flex:1 1 auto; min-height:0; overflow:auto; padding:10px 16px 18px; }
+.history-empty { color:var(--text-tertiary); padding:22px 24px; font-size:13px; }
+
+.history-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+.history-row { margin:0; padding:0; }
+/* A row cell is either an inert <div> or a focusable <button>; the button chrome
+   is reset to inherit so both read identically. width:100% so the button fills
+   the <li>. The hairline divider lives on the cell and is dropped on the last row. */
+.history-entry {
+  display:flex; align-items:center; gap:11px;
+  width:100%; padding:10px 10px;
+  font:inherit; text-align:left; color:inherit;
+  background:none; border:none; border-bottom:1px solid var(--border-hair);
+}
+.history-row:last-child .history-entry { border-bottom:none; }
+.history-focusable { cursor:pointer; border-radius:7px; transition:background 120ms ease; }
+.history-focusable:hover { background:var(--bg-surface-low); }
+.history-focusable:focus-visible { box-shadow:0 0 0 1px var(--blue) inset; outline:none; }
+
+.history-dot { flex:0 0 auto; width:8px; height:8px; border-radius:2px; background:var(--text-ghost); }
+.history-label {
+  flex:1 1 auto; min-width:0;
+  font-size:12.5px; color:var(--text-secondary);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.history-role {
+  flex:0 0 auto;
+  font-family:var(--font-mono); font-size:10px; font-weight:500;
+  color:var(--text-secondary);
+  background:var(--bg-surface-low); border:1px solid var(--border-default);
+  border-radius:5px; padding:2px 7px;
+}
+.history-time { flex:0 0 auto; font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+
+/* Per-kind accent dots reuse the status palette (subtle, graphite-aligned). */
+.hk-agent-added { background:var(--status-working); }
+.hk-agent-updated { background:var(--status-done); }
+.hk-delegation-proposed { background:var(--status-attention); }
+.hk-delegation-resolved { background:var(--green-deep); }

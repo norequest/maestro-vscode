@@ -74,6 +74,15 @@ describe("buildAgentProfile", () => {
     expect(md).not.toContain("# Task");
     expect(md).not.toContain("review cache.py");
   });
+  it("derives the description past a leading '# Instructions' heading, not the heading itself", () => {
+    const headed: Role = {
+      ...baseRole,
+      instructions: "# Instructions\nYou own ALPHA.md in the repo root and nothing else.",
+    };
+    const md = buildAgentProfile(headed, baseTask);
+    expect(md).toContain('description: "You own ALPHA.md in the repo root and nothing else."');
+    expect(md).not.toContain('description: "# Instructions"');
+  });
   it("emits a tools list only when the role declares grants", () => {
     expect(buildAgentProfile(baseRole, baseTask)).not.toContain("tools:");
     const scoped: Role = { ...baseRole, tools: { builtins: { read: ["Read"], write: ["Edit"] } } };

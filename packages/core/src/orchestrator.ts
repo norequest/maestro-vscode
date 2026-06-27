@@ -1,5 +1,6 @@
 import type { AgentSession, ApprovalDecision, EngineAdapter } from "./adapter.js";
 import { buildLeadBrief, parseDelegateDirectives } from "./delegation.js";
+import { firstMeaningfulLine } from "./text.js";
 import { Emitter } from "./emitter.js";
 import { isDiscardableState, isTerminalState } from "./events.js";
 import type {
@@ -339,6 +340,20 @@ export class Orchestrator {
         // materialization failure is non-fatal; the engine just lacks the files
       }
     }
+    // A stop() can also arrive while the awaits above (preamble resolution,
+    // skill/profile materialization) were in flight: the agent was still
+    // preparing with no session, so stop() could only RECORD the intent (it
+    // cannot call session.stop() on a session that does not exist yet). Re-check
+    // here, the last point before the engine starts, and honor that Stop: do NOT
+    // start the engine, finish in "stopped", and release the slot this launch
+    // consumed. Mirrors the post-create check above; the worktree is left on disk
+    // (as that check does) so a later resume can reuse it.
+    if (this.stopping.has(agent.id)) {
+      this.stopping.delete(agent.id);
+      this.update(agent, "stopped");
+      this.release();
+      return;
+    }
     this.update(agent, "working");
     agent.engineCapabilities = {
       approvals: adapter.capabilities.approvals,
@@ -488,9 +503,14 @@ export class Orchestrator {
       autonomy: "manual",
     };
     const id = this.idGen();
+    // Sanitize the reported description: the engine echoes the teammate's
+    // `.agent.md` description, which can be a bare markdown heading like
+    // "# Instructions". Strip leading heading/blank lines; fall back to the
+    // name when nothing meaningful remains, so a heading never becomes the task.
+    const meaningful = description ? firstMeaningfulLine(description) : "";
     const task: Task = {
       id: `task-${id}`,
-      description: description ?? name,
+      description: meaningful || name,
       roleName: name,
     };
     const child: Agent = {
@@ -953,5 +973,27 @@ export class Orchestrator {
     const agent = this.agents.get(agentId);
     if (!agent) throw new Error(`Unknown agent: ${agentId}`);
     return agent;
+  }
+
+  /**
+   * Stop EVERY live engine session, best-effort. Called on extension teardown
+   * (window reload, disable, quit) so in-flight CLI children (copilot/gemini) are
+   * killed instead of orphaned: an orphaned child keeps burning tokens and keeps
+   * mutating its worktree, and the next activation can only relabel it "detached".
+   *
+   * Iterates a SNAPSHOT of the sessions map and signals each session.stop(),
+   * swallowing per-session errors so one engine's failing kill never blocks the
+   * rest. State/slot bookkeeping is intentionally left to each session's own
+   * consume() loop (or, after a reload, to hydrate(), which relabels survivors
+   * "detached"); on teardown the host is going away, so doing more here is moot.
+   */
+  stopAll(): void {
+    for (const session of [...this.sessions.values()]) {
+      try {
+        session.stop();
+      } catch {
+        // best-effort: a failing stop must not block stopping the rest
+      }
+    }
   }
 }

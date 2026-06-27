@@ -9,6 +9,10 @@ import type { ChildHandle } from "./types.js";
  *  tail without letting an unbounded child flood memory. */
 const STDERR_RING_BYTES = 8 * 1024;
 
+/** Grace period after SIGTERM before escalating to SIGKILL. Exported so the
+ *  escalation is testable with fake timers without duplicating the magic number. */
+export const COPILOT_KILL_GRACE_MS = 2000;
+
 export interface CopilotSessionOptions {
   /** Wire format Copilot streams on stdout. Defaults to `"text"` (v1 behavior).
    *  In `"json"` mode each complete line is parsed as JSON and mapped to a
@@ -34,6 +38,10 @@ export class CopilotSession implements AgentSession {
    *  toolCallIds belong to sub-agents so later output is attributed correctly
    *  (the lead's own narration stays top-level). */
   private readonly fleetParser = new FleetLineParser();
+  /** Set the moment the child emits close/error, independent of `settled`, so a
+   *  pending SIGKILL escalation can be cancelled even after stop(). */
+  private childExited = false;
+  private killTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly child: ChildHandle,
@@ -57,8 +65,14 @@ export class CopilotSession implements AgentSession {
     this.child.stderr.on("data", (chunk) => {
       this.appendStderr(this.decode(chunk));
     });
-    this.child.on("error", (err) => this.fail(`Failed to run copilot: ${err.message}`));
+    this.child.on("error", (err) => {
+      this.childExited = true;
+      this.clearKillTimer();
+      this.fail(`Failed to run copilot: ${err.message}`);
+    });
     this.child.on("close", (code) => {
+      this.childExited = true;
+      this.clearKillTimer();
       if (this.settled) return;
       this.settled = true;
       this.flushStdoutTail();
@@ -176,11 +190,39 @@ export class CopilotSession implements AgentSession {
   stop(): void {
     if (this.settled) return;
     this.settled = true;
+    this.killWithEscalation();
+    this.queue.end();
+  }
+
+  /**
+   * Send SIGTERM, then arm a grace timer; if the child has not emitted
+   * close/error by then it is ignoring SIGTERM (and still mutating the worktree),
+   * so escalate to SIGKILL. The timer is cleared the moment the child exits.
+   */
+  private killWithEscalation(): void {
     try {
       this.child.kill("SIGTERM");
     } catch {
-      /* already exited */
+      return; // already exited
     }
-    this.queue.end();
+    if (this.childExited) return;
+    this.killTimer = setTimeout(() => {
+      this.killTimer = undefined;
+      if (this.childExited) return;
+      try {
+        this.child.kill("SIGKILL");
+      } catch {
+        /* exited in the grace window */
+      }
+    }, COPILOT_KILL_GRACE_MS);
+    // Do not let a pending escalation keep the event loop alive.
+    (this.killTimer as { unref?: () => void }).unref?.();
+  }
+
+  private clearKillTimer(): void {
+    if (this.killTimer !== undefined) {
+      clearTimeout(this.killTimer);
+      this.killTimer = undefined;
+    }
   }
 }

@@ -3,9 +3,25 @@ import { AsyncMessageQueue } from "./async-queue.js";
 import { parseAcpLine } from "./messages.js";
 import type { AcpMessage, AcpTransport, AcpTransportFn } from "./types.js";
 
+/** Keep at most the last ~8 KB of stderr so a failing run yields a diagnostic
+ *  tail without letting a chatty child flood memory. Mirrors the copilot adapter. */
+const STDERR_RING_BYTES = 8 * 1024;
+
+/** Grace period after SIGTERM before escalating to SIGKILL. Exported so the
+ *  escalation is testable with fake timers without duplicating the magic number. */
+export const ACP_KILL_GRACE_MS = 2000;
+
 /** Minimal handle over a spawned child. Node's ChildProcess satisfies this. */
 export interface AcpChildHandle {
   readonly stdout: {
+    on(event: "data", listener: (chunk: Buffer | string) => void): void;
+  };
+  /**
+   * The child's stderr. Optional only so pre-existing fakes that never produce
+   * stderr keep compiling; a real piped child always has it, and when present it
+   * MUST be drained or the OS pipe buffer fills and the child deadlocks.
+   */
+  readonly stderr?: {
     on(event: "data", listener: (chunk: Buffer | string) => void): void;
   };
   readonly stdin: {
@@ -21,6 +37,12 @@ export class ProcessAcpTransport implements AcpTransport {
   private readonly queue = new AsyncMessageQueue<AcpMessage>();
   private settled = false;
   private buffer = "";
+  /** Bounded tail of stderr, surfaced on the exit/error path for diagnostics. */
+  private stderrTail = "";
+  /** Set the moment the child emits close/error, independent of `settled`, so a
+   *  pending SIGKILL escalation can be cancelled even after terminate(). */
+  private childExited = false;
+  private killTimer?: ReturnType<typeof setTimeout>;
 
   constructor(private readonly child: AcpChildHandle) {
     child.stdout.on("data", (chunk) => {
@@ -35,14 +57,26 @@ export class ProcessAcpTransport implements AcpTransport {
         if (msg !== null) this.queue.push(msg);
       }
     });
+    // Drain stderr into a bounded ring. Without this a chatty engine fills the
+    // ~64 KB OS pipe buffer, blocks on its next write, stops emitting stdout, and
+    // the transport's 'close' never fires (a stuck `working` card forever).
+    child.stderr?.on("data", (chunk) => this.appendStderr(chunk.toString()));
     child.on("error", (err) => {
+      this.childExited = true;
+      this.clearKillTimer();
       if (this.settled) return;
       this.settled = true;
       this.flushBuffer();
-      this.queue.push({ jsonrpc: "2.0", method: "error", params: { message: err.message } });
+      this.queue.push({
+        jsonrpc: "2.0",
+        method: "error",
+        params: { message: this.withStderr(err.message) },
+      });
       this.queue.end();
     });
     child.on("close", (code) => {
+      this.childExited = true;
+      this.clearKillTimer();
       if (this.settled) return;
       this.settled = true;
       this.flushBuffer();
@@ -50,11 +84,33 @@ export class ProcessAcpTransport implements AcpTransport {
         this.queue.push({
           jsonrpc: "2.0",
           method: "error",
-          params: { message: `acp process exited with code ${code ?? "unknown"}` },
+          params: {
+            message: this.withStderr(`acp process exited with code ${code ?? "unknown"}`),
+          },
         });
       }
       this.queue.end();
     });
+  }
+
+  private appendStderr(text: string): void {
+    this.stderrTail += text;
+    if (this.stderrTail.length > STDERR_RING_BYTES) {
+      this.stderrTail = this.stderrTail.slice(-STDERR_RING_BYTES);
+    }
+  }
+
+  /** Append the captured stderr tail (if any) to a base error message. */
+  private withStderr(message: string): string {
+    const tail = this.stderrTail.trim();
+    return tail ? `${message}: ${tail}` : message;
+  }
+
+  private clearKillTimer(): void {
+    if (this.killTimer !== undefined) {
+      clearTimeout(this.killTimer);
+      this.killTimer = undefined;
+    }
   }
 
   /**
@@ -82,12 +138,33 @@ export class ProcessAcpTransport implements AcpTransport {
   terminate(): void {
     if (this.settled) return;
     this.settled = true;
+    this.killWithEscalation();
+    this.queue.end();
+  }
+
+  /**
+   * Send SIGTERM, then arm a grace timer; if the child has not emitted
+   * close/error by then it is ignoring SIGTERM (and still mutating the worktree),
+   * so escalate to SIGKILL. The timer is cleared the moment the child exits.
+   */
+  private killWithEscalation(): void {
     try {
       this.child.kill("SIGTERM");
     } catch {
-      /* already exited */
+      return; // already exited
     }
-    this.queue.end();
+    if (this.childExited) return;
+    this.killTimer = setTimeout(() => {
+      this.killTimer = undefined;
+      if (this.childExited) return;
+      try {
+        this.child.kill("SIGKILL");
+      } catch {
+        /* exited in the grace window */
+      }
+    }, ACP_KILL_GRACE_MS);
+    // Do not let a pending escalation keep the event loop alive.
+    (this.killTimer as { unref?: () => void }).unref?.();
   }
 }
 

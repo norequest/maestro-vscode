@@ -310,4 +310,34 @@ describe("createDiscoverController", () => {
     expect(sources).toContain(item1.source);
     expect(sources).toContain(item2.source);
   });
+
+  // 12. resolveSource: a scanned local-path itemId resolves to a file open target.
+  // This is the seam the host's "Browse" button uses (it then turns it into a Uri).
+  it("resolveSource returns the cached source flagged as a file for a scanned local path", async () => {
+    const item = makeItem({ source: "/repo/.github/agents/alpha.agent.md" });
+    const deps = makeDeps({ scanWorkspace: vi.fn(async () => makeDiscoverResult([item])) });
+    const ctrl = createDiscoverController(deps);
+    await ctrl.handle({ type: "scan-repo" });
+
+    expect(ctrl.resolveSource(item.source)).toEqual({ source: item.source, kind: "file" });
+  });
+
+  // 13. resolveSource: an http(s) source is flagged as a url (host parses instead of file://).
+  it("resolveSource flags an http(s) source as a url", async () => {
+    const item = makeItem({ source: "https://example.com/agents/remote.agent.md" });
+    const deps = makeDeps({ scanWorkspace: vi.fn(async () => makeDiscoverResult([item])) });
+    const ctrl = createDiscoverController(deps);
+    await ctrl.handle({ type: "scan-repo" });
+
+    expect(ctrl.resolveSource(item.source)).toEqual({ source: item.source, kind: "url" });
+  });
+
+  // 14. resolveSource: an id NOT in the scan cache resolves to undefined, so the host
+  // opens nothing (and never opens an arbitrary path a stale/tampered webview posts).
+  it("resolveSource returns undefined for an id not in the cache", () => {
+    const deps = makeDeps();
+    const ctrl = createDiscoverController(deps);
+
+    expect(ctrl.resolveSource("/no/such/item.md")).toBeUndefined();
+  });
 });

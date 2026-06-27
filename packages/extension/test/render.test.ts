@@ -157,7 +157,7 @@ describe("renderBoard", () => {
       card({ id: "c1", lane: "conflict", state: "conflict", attention: true }),
       card({ id: "d1", lane: "done", state: "merged" }),
     ];
-    const html = renderBoard({ cards, delegations: [] });
+    const html = renderBoard({ cards, delegations: [] }, { groupByStatus: true });
     // The three board columns.
     expect(html).toContain("Working");
     expect(html).toContain("Needs you");
@@ -180,8 +180,8 @@ describe("renderBoard", () => {
     expect(html).toContain("New task");
     expect(html).toContain('data-action="new-task"');
     expect(html).toContain('class="status-bar"');
-    // Status bar derives "N running" from the working count.
-    expect(html).toMatch(/sb-running">1 running/);
+    // Status bar derives "N running" from the working count (passive readout dot).
+    expect(html).toMatch(/sb-running"><span class="sb-dot"><\/span>1 running/);
   });
   it("opens the Library from the single header button (no duplicate nav)", () => {
     const html = renderBoard({ cards: [], delegations: [] });
@@ -193,13 +193,14 @@ describe("renderBoard", () => {
   it("shows a 'Clear all' button in the Done lane header when it has cards", () => {
     const html = renderBoard(
       board({ cards: [card({ id: "d1", lane: "done", state: "done", diff: { files: ["a.ts"], patch: "P" } })] }),
+      { groupByStatus: true },
     );
     expect(html).toContain('class="lane-clear"');
     expect(html).toContain('data-action="clear-done-lane"');
     expect(html).toContain("Clear all");
   });
   it("omits 'Clear all' when the Done lane is empty", () => {
-    const html = renderBoard(board({ cards: [card({ id: "w1", lane: "working" })] }));
+    const html = renderBoard(board({ cards: [card({ id: "w1", lane: "working" })] }), { groupByStatus: true });
     expect(html).not.toContain('class="lane-clear"');
     expect(html).not.toContain('data-action="clear-done-lane"');
   });
@@ -212,6 +213,7 @@ describe("renderBoard", () => {
           card({ id: "d1", lane: "done", state: "done", diff: { files: ["a.ts"], patch: "P" } }),
         ],
       }),
+      { groupByStatus: true },
     );
     // Exactly one Clear all affordance, in the Done column.
     const clears = html.match(/data-action="clear-done-lane"/g) ?? [];
@@ -219,11 +221,11 @@ describe("renderBoard", () => {
     expect(html).toMatch(/lane-col-done[\s\S]*?lane-clear/);
   });
   it("renders empty columns as a quiet placeholder, never a hard border", () => {
-    const html = renderBoard({ cards: [card({ lane: "working" })], delegations: [] });
+    const html = renderBoard({ cards: [card({ lane: "working" })], delegations: [] }, { groupByStatus: true });
     expect(html).toContain('class="lane-empty"');
   });
   it("gives each empty column its own copy (Needs-you uses no em dash)", () => {
-    const html = renderBoard({ cards: [], delegations: [] });
+    const html = renderBoard({ cards: [], delegations: [] }, { groupByStatus: true });
     expect(html).toContain("No agents working");
     expect(html).toContain("Nothing needs you right now.");
     expect(html).toContain("Nothing merged yet");
@@ -233,8 +235,8 @@ describe("renderBoard", () => {
   it("status bar shows a branch icon before main and the running/awaiting counts", () => {
     const html = renderBoard({ cards: [card({ lane: "working" }), card({ lane: "needsYou", state: "done", attention: true })], delegations: [] });
     expect(html).toContain('class="sb-branch-icon"');
-    expect(html).toMatch(/sb-running">1 running/);
-    expect(html).toMatch(/sb-awaiting">1 awaiting review/);
+    expect(html).toMatch(/sb-running"><span class="sb-dot"><\/span>1 running/);
+    expect(html).toMatch(/sb-awaiting"><span class="sb-dot"><\/span>1 awaiting review/);
   });
 
   // ─── Lead-coordinated teams: pending delegation proposals ─────────────────
@@ -294,6 +296,7 @@ describe("renderBoard", () => {
           card({ id: "child1", roleName: "Coder", parentId: "lead1" }),
         ],
       }),
+      { groupByStatus: true },
     );
     expect(html).toContain('class="via"');
     expect(html).toContain("via Lead");
@@ -348,6 +351,7 @@ describe("renderBoard", () => {
           card({ id: "kid2", roleName: "Tester", lane: "working", parentId: "lead1" }),
         ],
       }),
+      { groupByStatus: true },
     );
     const lead = html.indexOf('data-id="lead1"');
     const kid1 = html.indexOf('data-id="kid1"');
@@ -378,13 +382,14 @@ describe("renderBoard", () => {
           card({ id: "kid1", roleName: "Coder", lane: "working", parentId: "lead1" }),
         ],
       }),
+      { groupByStatus: true },
     );
     expect(html).toContain("1 sub-agent");
     expect(html).not.toContain("1 sub-agents");
   });
 
   it("adds NO sub-agents affordance to a plain card with no children", () => {
-    const html = renderBoard(board({ cards: [card({ id: "solo", lane: "working" })] }));
+    const html = renderBoard(board({ cards: [card({ id: "solo", lane: "working" })] }), { groupByStatus: true });
     expect(html).not.toContain('class="subagents"');
   });
 
@@ -397,6 +402,7 @@ describe("renderBoard", () => {
           card({ id: "kid1", roleName: "Coder", lane: "needsYou", state: "awaiting-approval", attention: true, parentId: "lead1" }),
         ],
       }),
+      { groupByStatus: true },
     );
     // The cross-lane child is NOT dropped.
     const kid1 = html.indexOf('data-id="kid1"');
@@ -442,6 +448,7 @@ describe("renderBoard", () => {
           card({ id: "sub1", roleName: "Coder", lane: "working", parentId: "lead1", virtual: true }),
         ],
       }),
+      { groupByStatus: true },
     );
     const sub = html.indexOf('data-id="sub1"');
     const openTag = html.slice(html.lastIndexOf("<section", sub), html.indexOf(">", sub));
@@ -470,11 +477,13 @@ describe("renderDrawer", () => {
   it("is empty when nothing is focused (board stays full-width)", () => {
     expect(renderDrawer({ cards: [card()], delegations: [] })).toBe("");
   });
-  it("emits a click-to-close scrim immediately before the drawer panel", () => {
+  it("docks as a non-modal inspector: no full-screen scrim, close via the header button", () => {
     const html = renderDrawer({ cards: [card({ id: "a1" })], focusedId: "a1", delegations: [] });
-    // The scrim dims the board behind the drawer and routes clicks to close-drawer.
-    expect(html).toContain('<div class="drawer-scrim" data-action="close-drawer"></div>');
-    expect(html.indexOf('class="drawer-scrim"')).toBeLessThan(html.indexOf('class="drawer"'));
+    // The inspector docks beside the board (no modal scrim dimming/hiding it), so
+    // the header close button is the close path and still posts close-drawer.
+    expect(html).not.toContain("drawer-scrim");
+    expect(html).toContain('class="drawer"');
+    expect(html).toContain('class="drawer-close" data-action="close-drawer"');
   });
   it("renders Instructions / Output / Diff tabs for the focused card", () => {
     const html = renderDrawer({ cards: [card({ id: "a1" })], focusedId: "a1", delegations: [] });
@@ -569,6 +578,46 @@ describe("renderDrawer", () => {
     const html = renderDrawer({ cards: [card({ id: "a1", taskDescription: '"><img src=x>' })], focusedId: "a1", delegations: [] });
     expect(html).not.toContain('value=""><img src=x>');
     expect(html).toContain("&lt;img");
+  });
+  it("a virtual sub-agent with a heading-like task renders a NON-editable TASK with a Delegated-by placeholder", () => {
+    const html = renderDrawer({
+      cards: [
+        card({ id: "lead1", roleName: "Fleet Lead", lane: "working" }),
+        card({ id: "sub1", roleName: "Coder", parentId: "lead1", taskDescription: "# Instructions", virtual: true }),
+      ],
+      focusedId: "sub1",
+      delegations: [],
+    });
+    // Read-only sub-agents get no editable task input/handler.
+    expect(html).not.toContain('data-action="edit-task"');
+    expect(html).not.toContain('class="drawer-task-input"');
+    // The heading-like task is replaced by a clear stand-in naming the lead role.
+    expect(html).toContain("Delegated by Fleet Lead");
+    expect(html).not.toContain("# Instructions");
+  });
+  it("a virtual sub-agent with no parent falls back to 'Delegated by lead'", () => {
+    const html = renderDrawer({
+      cards: [card({ id: "sub1", roleName: "Coder", taskDescription: "", virtual: true })],
+      focusedId: "sub1",
+      delegations: [],
+    });
+    expect(html).not.toContain('data-action="edit-task"');
+    expect(html).toContain("Delegated by lead");
+  });
+  it("a virtual sub-agent with a real (non-heading) task shows it statically, never as an editable input", () => {
+    const html = renderDrawer({
+      cards: [card({ id: "sub1", roleName: "Coder", taskDescription: "wire the parser", virtual: true })],
+      focusedId: "sub1",
+      delegations: [],
+    });
+    expect(html).not.toContain('data-action="edit-task"');
+    expect(html).not.toContain('class="drawer-task-input"');
+    expect(html).toContain("wire the parser");
+  });
+  it("a NON-virtual card still renders the editable TASK input (the static treatment is virtual-only)", () => {
+    const html = renderDrawer({ cards: [card({ id: "a1", taskDescription: "wire the router" })], focusedId: "a1", delegations: [] });
+    expect(html).toContain('data-action="edit-task"');
+    expect(html).toContain('class="drawer-task-input"');
   });
   it("working footer offers a Pause toggle, Stop, and (when steerable) Steer", () => {
     const html = renderDrawer({ cards: [card({ id: "a1", state: "working", engineCapabilities: steerable })], focusedId: "a1", delegations: [] });

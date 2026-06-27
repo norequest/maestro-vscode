@@ -1,7 +1,7 @@
 /**
  * Single-page app protocol: the merged webview<->host vocabulary for the future
  * one-page webview that replaces the three separate panels (Board/Stage, Library,
- * Anatomy) and the Review panel.
+ * Anatomy), the Review panel, and the in-session History tab.
  *
  * This module is PURELY ADDITIVE. It does not redefine any existing message; it
  * unions the three host-bound protocols and their host->webview counterparts so a
@@ -38,7 +38,7 @@ import type { HostToReview } from "./review-render.js";
 // ─── Navigation ────────────────────────────────────────────────────────────────
 
 /** Which surface the single-page app is currently showing. */
-export type AppView = "board" | "library" | "anatomy" | "review";
+export type AppView = "board" | "library" | "anatomy" | "review" | "history";
 
 /**
  * Host -> webview navigation message. New to the single-page app: tells the

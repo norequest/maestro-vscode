@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { isWebviewMessage } from "@hallucinate/cockpit";
 import { isLibraryMessage } from "../src/library-protocol.js";
 import { isAnatomyMessage } from "../src/anatomy-protocol.js";
-import { isAppMessage, type HostToApp, type OpenTaskComposerMessage } from "../src/app-protocol.js";
+import {
+  isAppMessage,
+  type AppView,
+  type HostToApp,
+  type OpenTaskComposerMessage,
+} from "../src/app-protocol.js";
 
 describe("isAppMessage", () => {
   // ─── accepts a representative of EACH host-bound protocol ───────────────────
@@ -161,5 +166,16 @@ describe("OpenTaskComposerMessage shape", () => {
     expect(
       isOpenTaskComposer({ type: "open-task-composer", teams: [{ name: "dev" }] })
     ).toBe(false);
+  });
+});
+
+// ─── AppView surfaces ──────────────────────────────────────────────────────────
+// The router mounts one of a fixed set of surfaces. The in-session History tab
+// (M10 Phase F) is one of them, so the AppView union must admit "history".
+
+describe("AppView union", () => {
+  it("admits the in-session history surface", () => {
+    const v: AppView = "history";
+    expect(v).toBe("history");
   });
 });

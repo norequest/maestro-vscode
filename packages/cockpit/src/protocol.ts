@@ -12,6 +12,12 @@ export interface CardVM {
   state: AgentState;
   /** Capped, accumulated `output` text the engine streamed. */
   output: string;
+  /**
+   * The last up to 3 non-empty lines of `output`, derived in the reducer for
+   * the live activity preview on the card. Bounded by construction (at most 3
+   * lines); empty when there is no output yet.
+   */
+  tail?: string[];
   summary?: string;
   diff?: Diff;
   diffError?: string;
@@ -28,6 +34,13 @@ export interface CardVM {
    * detached, merge-cleanup-failed.
    */
   attention: boolean;
+  /**
+   * Unix ms when this card first entered an attention state (per
+   * `stateNeedsAttention`); preserved across updates while it stays in
+   * attention, cleared when it leaves. Orders the attention queue (oldest
+   * waiting first) and drives a "waiting" hint. Undefined when not waiting.
+   */
+  needsYouSince?: number;
   /** Which lane on the Board this card belongs to. */
   lane: Lane;
   /** The active task's description text. */
@@ -38,6 +51,16 @@ export interface CardVM {
   goal?: string;
   /** Counts of added/deleted lines in the diff patch, excluding file headers. */
   diffStat?: { adds: number; dels: number };
+  /**
+   * Diff GROWTH on the most recent update: the non-negative delta of `diffStat`
+   * versus the previous card, with `at` (Unix ms) marking when it was observed.
+   * SET when the diff grew on this update; CLEARED (undefined) on an update where
+   * it did not grow, so a present `momentum` reads as "growing right now". An
+   * `agent-event` output tick does not recompute the card, so momentum persists
+   * between successive diff updates. The Floor renders a faint eqbar-style
+   * "growing" pulse on a working card while momentum is set.
+   */
+  momentum?: { adds: number; dels: number; at: number };
   /** Unix ms timestamp of the first time this card entered "working" state. */
   startedAt?: number;
   /** P4 anatomy: whether a Soul is attached (false when no soul). */
@@ -70,12 +93,150 @@ export interface DelegationVM {
   task: string;
 }
 
+/**
+ * One item in the attention queue: an agent that needs a human decision now.
+ * The attention bar shows one of these at a time (most-urgent first) and reuses
+ * existing messages (`focus` to jump; approve / resolve-conflict / open-review
+ * to act). No new host message is introduced.
+ */
+export interface AttentionVM {
+  /** The agent id; the bar reuses `focus` to jump to it. */
+  id: string;
+  roleName: string;
+  /** The agent's state, used to choose the inline primary action. */
+  state: AgentState;
+  /**
+   * The kind of attention, for the bar's label and primary action:
+   * approval -> awaiting-approval, conflict -> conflict, review -> done,
+   * error -> error, detached -> detached, cleanup -> merge-cleanup-failed.
+   */
+  kind: "approval" | "conflict" | "review" | "error" | "detached" | "cleanup";
+  /** For approvals: the pending approval id (to post approve / deny). */
+  pendingApprovalId?: string;
+  /** For approvals: human-readable detail of what is being approved. */
+  approvalDetail?: ApprovalDetail;
+  /** Unix ms the agent entered attention; for a "waiting" hint. */
+  since?: number;
+}
+
+/** A Floor tile's relative prominence: large (attention), medium (working), small (idle). */
+export type TileSize = "lg" | "md" | "sm";
+
+/**
+ * A Floor tile's "warmth" (how much it wants your eyes), derived purely from the
+ * agent's state:
+ *   hot  -> an urgent problem (conflict, error, merge-cleanup-failed),
+ *   warm -> waiting on you (awaiting-approval, detached, done/ready-to-review),
+ *   live -> actively progressing (working, preparing),
+ *   idle -> quiet (stopped).
+ * The CSS maps each to an accent so a busy Floor reads at a glance.
+ */
+export type TileWarmth = "hot" | "warm" | "live" | "idle";
+
+/**
+ * One tile on the Floor: a presentation projection over a CardVM. Carries only
+ * the card id plus its derived size + warmth + child flag, so the Floor payload
+ * stays lean (the full card is resolved from `CockpitState.cards` by id at render
+ * time, never duplicated here). `child` is true for a delegated sub-agent, which
+ * the Floor renders nested under its lead. Produced by `selectFloor`,
+ * salience-ordered (most-urgent first), each lead immediately followed by its
+ * children.
+ */
+export interface FloorTileVM {
+  /** The agent id; the card is resolved from CockpitState.cards. */
+  id: string;
+  size: TileSize;
+  warmth: TileWarmth;
+  /** True for a delegated child tile, rendered nested under its lead. */
+  child: boolean;
+}
+
+/**
+ * One lead-coordinated team: a lead agent and the ids of its delegated children
+ * (cards whose `parentId` is the lead). Id-based (cards resolved from
+ * `CockpitState.cards`), so the grouping is lean. Produced by `selectTeams`,
+ * which emits a group only for leads that actually have children. The Floor
+ * renders each team as a labeled "tray" that visually encloses the lead and its
+ * children as one unit; the header fields below populate that tray's header.
+ *
+ * The header fields are OPTIONAL on the type so the contract can land before
+ * `selectTeams` populates them, but `selectTeams` sets all of them in practice;
+ * render treats a missing field defensively.
+ */
+export interface TeamGroupVM {
+  /** The lead agent id. */
+  leadId: string;
+  /** Child agent ids (parentId === leadId), in id order. */
+  memberIds: string[];
+  /** The lead's role label, shown as the tray's title. */
+  leadRoleName?: string;
+  /** The lead's engine id (e.g. "copilot-fleet"), shown faint in the tray header. */
+  leadEngineId?: string;
+  /** Rolled-up one-line status across the lead and its members, e.g. "2 ready to review". */
+  statusLabel?: string;
+  /** Most-urgent warmth across the lead and its members; drives the header status dot. */
+  tone?: TileWarmth;
+  /**
+   * A stable hue (0-359) derived deterministically from `leadId`, for a subtle
+   * team-identity accent on the tray header. Same team always gets the same hue;
+   * it is an identity cue, never a status signal (status stays on `tone`).
+   */
+  hue?: number;
+}
+
+/**
+ * One entry in the in-session activity history: a single orchestrator event the
+ * reducer folded, projected to a render-ready one-liner. The history is a bounded
+ * ring (oldest dropped past the cap) and is surfaced newest-first by
+ * `selectHistory`. In-session ONLY: it is rebuilt from the live event stream,
+ * never persisted; replaying a prior session's on-disk log is deferred. Lean and
+ * id-based (the agent, if any, is resolved from `CockpitState.cards`).
+ */
+export interface HistoryEntryVM {
+  /** Monotonic fold index (also a stable render key); rises by one per recorded event. */
+  seq: number;
+  /** Unix ms when the event was folded. */
+  at: number;
+  /** The orchestrator event kind, for a per-kind icon/accent (e.g. "agent-updated"). */
+  kind: string;
+  /** A short human one-liner for the timeline row (the render layer escapes it). */
+  label: string;
+  /** The agent the entry concerns, when applicable, for a focus jump back to the board. */
+  agentId?: string;
+  /** The agent's role label, when resolvable, for display. */
+  roleName?: string;
+}
+
 /** The whole cockpit, a pure function of orchestrator events. `cards` are pre-ordered. */
 export interface CockpitState {
   cards: CardVM[];
   focusedId?: string;
   /** Pending delegation proposals, in arrival order. Resolved ones are dropped. */
   delegations: DelegationVM[];
+  /**
+   * The attention queue: agents needing a human decision, most-urgent first
+   * (conflict before approval; oldest `needsYouSince` wins ties). The webview's
+   * attention bar shows one at a time with an "n of m" counter. Omitted/empty
+   * when nothing needs you.
+   */
+  attention?: AttentionVM[];
+  /**
+   * The Floor layout: salience-ordered tiles (size + warmth) over `cards`, with
+   * children nested under leads. The default board layout; the "Status" toggle
+   * falls back to the lane columns. Omitted/empty before any agent exists.
+   */
+  floor?: FloorTileVM[];
+  /**
+   * Lead-coordinated teams: each lead with its delegated children, for nesting
+   * and (Phase E) connectors. Omitted/empty when no delegation has occurred.
+   */
+  teams?: TeamGroupVM[];
+  /**
+   * In-session activity history: a bounded, newest-first list of folded
+   * orchestrator events for the History tab. In-session only (rebuilt from the
+   * live stream, never persisted). Omitted/empty before any event is recorded.
+   */
+  history?: HistoryEntryVM[];
 }
 
 /** Messages the extension host sends INTO the webview. */

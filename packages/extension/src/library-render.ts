@@ -19,7 +19,7 @@ const TAB_LABELS: Record<LibraryTab, string> = {
   discover: "Discover",
 };
 
-const TAB_ORDER: readonly LibraryTab[] = ["agents", "teams", "skills", "discover"];
+const TAB_ORDER: readonly LibraryTab[] = ["teams", "agents", "skills", "discover"];
 
 /**
  * Renders the four-tab navigation bar, marking `activeTab` with the

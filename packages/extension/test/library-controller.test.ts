@@ -93,11 +93,11 @@ describe("createLibrary", () => {
     expect(snaps.at(-1)!.skills.length).toBeGreaterThan(0);
   });
 
-  it("the open snapshot has tab 'agents' by default", async () => {
+  it("the open snapshot has tab 'teams' by default", async () => {
     const snaps: LibrarySnapshot[] = [];
     const gw = fakeGateway();
     await openLibrary(gw, snaps);
-    expect(snaps.at(-1)!.tab).toBe("agents");
+    expect(snaps.at(-1)!.tab).toBe("teams");
   });
 
   it("switch-library-tab pushes a snapshot with the new tab", async () => {

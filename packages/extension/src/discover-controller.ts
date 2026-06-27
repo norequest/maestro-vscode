@@ -48,6 +48,15 @@ export function createDiscoverController(deps: DiscoverDeps): {
   handle(
     msg: Extract<LibraryToHost, { type: "scan-repo" | "scan-plugins" | "adopt-agent" | "adopt-skill" | "browse-source" }>
   ): Promise<void>;
+  /**
+   * Resolve a discovered item's id (its `source`) to an open target for the
+   * host's "Browse" action. Returns the cached source plus whether it is a URL or
+   * a local path, or undefined when the id is not in the scan cache. Looking the
+   * id up in the cache (rather than trusting the raw id) means the host never
+   * opens an arbitrary path a stale/tampered webview posts. Pure: no vscode, so
+   * the host turns the result into a Uri.
+   */
+  resolveSource(itemId: string): { source: string; kind: "file" | "url" } | undefined;
 } {
   /** Merged cache of all scanned items, keyed by item.source. */
   const cache = new Map<string, DiscoveredItem>();
@@ -80,6 +89,15 @@ export function createDiscoverController(deps: DiscoverDeps): {
       upstreamSha: await deps.headSha(),
       adoptedAt: deps.now(),
     };
+  }
+
+  function resolveSource(itemId: string): { source: string; kind: "file" | "url" } | undefined {
+    const item = cache.get(itemId);
+    if (!item) return undefined;
+    // Sources are local paths today (absolute or repo-relative); an http(s) source
+    // is flagged as a URL so the host parses it rather than wrapping it as a file path.
+    const kind = /^https?:\/\//i.test(item.source) ? "url" : "file";
+    return { source: item.source, kind };
   }
 
   async function handle(
@@ -137,7 +155,11 @@ export function createDiscoverController(deps: DiscoverDeps): {
       }
 
       case "browse-source": {
-        // Handled by the extension layer via a separate vscode.open call.
+        // No-op here by design: opening a source needs vscode (env.openExternal),
+        // which this pure controller must not import. The extension host intercepts
+        // "browse-source" in its onDiscover wrapper and calls resolveSource() to turn
+        // the itemId into a Uri it can open. Reaching this case means the message was
+        // not intercepted; there is nothing to do without vscode.
         return;
       }
 
@@ -150,5 +172,5 @@ export function createDiscoverController(deps: DiscoverDeps): {
     }
   }
 
-  return { handle };
+  return { handle, resolveSource };
 }

@@ -19,7 +19,10 @@ import type {
 } from "@hallucinate/cockpit";
 import { buildDispatchMessage, canDispatch, ENGINE_FAMILIES } from "@hallucinate/cockpit";
 import type { Autonomy } from "@hallucinate/core";
-import { renderBoard, renderDrawer } from "../render.js";
+import { renderBoard, renderDrawer, renderAttentionBar } from "../render.js";
+import { renderHistory } from "../render-history.js";
+import { nextAttentionIndex } from "../attention-cycle.js";
+import { nextIndexForRender, historyChanged, historySignature } from "../render-gate.js";
 import { renderComposerHTML } from "../render-composer.js";
 import {
   renderLibraryHeader,
@@ -76,6 +79,23 @@ let lastComposerOptions: ComposerOptions | undefined;
 // drawer the user explicitly closed (so the next state tick does not re-open it).
 let drawerTab = "instructions";
 let closedDrawerId: string | null = null;
+// Attention bar: which queue item the bar currently shows. Advanced by the
+// auto-advance ticker (tickAttention) which re-renders ONLY the bar. PRESERVED
+// across board re-renders while the queue is unchanged (lastAttentionSig), so a
+// streaming agent's output ticks do not snap it back to index 0 (regression A).
+let attentionIndex = 0;
+// Signature of the attention queue the bar's index was last rendered for. A
+// matching signature on the next board render means the queue is unchanged, so
+// attentionIndex is kept (clamped); a differing one resets it to 0.
+let lastAttentionSig: string | undefined;
+// Signature of the in-session history the History view was last rendered for.
+// Lets the live `state` listener skip rebuilding the timeline on output ticks
+// (which record no history entry), preserving keyboard focus (regression B).
+let lastHistorySig: string | undefined;
+// Board layout: the Floor (size+warmth tiles) is the default; the status bar's
+// "Status" toggle flips this to the lane columns. Webview-local only (no host
+// round-trip), so a layout choice survives every `state` re-render.
+let groupByStatus = false;
 
 // Library.
 let libraryTab: LibraryTab = "agents";
@@ -129,6 +149,9 @@ function render(): void {
     case "review":
       renderReviewView();
       break;
+    case "history":
+      renderHistoryView();
+      break;
     default: {
       const _exhaustive: never = view;
       void _exhaustive;
@@ -139,9 +162,24 @@ function render(): void {
 
 function renderBoardView(): void {
   if (!root) return;
+  // renderBoard hardcodes the attention bar at index 0, but a streaming agent
+  // posts `state` continuously, so resetting the ticker's index here would snap
+  // the bar back to item 1 on every output tick and the auto-advance would never
+  // run (regression A). Preserve the index while the attention queue is unchanged
+  // (matching signature, clamped to length); only a real queue change resets it.
+  const attentionQueue = lastCockpit.attention ?? [];
+  const nextAttention = nextIndexForRender(attentionIndex, lastAttentionSig, attentionQueue);
+  attentionIndex = nextAttention.index;
+  lastAttentionSig = nextAttention.signature;
   // The board shell (tab strip + header + empty lanes + status bar) always
   // renders so "+ New agent" stays reachable even with zero agents.
-  root.innerHTML = `${renderBoard(lastCockpit)}${renderDrawer(lastCockpit)}`;
+  root.innerHTML = `${renderBoard(lastCockpit, { groupByStatus })}${renderDrawer(lastCockpit)}`;
+  // renderBoard emitted the bar at index 0; swap in the preserved index when it
+  // is non-zero (same bar-only re-render tickAttention does, no full re-render).
+  if (attentionIndex !== 0) {
+    const bar = root.querySelector<HTMLElement>(".attention-bar");
+    if (bar) bar.outerHTML = renderAttentionBar(attentionQueue, attentionIndex);
+  }
   tickElapsed();
   // The drawer is re-rendered from state every tick (a streaming agent posts
   // `state` continuously). Re-apply the user's client-only drawer choices so a
@@ -149,7 +187,6 @@ function renderBoardView(): void {
   if (closedDrawerId !== null && lastCockpit.focusedId === closedDrawerId) {
     // The user closed THIS exact drawer; keep it shut despite the re-render.
     root.querySelector(".drawer")?.remove();
-    root.querySelector(".drawer-scrim")?.remove();
   } else if (closedDrawerId !== null) {
     // Focus moved to a different card (or cleared): the suppression no longer
     // applies, so let the freshly rendered drawer stand.
@@ -274,6 +311,37 @@ function renderReviewView(): void {
   }
   const parsed = parseUnifiedDiff(lastReviewCard.diff?.patch ?? "");
   root.innerHTML = renderReviewBody(lastReviewCard, parsed, lastReviewOpts);
+}
+
+/**
+ * The in-session History tab. A full-page view rendered from the ALREADY-CACHED
+ * board state (lastCockpit): no new host message and no host fetch. Because the
+ * timeline is derived from the live cockpit state, the `state` listener re-renders
+ * this view too so new events stream in while it is open.
+ *
+ * Two pieces of DOM glue keep the streamed re-render calm. Scroll is preserved
+ * across the innerHTML swap (mirrors renderAnatomyView) so a new event never yanks
+ * the operator. And the pure render's `.history-time[data-at]` timestamps are
+ * formatted here (render stays pure; formatting is DOM glue). A static HH:MM is
+ * enough, so no repeating ticker is needed.
+ */
+function renderHistoryView(): void {
+  if (!root) return;
+  const bodyScroll = root.querySelector<HTMLElement>(".history-body")?.scrollTop ?? 0;
+  root.innerHTML = renderHistory(lastCockpit);
+  // Record what we just rendered so the live `state` listener can skip redundant
+  // re-renders (regression B): an output tick adds no history entry, so an
+  // unchanged signature means there is nothing new to show and focus is kept.
+  lastHistorySig = historySignature(lastCockpit.history ?? []);
+  // Format the captured timestamps (render stays pure; formatting is DOM glue).
+  root.querySelectorAll<HTMLElement>(".history-time[data-at]").forEach((el) => {
+    const ms = Number(el.dataset["at"]);
+    if (Number.isFinite(ms) && ms > 0) {
+      el.textContent = new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+  });
+  const nextBody = root.querySelector<HTMLElement>(".history-body");
+  if (nextBody) nextBody.scrollTop = bodyScroll;
 }
 
 // ─── Board: composer overlay helpers (ported from main.ts) ──────────────────────
@@ -610,6 +678,34 @@ function tickElapsed(): void {
 
 setInterval(tickElapsed, 1000);
 
+/**
+ * Auto-advance the attention bar through its queue. Like `tickElapsed`, this
+ * mutates ONLY the bar's DOM (replaces the `.attention-bar` element via
+ * `renderAttentionBar`), never the whole board, so the user's drawer / scroll /
+ * composer state is untouched. It advances only when there is more than one item
+ * and the user is not reading: PAUSE while the pointer hovers the bar, or while
+ * an agent's inspector/drawer is open (an agent is focused).
+ */
+function tickAttention(): void {
+  if (view !== "board") return;
+  const bar = document.querySelector<HTMLElement>(".attention-bar");
+  if (!bar) return;
+  const queue = lastCockpit.attention ?? [];
+  if (queue.length <= 1) return;
+  // Respect reduced-motion: a JS-driven content swap bypasses CSS media rules,
+  // so freeze on the most-urgent item for users who opt out of motion.
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  // Pause: pointer over the bar, keyboard focus inside it (rotating would yank
+  // focus mid-action), or the focused-agent inspector is open.
+  if (bar.matches(":hover")) return;
+  if (bar.contains(document.activeElement)) return;
+  if (document.querySelector(".drawer")) return;
+  attentionIndex = nextAttentionIndex(attentionIndex, queue.length);
+  bar.outerHTML = renderAttentionBar(queue, attentionIndex);
+}
+
+setInterval(tickAttention, 4500);
+
 // ─── Navigation ──────────────────────────────────────────────────────────────
 
 /** Switch views, closing any body-mounted overlay first so it never strands
@@ -650,7 +746,17 @@ window.addEventListener("message", (e: MessageEvent<HostToApp>) => {
   switch (data.type) {
     case "state":
       lastCockpit = data.state;
-      if (view === "board") render();
+      // Keep the live views fresh as events stream in, but skip redundant work.
+      // The board always re-renders (cards/floor/drawer move with the stream),
+      // with the attention index preserved inside renderBoardView (regression A).
+      // The History view re-renders ONLY when the timeline actually changed: an
+      // output tick records no history entry, so rebuilding the list would throw
+      // keyboard focus off the focused entry on every tick (regression B).
+      if (view === "board") {
+        render();
+      } else if (view === "history" && historyChanged(lastHistorySig, lastCockpit.history ?? [])) {
+        render();
+      }
       break;
     case "composer-options":
       // Opening the dispatch modal is a board affordance; jump to the board.
@@ -821,6 +927,46 @@ document.addEventListener("keydown", (e) => {
   if (view === "review") {
     backToBoard();
   }
+
+  // (4) Full-page history: Escape is the keyboard twin of the close button, so the
+  // user is never stranded off the Board (mirrors the review branch).
+  if (view === "history") {
+    backToBoard();
+  }
+});
+
+/**
+ * Flip the board layout between the Floor and the status lane columns (webview-
+ * local: no host round-trip). The already-active layout is a no-op; a REAL flip
+ * re-renders and plays the board enter animation so the change reads as
+ * deliberate. Shared by the status-bar toggle click and its arrow-key nav.
+ */
+function setBoardLayout(next: boolean): void {
+  if (next === groupByStatus) return;
+  groupByStatus = next;
+  render();
+  root?.querySelector<HTMLElement>(".floor, .lanes")?.classList.add("hallucinate-enter");
+}
+
+// Roving arrow-key navigation for the board-layout segmented control (a
+// radiogroup, board only). Left/Up select the first option (Floor), Right/Down
+// the second (Status); selection moves and focus follows it (the active tab
+// carries tabindex=0). Scoped to a focused toggle tab so it never hijacks other
+// arrow-key use on the board.
+document.addEventListener("keydown", (e) => {
+  if (view !== "board") return;
+  if (!(e.target instanceof HTMLElement)) return;
+  if (!e.target.closest(".board-layout-toggle")) return;
+  let next: boolean;
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = true; // Status
+  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = false; // Floor
+  else return;
+  e.preventDefault();
+  setBoardLayout(next);
+  // Move focus onto the now-active tab (roving tabindex put tabindex=0 on it).
+  root
+    ?.querySelector<HTMLElement>(`.layout-tab[data-layout="${next ? "status" : "floor"}"]`)
+    ?.focus();
 });
 
 // ─── Click delegation (branches on `view` FIRST) ───────────────────────────────
@@ -848,6 +994,9 @@ document.addEventListener("click", (e) => {
       break;
     case "review":
       handleReviewClick(target);
+      break;
+    case "history":
+      handleHistoryClick(target);
       break;
   }
 });
@@ -927,6 +1076,15 @@ function handleBoardClick(target: HTMLElement): void {
     return;
   }
 
+  // [History] button: open the in-session History tab. The timeline reads the
+  // already-cached lastCockpit, so this is webview-local (NO host post, no fetch).
+  // It carries no data-id, so it must be handled BEFORE the id-bound branch below
+  // (which early-returns on a missing data-id).
+  if (target.closest<HTMLElement>('[data-action="open-history"]')) {
+    setView("history");
+    return;
+  }
+
   // Drawer tab switching.
   const tabBtn = target.closest<HTMLElement>(".tab[data-tab]");
   if (tabBtn) {
@@ -945,15 +1103,15 @@ function handleBoardClick(target: HTMLElement): void {
     return;
   }
 
-  // close-drawer (the × button OR the scrim, both carry data-action="close-drawer").
+  // close-drawer (the × header button carries data-action="close-drawer"). The
+  // docked inspector has no scrim, so the header button is the only close path.
   const closeBtn = target.closest<HTMLElement>('[data-action="close-drawer"]');
   if (closeBtn) {
     // Record which drawer the user closed so the next `state` tick (which re-adds
-    // the drawer from state.focusedId) keeps it shut. Remove both the drawer and
-    // its scrim sibling. Reset the tab so a later re-open starts on the default.
+    // the drawer from state.focusedId) keeps it shut. Remove the docked drawer.
+    // Reset the tab so a later re-open starts on the default.
     closedDrawerId = lastCockpit.focusedId ?? null;
     document.querySelector(".drawer")?.remove();
-    document.querySelector(".drawer-scrim")?.remove();
     drawerTab = "instructions";
     return;
   }
@@ -964,6 +1122,17 @@ function handleBoardClick(target: HTMLElement): void {
   // confirms (destructive) then discards each done agent.
   if (target.closest<HTMLElement>('[data-action="clear-done-lane"]')) {
     vscode.postMessage({ type: "clear-done-lane" });
+    return;
+  }
+
+  // Board-layout toggle (status bar): Floor vs Status. Webview-local (no host
+  // message), and it carries NO data-id, so it is handled BEFORE the id-bound
+  // branch below (which early-returns on a missing data-id). Re-render only when
+  // the layout actually changes, and play the board enter animation on the new
+  // layout so the flip reads as deliberate (the already-active tab is a no-op).
+  const layoutBtn = target.closest<HTMLElement>('[data-action="set-board-layout"]');
+  if (layoutBtn) {
+    setBoardLayout(layoutBtn.dataset["layout"] === "status");
     return;
   }
 
@@ -1009,6 +1178,13 @@ function handleBoardClick(target: HTMLElement): void {
       // In-page review: ask the host for the card; it replies with review-state,
       // which flips the view. Post the same open-review message as before.
       vscode.postMessage({ type: "open-review", agentId: id });
+    } else if (action === "focus") {
+      // The attention bar's label jumps to the agent, reusing the same focus
+      // path a card click uses: open its inspector fresh (clear the close
+      // suppression, reset to the default tab).
+      closedDrawerId = null;
+      drawerTab = "instructions";
+      vscode.postMessage({ type: "focus", agentId: id });
     } else if (action === "approve-delegation") {
       // `id` here is the DELEGATION id (not an agent id): the lead asked to bring
       // a teammate in; approving spawns it host-side.
@@ -1508,7 +1684,11 @@ function handleReviewClick(target: HTMLElement): void {
   if (action === "merge") {
     vscode.postMessage({ type: "merge", agentId: id });
   } else if (action === "discard") {
+    // Discard always removes the card, so leave the full-page review immediately
+    // for instant feedback (mirrors resume below); the host also navigates back
+    // when the card resolves away, as a safety net for the async/Merge path.
     vscode.postMessage({ type: "discard", agentId: id });
+    backToBoard();
   } else if (action === "resume") {
     // Resume a stopped agent in its worktree (sendBack verb, empty feedback).
     vscode.postMessage({ type: "sendBack", agentId: id, feedback: "" });
@@ -1531,6 +1711,33 @@ function handleReviewClick(target: HTMLElement): void {
       vscode.postMessage({ type: "sendBack", agentId: id, feedback: text });
       if (textarea) textarea.value = "";
     }
+  }
+}
+
+// ─── History click delegation ──────────────────────────────────────────────────
+
+/**
+ * Clicks inside the in-session History tab. The close button returns to the
+ * board; a focusable timeline entry focuses its agent on the board, reusing the
+ * SAME focus path a card click uses (clear the close suppression, reset to the
+ * default drawer tab). Tolerant when no entry carries a data-id.
+ */
+function handleHistoryClick(target: HTMLElement): void {
+  // Close: back to the board.
+  if (target.closest<HTMLElement>('[data-action="close-history"]')) {
+    backToBoard();
+    return;
+  }
+
+  // A focusable timeline entry: focus its agent on the board. Match whichever
+  // element carries the data-id (an explicit focus action or a history entry).
+  const entry = target.closest<HTMLElement>('[data-action="focus"], .history-entry[data-id]');
+  const id = entry?.dataset["id"];
+  if (id) {
+    backToBoard();
+    closedDrawerId = null;
+    drawerTab = "instructions";
+    vscode.postMessage({ type: "focus", agentId: id });
   }
 }
 

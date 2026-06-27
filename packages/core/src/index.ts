@@ -12,6 +12,7 @@ export { FakeWorkspaceProvider, FakeWorkspaceManager, isWorkspaceManager } from 
 export type { WorkspaceProvider, WorkspaceManager } from "./workspace.js";
 export * from "./compose.js";
 export * from "./tools-select.js";
+export { firstMeaningfulLine } from "./text.js";
 export {
   DELEGATE_FENCE,
   parseDelegateDirectives,

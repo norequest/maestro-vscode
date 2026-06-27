@@ -80,6 +80,11 @@ describe("renderTabBar", () => {
     const html = renderTabBar("agents");
     expect(html).toMatch(/class="[^"]*active[^"]*"[^>]*data-tab="agents"|data-tab="agents"[^>]*class="[^"]*active/);
   });
+
+  it("renders Teams first, before Agents", () => {
+    const html = renderTabBar("teams");
+    expect(html.indexOf('data-tab="teams"')).toBeLessThan(html.indexOf('data-tab="agents"'));
+  });
 });
 
 // ─── renderSkillCard ──────────────────────────────────────────────────────────

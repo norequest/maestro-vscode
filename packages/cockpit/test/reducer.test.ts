@@ -235,4 +235,18 @@ describe("reduce", () => {
     const plain = reduce(initialModel(), added(agent({ id: "p1" }))).cards.get("p1")!;
     expect(plain.virtual).toBeUndefined();
   });
+
+  it("an unknown event kind is a runtime no-op (default exhaustiveness guard): folds without throwing or mutating", () => {
+    let m = reduce(initialModel(), added(agent()));
+    m = reduce(m, out("a1", "some output\n"));
+    // A kind outside the OrchestratorEvent union should never reach the reducer at
+    // runtime (the never guard makes a new kind a compile error), but if one slips
+    // through it must be ignored: no throw, cards/delegations/history untouched.
+    const unknown = { kind: "unknown-future-kind" } as unknown as OrchestratorEvent;
+    const after = reduce(m, unknown);
+    expect(after.cards.get("a1")!.output).toBe("some output\n");
+    expect(after.cards.size).toBe(m.cards.size);
+    expect(after.delegations.size).toBe(m.delegations.size);
+    expect(after.history).toEqual(m.history);
+  });
 });
